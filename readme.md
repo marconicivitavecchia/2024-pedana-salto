@@ -117,7 +117,7 @@ $$Code = \frac{2^{23}}{2} \cdot \left(\frac{V_+}{V_{REF}} - 1\right) + 2^{22}$$
 
 Se poi si aggiunge pure un guadagno di due si potrebbero sfruttare tutte le divisioni consentite dall'ADC:
 
-Formula modificata con guadagno G:
+Formula modificata con guadagno G=2:
 
 $$Code = G \cdot 2^{23} \cdot \left(\frac{V_+}{V_{REF}} - 1\right) + 2^{23}$$
 
