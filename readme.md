@@ -129,12 +129,14 @@ $$Code = G \cdot 2^{23} \cdot \left(\frac{V_+}{V_{REF}} - 1\right) + 2^{23}$$
 | Vref | $G \cdot 2^{23} \cdot \left(\frac{V_{REF}}{V_{REF}} - 1\right) + 2^{23}$ |  0 + 8.388.608$ | 8.388.608 | 0x800000 |
 | 0 | $G \cdot 2^{23} \cdot \left(\frac{0}{V_{REF}} - 1\right) + 2^{23}$ |  -8.388.608 + 8.388.608$ | 0 | 0x000000 |
 
-Per una cella tipica:
+## Dimensionamento di una singola cella
+
+Per una tipica cella:
 - Alimentazione: 5V
 - Sensibilità: 2mV/V dove V sono i volt di alimentazione
 - Carico nominale: 100kg
 
-Se supponiamo una alimentazione di 5V:
+Se supponiamo una alimentazione di 5V il massimo dell'escursione di peso vale in volt:
 
 Signal_max = 5V * (2mV/V) = 10mV a fondo scala
 
