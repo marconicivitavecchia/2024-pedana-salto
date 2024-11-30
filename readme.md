@@ -153,7 +153,7 @@ Quindi con sensibilità 2mV/V e Vcc=5V:
 -	Output cella a fondo scala = 5V * 2mV/V = 10mV
 -	Range ADC = ±2.5V
 -	Guadagno teorico = 2.5V/10mV = 250
--	
+
 Ma ADS1256 offre solo guadagni: 1,2,4,8,16,32,64
 
 In questo caso si sceglierebbe G=64 come massimo disponibile, e si compenserà via software la differenza rimanente nella calibrazione.
