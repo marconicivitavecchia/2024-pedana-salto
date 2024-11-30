@@ -86,6 +86,8 @@ Dove:
 
 ## Formula ADS1256 consigliata per ingressi single ended (non duali)
 
+<img src="ads1256_single_ended.png" alt="alt text" width="600">
+
 Il codice di uscita dell'ADS1256 è dato da:
 
 $$Code = 2^{23}\cdot \frac{(V_+ - V_-)}{2V_{REF}} = \frac{2^{23}}{2} \cdot \left(\frac{V_+}{V_{REF}} - 1\right)$$
