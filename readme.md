@@ -197,6 +197,8 @@ Confrontando:
 - ADS1256: ±0.0015% FSR (worst case)
 La non linearità dell'ADC è circa 20 volte migliore della cella di carico, quindi praticamente trascurabile nel budget di errore complessivo del sistema. Il fattore limitante è decisamente la cella di carico.
 
+<img src="img/bridge_config.png" alt="alt text" width="1000">
+
 <img src="img/four_bridges.png" alt="alt text" width="1000">
 
 
