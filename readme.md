@@ -88,7 +88,7 @@ Dove:
 
 Il codice di uscita dell'ADS1256 è dato da:
 
-$$Code = 2^{23} \cdot \frac{(V_+ - V_{REF})}{2V_{REF}}$$ = 2^{23}\frac{2} \cdot (\frac{(V_+}{V_{REF}} - 1)}$$
+$$Code = 2^{23} \cdot \frac{(V_+ - V_{REF})}{2V_{REF}} = 2^{23}\frac{2} \cdot (\frac{(V_+}{V_{REF}} - 1)}$$
 
 Dove:
 - $V_+$ è la tensione sull'ingresso positivo
