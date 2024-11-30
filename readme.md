@@ -84,6 +84,18 @@ Dove:
 - $V_{REF}$ è la tensione di riferimento
 - $2^{23}$ rappresenta metà della risoluzione totale (24 bit)
 
+## Formula ADS1256 consigliata per ingressi single ended (non duali)
+
+Il codice di uscita dell'ADS1256 è dato da:
+
+$$Code = 2^{23} \cdot \frac{(V_+ - V_{REF})}{2V_{REF}}$$
+
+Dove:
+- $V_+$ è la tensione sull'ingresso positivo
+- $V_-$ è la tensione sull'ingresso negativo
+- $V_{REF}$ è la tensione di riferimento
+- $2^{23}$ rappresenta metà della risoluzione totale (24 bit)
+
 Per una cella tipica:
 - Alimentazione: 5V
 - Sensibilità: 2mV/V dove V sono i volt di alimentazione
