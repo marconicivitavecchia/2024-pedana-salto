@@ -2,6 +2,52 @@
 
 Il calcolo teorico è molto diretto:
 
+# Specifiche Cella di Carico YZC-516C
+
+## Capacità e Range
+- Range disponibili: 0.1, 0.2, 0.3, 0.5, 1, 2 tonnellate
+
+## Specifiche Elettriche
+- Tensione di uscita: 2.0±0.05 mV/V
+- Resistenza di ingresso: 365±5 Ω
+- Resistenza di uscita: 350±3 Ω
+- Resistenza di isolamento: >5000 MΩ/50V
+- Tensione di eccitazione raccomandata: 5~12V
+
+## Prestazioni e Precisione
+- Classe di precisione: C2
+- Errore combinato: ≤ ±0.030
+- Creep: 0.02
+- Effetto temperatura su sensibilità: 0.0017 %RO/°C
+- Effetto temperatura su zero: 0.005 %RO/°C
+- Bilanciamento zero: ±1.0 %RO
+
+## Range di Temperatura
+- Range temperatura compensata: -10~+40°C
+- Range temperatura operativa: -30~+80°C
+
+## Sovraccarichi
+- Sovraccarico di sicurezza: 150% RO
+- Sovraccarico ultimo: 200% RO
+
+## Specifiche Meccaniche
+- Materiale: Lega di acciaio
+- Cavo: Schermato Ø5.0X3.5m
+
+## Dimensioni
+| Capacità    | B (mm) | D          |
+|-------------|--------|------------|
+| 100-300kg   | 19.05  | M12x1.75   |
+| 500kg       | 25.4   | M12x1.75   |
+| 1t-2t       | 25.4   | M16x2      |
+
+## Caratteristiche Speciali
+- Alta resistenza all'acqua
+- Cavo schermato standard
+- Connessione aerea su richiesta
+
+## Calcolo del guadagno
+
 Per una cella tipica:
 - Alimentazione: 5V
 - Sensibilità: 2mV/V
