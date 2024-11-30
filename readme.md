@@ -86,7 +86,7 @@ Dove:
 
 ## Formula ADS1256 consigliata per ingressi single ended (non duali)
 
-<img src="ads1256_single_ended.png" alt="alt text" width="600">
+<img src="img/ads1256_single_ended.png" alt="alt text" width="600">
 
 Il codice di uscita dell'ADS1256 è dato da:
 
