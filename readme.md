@@ -117,14 +117,15 @@ $$Code = \frac{2^{23}}{2} \cdot \left(\frac{V_+}{V_{REF}} - 1\right) + 2^{22}$$
 
 Se poi si aggiunge pure un guadagno di due si potrebbero sfruttare tutte le divisioni consentite dall'ADC:
 
-# Formula modificata:
-$$Code = 2^{23} \cdot \left(\frac{V_+}{V_{REF}} - 1\right) + 2^{23}$$
+Formula modificata con guadagno G:
 
-| V+ Input | Formula | Calcolo | Codice Decimale | Codice Hex |
+$$Code = G \cdot \left(2^{23} \cdot \left(\frac{V_+}{V_{REF}} - 1\right) + 2^{23}\right)$$
+
+| V+ Input | Formula | Calcolo | Codice Decimale (G=1) | Codice Hex |
 |----------|---------|---------|-----------------|------------|
-| 2Vref | $2^{23} \cdot \left(\frac{2V_{REF}}{V_{REF}} - 1\right) + 2^{23}$ | $8.388.608 + 8.388.608$ | 16.777.216 | 0x1000000 |
-| Vref | $2^{23} \cdot \left(\frac{V_{REF}}{V_{REF}} - 1\right) + 2^{23}$ | $0 + 8.388.608$ | 8.388.608 | 0x800000 |
-| 0 | $2^{23} \cdot \left(\frac{0}{V_{REF}} - 1\right) + 2^{23}$ | $-8.388.608 + 8.388.608$ | 0 | 0x000000 |
+| 2Vref | $G \cdot \left(2^{23} \cdot \left(\frac{2V_{REF}}{V_{REF}} - 1\right) + 2^{23}\right)$ | $G \cdot (8.388.608 + 8.388.608)$ | 16.777.216 | 0x1000000 |
+| Vref | $G \cdot \left(2^{23} \cdot \left(\frac{V_{REF}}{V_{REF}} - 1\right) + 2^{23}\right)$ | $G \cdot (0 + 8.388.608)$ | 8.388.608 | 0x800000 |
+| 0 | $G \cdot \left(2^{23} \cdot \left(\frac{0}{V_{REF}} - 1\right) + 2^{23}\right)$ | $G \cdot (-8.388.608 + 8.388.608)$ | 0 | 0x000000 |
 
 
 Per una cella tipica:
