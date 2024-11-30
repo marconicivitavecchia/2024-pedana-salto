@@ -105,14 +105,26 @@ Dove:
 
 Per ovviare al risultato indesiderato di avere un valore negativo a fronte di un ingresso positivo possiamo sommare 2^23 al risultato finale:
 
-# Formula con 2^23 sommato alla fine:
-$$Code = \frac{2^{23}}{2} \cdot \left(\frac{V_+}{V_{REF}} - 1\right) + 2^{23}$$
+Formula con 2^22 sommato alla fine:
+
+Mi scuso per l'errore! Hai ragione, rifacciamo i calcoli:
+
+```markdown
+# Formula con 2^22 sommato alla fine:
+$$Code = \frac{2^{23}}{2} \cdot \left(\frac{V_+}{V_{REF}} - 1\right) + 2^{22}$$
 
 | V+ Input | Formula | Calcolo | Codice Decimale | Codice Hex |
 |----------|---------|---------|-----------------|------------|
-| 2Vref | $\frac{2^{23}}{2} \cdot \left(\frac{2V_{REF}}{V_{REF}} - 1\right) + 2^{23}$ | $4.194.304 + 8.388.608$ | 12.582.912 | 0xC00000 |
-| Vref | $\frac{2^{23}}{2} \cdot \left(\frac{V_{REF}}{V_{REF}} - 1\right) + 2^{23}$ | $0 + 8.388.608$ | 8.388.608 | 0x800000 |
-| 0 | $\frac{2^{23}}{2} \cdot \left(\frac{0}{V_{REF}} - 1\right) + 2^{23}$ | $-4.194.304 + 8.388.608$ | 4.194.304 | 0x400000 |
+| 2Vref | $\frac{2^{23}}{2} \cdot \left(\frac{2V_{REF}}{V_{REF}} - 1\right) + 2^{22}$ | $4.194.304 + 4.194.304$ | 8.388.608 | 0x800000 |
+| Vref | $\frac{2^{23}}{2} \cdot \left(\frac{V_{REF}}{V_{REF}} - 1\right) + 2^{22}$ | $0 + 4.194.304$ | 4.194.304 | 0x400000 |
+| 0 | $\frac{2^{23}}{2} \cdot \left(\frac{0}{V_{REF}} - 1\right) + 2^{22}$ | $-4.194.304 + 4.194.304$ | 0 | 0x000000 |
+```
+
+Verifiche:
+- 2^22 = 4.194.304 (corretto!)
+- Per 2Vref: 4.194.304 + 4.194.304 = 8.388.608
+- Per Vref: 0 + 4.194.304 = 4.194.304
+- Per 0: -4.194.304 + 4.194.304 = 0
 
 Per una cella tipica:
 - Alimentazione: 5V
