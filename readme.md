@@ -125,7 +125,7 @@ $$Code = G \cdot 2^{23} \cdot \left(\frac{V_+}{V_{REF}} - 1\right) + 2^{23}$$
 |----------|---------|---------|-----------------|------------|
 | 2Vref | $G \cdot 2^{23} \cdot \left(\frac{2V_{REF}}{V_{REF}} - 1\right) + 2^{23}$ |  8.388.608 + 8.388.608$ | 16.777.216 | 0x1000000 |
 | Vref | $G \cdot 2^{23} \cdot \left(\frac{V_{REF}}{V_{REF}} - 1\right) + 2^{23}$ |  0 + 8.388.608$ | 8.388.608 | 0x800000 |
-| 0 | $G \cdot 2^{23} \cdot \left(\frac{0}{V_{REF}} - 1\right) + 2^{23}$ |  (-8.388.608) + 8.388.608$ | 0 | 0x000000 |
+| 0 | $G \cdot 2^{23} \cdot \left(\frac{0}{V_{REF}} - 1\right) + 2^{23}$ |  -8.388.608 + 8.388.608$ | 0 | 0x000000 |
 
 Per una cella tipica:
 - Alimentazione: 5V
