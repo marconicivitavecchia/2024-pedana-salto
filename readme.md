@@ -103,6 +103,16 @@ Dove:
 | Vref | $\frac{2^{23}}{2} \cdot \left(\frac{V_{REF}}{V_{REF}} - 1\right)$ | $\frac{2^{23}}{2} \cdot (1-1) = 0$ | 0 | 0x000000 |
 | 0 | $\frac{2^{23}}{2} \cdot \left(\frac{0}{V_{REF}} - 1\right)$ | $\frac{2^{23}}{2} \cdot (0-1) = -\frac{2^{23}}{2}$ | -4.194.304 | 0xC00000 |
 
+Per ovviare al risultato indesiderato di avere un valore negativo a fronte di un ingresso positivo possiamo sommare 2^23 al risultato finale:
+
+# Formula con 2^23 sommato alla fine:
+$$Code = \frac{2^{23}}{2} \cdot \left(\frac{V_+}{V_{REF}} - 1\right) + 2^{23}$$
+
+| V+ Input | Formula | Calcolo | Codice Decimale | Codice Hex |
+|----------|---------|---------|-----------------|------------|
+| 2Vref | $\frac{2^{23}}{2} \cdot \left(\frac{2V_{REF}}{V_{REF}} - 1\right) + 2^{23}$ | $4.194.304 + 8.388.608$ | 12.582.912 | 0xC00000 |
+| Vref | $\frac{2^{23}}{2} \cdot \left(\frac{V_{REF}}{V_{REF}} - 1\right) + 2^{23}$ | $0 + 8.388.608$ | 8.388.608 | 0x800000 |
+| 0 | $\frac{2^{23}}{2} \cdot \left(\frac{0}{V_{REF}} - 1\right) + 2^{23}$ | $-4.194.304 + 8.388.608$ | 4.194.304 | 0x400000 |
 
 Per una cella tipica:
 - Alimentazione: 5V
