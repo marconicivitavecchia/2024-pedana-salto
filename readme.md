@@ -107,7 +107,6 @@ Per ovviare al risultato indesiderato di avere un valore negativo a fronte di un
 
 Formula con 2^22 sommato alla fine:
 
-# Formula con 2^22 sommato alla fine:
 $$Code = \frac{2^{23}}{2} \cdot \left(\frac{V_+}{V_{REF}} - 1\right) + 2^{22}$$
 
 | V+ Input | Formula | Calcolo | Codice Decimale | Codice Hex |
@@ -115,6 +114,18 @@ $$Code = \frac{2^{23}}{2} \cdot \left(\frac{V_+}{V_{REF}} - 1\right) + 2^{22}$$
 | 2Vref | $\frac{2^{23}}{2} \cdot \left(\frac{2V_{REF}}{V_{REF}} - 1\right) + 2^{22}$ | $4.194.304 + 4.194.304$ | 8.388.608 | 0x800000 |
 | Vref | $\frac{2^{23}}{2} \cdot \left(\frac{V_{REF}}{V_{REF}} - 1\right) + 2^{22}$ | $0 + 4.194.304$ | 4.194.304 | 0x400000 |
 | 0 | $\frac{2^{23}}{2} \cdot \left(\frac{0}{V_{REF}} - 1\right) + 2^{22}$ | $-4.194.304 + 4.194.304$ | 0 | 0x000000 |
+
+Se poi si aggiunge pure un guadagno di due si potrebbero sfruttare tutte le divisioni consentite dall'ADC:
+
+# Formula modificata:
+$$Code = 2^{23} \cdot \left(\frac{V_+}{V_{REF}} - 1\right) + 2^{23}$$
+
+| V+ Input | Formula | Calcolo | Codice Decimale | Codice Hex |
+|----------|---------|---------|-----------------|------------|
+| 2Vref | $2^{23} \cdot \left(\frac{2V_{REF}}{V_{REF}} - 1\right) + 2^{23}$ | $8.388.608 + 8.388.608$ | 16.777.216 | 0x1000000 |
+| Vref | $2^{23} \cdot \left(\frac{V_{REF}}{V_{REF}} - 1\right) + 2^{23}$ | $0 + 8.388.608$ | 8.388.608 | 0x800000 |
+| 0 | $2^{23} \cdot \left(\frac{0}{V_{REF}} - 1\right) + 2^{23}$ | $-8.388.608 + 8.388.608$ | 0 | 0x000000 |
+
 
 Per una cella tipica:
 - Alimentazione: 5V
