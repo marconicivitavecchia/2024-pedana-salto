@@ -1,8 +1,4 @@
-## CALCOLO DEL GUADAGNO DELL’ADC
-
-Il calcolo teorico è molto diretto:
-
-# Specifiche Cella di Carico YZC-516C
+## Specifiche Cella di Carico YZC-516C
 
 ## Capacità e Range
 - Range disponibili: 0.1, 0.2, 0.3, 0.5, 1, 2 tonnellate
@@ -46,16 +42,46 @@ Il calcolo teorico è molto diretto:
 - Cavo schermato standard
 - Connessione aerea su richiesta
 
-## Calcolo del guadagno
+## ADS1256 - Specifiche Tecniche
+
+### Caratteristiche Principali
+- Risoluzione: 24 bit
+- Velocità di campionamento massima: 30 ksps
+- Canali di ingresso: 8
+- Interfaccia: SPI
+- Architettura: Delta-Sigma
+- Rating: Catalog
+
+### Configurazione Ingressi
+- Tipo: Differenziale o Single-ended
+- Configurazione multicanale: Multiplexata
+- Range tensione di ingresso: 0V - 5.25V
+- Modalità di riferimento: Esterna
+
+### Alimentazione
+- Consumo tipico: 36 mW
+- Alimentazione analogica: 4.75V - 5.25V
+- Alimentazione digitale: 1.8V - 3.6V
+
+### Caratteristiche Operative
+- Range temperatura operativa: -40°C a +85°C
+- Caratteristiche speciali:
+  - Reiezione 50/60 Hz
+  - GPIO
+  - PGA (Amplificatore a Guadagno Programmabile)
+
+## CALCOLO DEL GUADAGNO DELL’ADC
 
 Per una cella tipica:
 - Alimentazione: 5V
-- Sensibilità: 2mV/V
+- Sensibilità: 2mV/V dove V sono i volt di alimentazione
 - Carico nominale: 100kg
 
+Se supponiamo una alimentazione di 5V:
+
 Signal_max = 5V * (2mV/V) = 10mV a fondo scala
-Quindi se ADC ha range ±2.5V:
-G = 2.5V/10mV = 250
+
+Quindi se ADC ha range ±2.5V: G = 2.5V/10mV = 250
 
 ADS1256
 Il guadagno più vicino disponibile nell'ADS1256 andrebbe scelto per utilizzare la maggior parte del range mantenendo un margine di sicurezza.
