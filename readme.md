@@ -342,7 +342,7 @@ La non linearità dell'ADC è circa 20 volte migliore della cella di carico, qui
 - https://www.olimex.com/Products/Breadboarding/BB-ADS1262/open-source-hardware
 
 **Tutorials su ADC differenziali:**
-- [Misure con ponti](manuali/sbaa532a.pdf)
+- [Misure con ponti](/manuali/sbaa532a.pdf)
 - [Misure single ended](manuali/sbaa133a.pdf)
 
 **Tutorials su ADS1234:**
