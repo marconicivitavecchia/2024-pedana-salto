@@ -124,53 +124,6 @@ Dove:
 | 0 | $2^{23} \cdot \frac{0}{2V_{\text{REF}}}$ | $2^{23} \cdot 0 = 0$ | 0 | 0x000000 |
 | -2Vref | $2^{23} \cdot \frac{-2V_{\text{REF}}}{2V_{\text{REF}}}$ | $2^{23} \cdot (-1) = -2^{23}$ | -8.388.608 | 0x800000 |
 
-## Formula ADS1256 consigliata per ingressi single ended (non duali)
-
-<img src="img/ads1256_single_ended.png" alt="alt text" width="600">
-
-Il codice di uscita dell'ADS1256 è dato da:
-
-$$Code = 2^{23}\cdot \frac{(V_+ - V_-)}{2V_{REF}} = \frac{2^{23}}{2} \cdot \left(\frac{V_+}{V_{REF}} - 1\right)$$
-
-con una escursione massima di $2V_{\text{REF}}$
-
-Dove:
-- $V_+$ è la tensione sull'ingresso positivo
-- $V_-$ è la tensione sull'ingresso negativo
-- $V_{REF}$ è la tensione di riferimento
-- $2^{23}$ rappresenta metà della risoluzione totale (24 bit)
-
-
-| V+ Input | Formula | Calcolo | Codice Decimale | Codice Hex |
-|----------|---------|---------|-----------------|------------|
-| 2Vref | $\frac{2^{23}}{2} \cdot \left(\frac{2V_{REF}}{V_{REF}} - 1\right)$ | $\frac{2^{23}}{2} \cdot (2-1) = \frac{2^{23}}{2}$ | 4.194.304 | 0x400000 |
-| Vref | $\frac{2^{23}}{2} \cdot \left(\frac{V_{REF}}{V_{REF}} - 1\right)$ | $\frac{2^{23}}{2} \cdot (1-1) = 0$ | 0 | 0x000000 |
-| 0 | $\frac{2^{23}}{2} \cdot \left(\frac{0}{V_{REF}} - 1\right)$ | $\frac{2^{23}}{2} \cdot (0-1) = -\frac{2^{23}}{2}$ | -4.194.304 | 0xC00000 |
-
-Per ovviare al risultato indesiderato di avere un valore negativo a fronte di un ingresso positivo possiamo sommare 2^23 al risultato finale:
-
-Formula con 2^22 sommato alla fine:
-
-$$Code = \frac{2^{23}}{2} \cdot \left(\frac{V_+}{V_{REF}} - 1\right) + 2^{22}$$
-
-| V+ Input | Formula | Calcolo | Codice Decimale | Codice Hex |
-|----------|---------|---------|-----------------|------------|
-| 2Vref | $\frac{2^{23}}{2} \cdot \left(\frac{2V_{REF}}{V_{REF}} - 1\right) + 2^{22}$ | $4.194.304 + 4.194.304$ | 8.388.608 | 0x800000 |
-| Vref | $\frac{2^{23}}{2} \cdot \left(\frac{V_{REF}}{V_{REF}} - 1\right) + 2^{22}$ | $0 + 4.194.304$ | 4.194.304 | 0x400000 |
-| 0 | $\frac{2^{23}}{2} \cdot \left(\frac{0}{V_{REF}} - 1\right) + 2^{22}$ | $-4.194.304 + 4.194.304$ | 0 | 0x000000 |
-
-Se poi si aggiunge pure un guadagno di due si potrebbero sfruttare tutte le divisioni consentite dall'ADC:
-
-Formula modificata con guadagno G=2:
-
-$$Code = G \cdot 2^{23} \cdot \left(\frac{V_+}{V_{REF}} - 1\right) + 2^{23}$$
-
-| V+ Input | Formula | Calcolo | Codice Decimale (G=2) | Codice Hex |
-|----------|---------|---------|-----------------|------------|
-| 2Vref | $G \cdot 2^{23} \cdot \left(\frac{2V_{REF}}{V_{REF}} - 1\right) + 2^{23}$ |  8.388.608 + 8.388.608$ | 16.777.216 | 0x1000000 |
-| Vref | $G \cdot 2^{23} \cdot \left(\frac{V_{REF}}{V_{REF}} - 1\right) + 2^{23}$ |  0 + 8.388.608$ | 8.388.608 | 0x800000 |
-| 0 | $G \cdot 2^{23} \cdot \left(\frac{0}{V_{REF}} - 1\right) + 2^{23}$ |  -8.388.608 + 8.388.608$ | 0 | 0x000000 |
-
 ## Polarizzazione cella e ADC comune
 
 <img src="img/unipolar_bridge.png" alt="alt text" width="700">
