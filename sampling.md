@@ -543,7 +543,7 @@ Processo in 3 fasi:
 
    - Il fattore di scala viene calcolato come:
 
-$$Fattore di scala = Somma dei valori con peso − Somma dei valori di taraPeso noto\text{Fattore di scala} = \frac{\text{Somma dei valori con peso} - \text{Somma dei valori di tara}}{\text{Peso noto}}Fattore di scala = Peso notoSomma dei valori con peso−Somma dei valori di tara$$
+$$\text{Fattore di scala} = \frac{\text{Somma dei valori con peso} - \text{Somma dei valori di tara}}{\text{Peso noto}}$$
 ​
  
 4. Memorizzazione dei Parametri:
