@@ -173,11 +173,11 @@ $$Code = G \cdot 2^{23} \cdot \left(\frac{V_+}{V_{REF}} - 1\right) + 2^{23}$$
 
 ## Polarizzazione cella e ADC comune
 
-<img src="img/unipolar_bridge.png" alt="alt text" width="600">
+<img src="img/unipolar_bridge.png" alt="alt text" width="700">
 
 ## Polarizzazione cella e ADC separate
 
-<img src="img/buffered_bridge.png" alt="alt text" width="600">
+<img src="img/buffered_bridge.png" alt="alt text" width="700">
 
 ## Dimensionamento di una singola cella
 
