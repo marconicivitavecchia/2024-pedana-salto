@@ -175,6 +175,14 @@ Questo codice permette di leggere i dati da 4 celle di carico collegate a un ADC
 ### 2. **Interrupt su `DRDY`**
 L'interrupt viene configurato per attivarsi sul fronte di discesa del segnale `DRDY`. Quando l'ADS1256 segnala che i dati sono pronti, l'handler dell'interrupt imposta la variabile globale `data_ready` a `True`.
 
+```python
+def drdy_interrupt(pin):
+    global data_ready
+    data_ready = True
+
+drdy.irq(trigger=Pin.IRQ_FALLING, handler=drdy_interrupt)
+```
+
 ### 3. **Funzioni Principali**
 #### **`send_command(command)`**
 Invia un comando generico all'ADS1256 utilizzando SPI:
@@ -206,7 +214,17 @@ Il loop principale legge i valori dai 4 canali e li stampa sulla console:
 2. Stampa i valori grezzi per ciascun canale.
 3. Include una pausa (`time.sleep(0.01)`) per evitare un sovraccarico del ciclo.
 
----
+```python
+try:
+    while True:
+        values = read_all_channels(channels=4)
+        for i, value in enumerate(values):
+            print(f"Canale {i}: Valore grezzo = {value}")
+        time.sleep(0.01)
+except KeyboardInterrupt:
+    print("Esecuzione interrotta.")
+
+```
 
 ## Vantaggi del Codice
 1. **Efficienza con Interrupt su `DRDY`:**
