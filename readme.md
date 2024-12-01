@@ -322,18 +322,18 @@ Confrontando:
 
 La non linearità dell'ADC è circa 20 volte migliore della cella di carico, quindi praticamente trascurabile nel budget di errore complessivo del sistema. Il fattore limitante è decisamente la cella di carico.
 
-CALIBRAZIONE
-•	la calibrazione ha due scopi principali:
-•	Azzeramento (offset q):
-•	Rimuove il peso della struttura
-•	Compensa derive termiche
-•	Idealmente pone lo zero a metà range ADC
-•	Taratura scala (m):
-•	Converte conteggi ADC in unità fisiche (kg, N)
-•	Compensa differenze tra celle
-•	Corregge non linearità del sistema
-•	La posizione dello zero a metà range è una scelta progettuale che:
-•	Massimizza range dinamico bidirezionale
+## **Calibrazione**
+-	la calibrazione ha due scopi principali:
+-	Azzeramento (offset q):
+-	Rimuove il peso della struttura
+-	Compensa derive termiche
+-	Idealmente pone lo zero a metà range ADC
+-	Taratura scala (m):
+-	Converte conteggi ADC in unità fisiche (kg, N)
+-	Compensa differenze tra celle
+-	Corregge non linearità del sistema
+-	La posizione dello zero a metà range è una scelta progettuale che:
+-	Massimizza range dinamico bidirezionale
 
 **Materiale**:
 - ADC ADS1232 https://it.aliexpress.com/item/1005007195802960.html?spm=a2g0o.order_list.order_list_main.5.31183696R6xAH9&gatewayAdapt=glo2ita
