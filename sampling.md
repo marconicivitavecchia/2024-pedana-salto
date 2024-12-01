@@ -562,6 +562,34 @@ Per introdurre la calibrazione basata su transizioni di peso rilevate (fronte di
 - **Rilevazione di discesa (togli):** La lettura del peso diminuisce significativamente e rimane stabile (si stabilizza sotto una certa soglia).
 - **Rilevazione di salita (metti):** Subito dopo una discesa, il peso inizia ad aumentare e raggiunge un valore stabile sopra una soglia predefinita.
 
+#### Descrizione delle Funzionalità
+
+1. Configurazione SPI:
+
+- L'ESP32 utilizza il protocollo SPI per comunicare con l'ADS1256.
+- ```CS_PIN```: Pin di selezione chip (```CS```) per l'ADS1256.
+- ```DRDY_PIN```: Pin di ready (```DRDY```) che indica quando i dati sono pronti.
+
+2. Comandi per l'ADS1256:
+
+- Funzioni send_command e select_channel per interagire con il registri dell'ADS1256.
+- La funzione read_adc esegue la lettura dei dati grezzi a 24 bit.
+
+3. Rilevazione delle Transizioni di Peso:
+
+- ```detect_weight_change``` monitora la variazione del peso rilevato dalle celle.
+- Se la differenza tra le letture supera un valore di soglia (```target_delta```), si rileva una transizione di peso.
+
+4. Calibrazione del Sistema:
+
+- Durante la calibrazione, il programma prima rileva la tara (peso a vuoto), poi rileva un peso noto e calcola un fattore di scala.
+- Il fattore di scala è utilizzato per convertire le letture dell'ADC in unità fisiche (ad esempio, grammi).
+
+5. Salvataggio della Calibrazione:
+
+- I dati di calibrazione, inclusi il valore di tara e il fattore di scala, vengono salvati in un file CSV.
+
+
 ```python
 import time
 from machine import Pin, SPI
