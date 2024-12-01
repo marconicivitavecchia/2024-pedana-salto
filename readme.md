@@ -132,6 +132,10 @@ Dove:
 
 <img src="img/buffered_bridge.png" alt="alt text" width="700">
 
+## Polarizzazione cella e ADC separate
+
+<img src="img/buffered_bridge.png" alt="alt text" width="700">
+
 ## Dimensionamento di una singola cella
 
 ## Analisi Range ADC e Guadagno per Celle di Carico
