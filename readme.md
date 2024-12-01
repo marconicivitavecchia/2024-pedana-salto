@@ -47,27 +47,22 @@
 | ADC      | Max Sample Rate | PGA Max | Canali Diff. | Alimentazione | Note |
 |----------|----------------|---------|--------------|---------------|------|
 | ADS1256  | 30k SPS        | 64x     | 4            | AVDD: 5V, DVDD: 1.8-3.6V | Più veloce ma PGA insufficiente |
+| ADS1261  | 40k SPS        | 128x    | 1            | AVDD: 2.7-3.6V, DVDD: 1.65-3.6V | Veloce, singolo canale |
+| ADS1262  | 38k SPS        | 128x    | 4            | AVDD: 2.7-3.6V, DVDD: 1.65-3.6V | Alta risoluzione, basso rumore |
+| ADS1263  | 38k SPS        | 128x    | 6            | AVDD: 2.7-3.6V, DVDD: 1.65-3.6V | Come 1262 ma con più canali |
 | MCP3561  | 15k SPS        | 64x     | 2            | 2.7-3.6V     | Buon compromesso velocità/prestazioni |
 | ADS1232  | 1.6k SPS       | 128x    | 2            | AVDD: 5V, DVDD: 2.7-5.25V | Progettato per celle di carico |
 | NAU7802  | 320 SPS        | 128x    | 1            | 2.7-3.6V     | I2C limita la velocità |
 | HX711    | 80 SPS         | 128x    | 1            | AVDD: 4.8-5.5V | Lento ma ampiamente utilizzato |
 
 ## Note aggiuntive
-* ADS1256: richiede alimentazioni separate per parte analogica e digitale
-* MCP3561: singola alimentazione, ottimo per sistemi a batteria
-* ADS1232: alimentazioni separate permettono interfacciamento flessibile
-* NAU7802: singola alimentazione bassa, ideale per sistemi portatili
-* HX711: richiede 5V, meno flessibile per sistemi a batteria
-
-# Gestione Alimentazioni ADC
-
-| ADC      | Configurazione Alimentazione | Note |
-|----------|----------------------------|------|
-| ADS1256  | Richiede alimentazioni separate | AVDD: 5V necessario dall'esterno, DVDD: 1.8-3.6V dall'esterno |
-| MCP3561  | Singola alimentazione | Il chip genera internamente le tensioni necessarie |
-| ADS1232  | AVDD dall'esterno, DVDD opzionale | Può usare AVDD per generare DVDD internamente |
-| NAU7802  | Singola alimentazione | Gestisce internamente la separazione analogico/digitale |
-| HX711    | Singola alimentazione (5V) | Genera internamente le tensioni necessarie |
+* ADS1256: 8 canali single-ended configurabili come 4 differenziali 
+* ADS1261: Singolo canale ad alte prestazioni, velocità massima
+* ADS1262/63: PGA adeguato e alta velocità, ottimi per celle di carico
+* MCP3561: 4 canali single-ended / 2 differenziali con multiplexer
+* ADS1232: versione a 2 canali, esiste ADS1234 a 4 canali
+* NAU7802: singolo canale differenziale dedicato
+* HX711: singolo canale differenziale più un canale ausiliario
 
 ## Note sulla Separazione A/D
 - I chip più moderni tendono ad avere generazione interna delle tensioni
