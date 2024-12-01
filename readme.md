@@ -47,9 +47,9 @@
 | ADC      | Max Sample Rate | PGA Max | Canali Diff. | Alimentazione | Note |
 |----------|----------------|---------|--------------|---------------|------|
 | ADS1256  | 30k SPS        | 64x     | 4            | AVDD: 5V, DVDD: 1.8-3.6V | Più veloce ma PGA insufficiente |
-| ADS1261  | 40k SPS        | 128x    | 1            | AVDD: 2.7-3.6V, DVDD: 1.65-3.6V | Veloce, singolo canale |
-| ADS1262  | 38k SPS        | 128x    | 4            | AVDD: 2.7-3.6V, DVDD: 1.65-3.6V | Alta risoluzione, basso rumore |
-| ADS1263  | 38k SPS        | 128x    | 6            | AVDD: 2.7-3.6V, DVDD: 1.65-3.6V | Come 1262 ma con più canali |
+| ADS1261  | 40k SPS        | 32x     | 1            | AVDD: 2.7-3.6V, DVDD: 1.65-3.6V | Veloce, singolo canale |
+| ADS1262  | 38k SPS        | 32x     | 4            | AVDD: 2.7-3.6V, DVDD: 1.65-3.6V | Alta risoluzione, basso rumore |
+| ADS1263  | 38k SPS        | 128x    | 6            | AVDD: 2.7-3.6V, DVDD: 1.65-3.6V | Come 1262 ma con più canali e gain esteso |
 | MCP3561  | 15k SPS        | 64x     | 2            | 2.7-3.6V     | Buon compromesso velocità/prestazioni |
 | ADS1232  | 1.6k SPS       | 128x    | 2            | AVDD: 5V, DVDD: 2.7-5.25V | Progettato per celle di carico |
 | NAU7802  | 320 SPS        | 128x    | 1            | 2.7-3.6V     | I2C limita la velocità |
@@ -58,7 +58,8 @@
 ## Note aggiuntive
 * ADS1256: 8 canali single-ended configurabili come 4 differenziali 
 * ADS1261: Singolo canale ad alte prestazioni, velocità massima
-* ADS1262/63: PGA adeguato e alta velocità, ottimi per celle di carico
+* ADS1262: PGA fino a 32x e alta velocità, ottimo per celle di carico
+* ADS1263: Come ADS1262 ma con 6 canali diff. e PGA fino a 128x
 * MCP3561: 4 canali single-ended / 2 differenziali con multiplexer
 * ADS1232: versione a 2 canali, esiste ADS1234 a 4 canali
 * NAU7802: singolo canale differenziale dedicato
