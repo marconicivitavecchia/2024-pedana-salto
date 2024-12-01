@@ -247,6 +247,10 @@ except KeyboardInterrupt:
    - Adattato alla lentezza del linguaggio, mantenendo una frequenza consigliata di 250-500 Hz per canale.
 
 
+## Ottimizzazione
+
+
+
 ```python
 import time
 from machine import SPI, Pin
@@ -371,6 +375,14 @@ try:
 except KeyboardInterrupt:
     print("Esecuzione interrotta.")
 ```
+
+Il file generato avrà questo formato:
+
+```python
+Canale1,Canale2,Canale3,Canale4
+123456,234567,345678,456789
+123460,234570,345680,456790
+...
 
 
 
