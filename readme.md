@@ -171,6 +171,14 @@ $$Code = G \cdot 2^{23} \cdot \left(\frac{V_+}{V_{REF}} - 1\right) + 2^{23}$$
 | Vref | $G \cdot 2^{23} \cdot \left(\frac{V_{REF}}{V_{REF}} - 1\right) + 2^{23}$ |  0 + 8.388.608$ | 8.388.608 | 0x800000 |
 | 0 | $G \cdot 2^{23} \cdot \left(\frac{0}{V_{REF}} - 1\right) + 2^{23}$ |  -8.388.608 + 8.388.608$ | 0 | 0x000000 |
 
+## Polarizzazione cella e ADC comune
+
+<img src="img/unipolar_bridge.png" alt="alt text" width="600">
+
+## Polarizzazione cella e ADC separate
+
+<img src="img/buffered_bridge.png" alt="alt text" width="600">
+
 ## Dimensionamento di una singola cella
 
 ## Analisi Range ADC e Guadagno per Celle di Carico
