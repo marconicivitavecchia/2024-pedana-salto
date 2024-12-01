@@ -247,7 +247,7 @@ except KeyboardInterrupt:
    - Adattato alla lentezza del linguaggio, mantenendo una frequenza consigliata di 250-500 Hz per canale.
 
 
-## Ottimizzazione
+# Ottimizzazione
 
 ```python
 import time
@@ -374,7 +374,7 @@ except KeyboardInterrupt:
     print("Esecuzione interrotta.")
 ```
 
-### Struttura del file csv
+## Struttura del file csv
 
 Il file generato avrà questo formato:
 
@@ -516,7 +516,7 @@ except KeyboardInterrupt:
 
 ```
 
-### Struttura del dile csv
+## Struttura del dile csv
 
 ```python
 Timestamp,Canale1,Canale2,Canale3,Canale4
@@ -525,67 +525,67 @@ Timestamp,Canale1,Canale2,Canale3,Canale4
 10,123470,234580,345690,456800
 ```
 
-## Calibrazione
+# Calibrazione
 
 Processo in 3 fasi:
 
-1. Lettura a Vuoto (Tara):
+1. **Lettura a Vuoto (Tara):**
 
    - I valori di uscita grezzi delle 4 celle vengono letti e sommati.
    - Questo valore rappresenta la tara totale del sistema.
 
-1. Lettura con Peso di Riferimento:
+1. **Lettura con Peso di Riferimento:**
 
    - Un peso noto (ad esempio, 1000 grammi) viene posizionato sulla pedana.
    - I valori letti dalle 4 celle vengono sommati.
 
-3. Calcolo del Fattore di Scala:
+3. **Calcolo del Fattore di Scala:**
 
    - Il fattore di scala viene calcolato come:
 
       $$\text{Fattore di scala} = \frac{\text{Somma dei valori con peso} - \text{Somma dei valori di tara}}{\text{Peso noto}}$$
 ​
  
-4. Memorizzazione dei Parametri:
+4. **Memorizzazione dei Parametri:**
 
    - I valori di tara per ciascuna cella e il fattore di scala complessivo vengono salvati in un file CSV.
 
-#### Esempio di Utilizzo
+## Esempio di Utilizzo
 1. Posizionare la pedana senza alcun carico e avviare il programma.
 2. Posizionare il peso noto (es. 1000 grammi) quando richiesto.
 3. I dati di calibrazione verranno salvati nel file /sd/calibrazione_sistema.csv.
 
 Per introdurre la calibrazione basata su transizioni di peso rilevate (fronte di discesa e fronte di salita), possiamo implementare un sistema che rilevi variazioni significative nel peso totale misurato dalle 4 celle di carico. Questo approccio sostituisce il ritardo fisso con un monitoraggio dinamico delle misurazioni, reagendo a eventi di sollevamento del peso e applicazione del peso di riferimento.
 
-#### Strategia
+## Strategia
 
 - **Rilevazione di discesa (togli):** La lettura del peso diminuisce significativamente e rimane stabile (si stabilizza sotto una certa soglia).
 - **Rilevazione di salita (metti):** Subito dopo una discesa, il peso inizia ad aumentare e raggiunge un valore stabile sopra una soglia predefinita.
 
 #### Descrizione delle Funzionalità
 
-1. Configurazione SPI:
+1. **Configurazione SPI:**
 
 - L'ESP32 utilizza il protocollo SPI per comunicare con l'ADS1256.
 - ```CS_PIN```: Pin di selezione chip (```CS```) per l'ADS1256.
 - ```DRDY_PIN```: Pin di ready (```DRDY```) che indica quando i dati sono pronti.
 
-2. Comandi per l'ADS1256:
+2. **Comandi per l'ADS1256:**
 
 - Funzioni send_command e select_channel per interagire con il registri dell'ADS1256.
 - La funzione read_adc esegue la lettura dei dati grezzi a 24 bit.
 
-3. Rilevazione delle Transizioni di Peso:
+3. **Rilevazione delle Transizioni di Peso:**
 
 - ```detect_weight_change``` monitora la variazione del peso rilevato dalle celle.
 - Se la differenza tra le letture supera un valore di soglia (```target_delta```), si rileva una transizione di peso.
 
-4. Calibrazione del Sistema:
+4. **Calibrazione del Sistema:**
 
 - Durante la calibrazione, il programma prima rileva la tara (peso a vuoto), poi rileva un peso noto e calcola un fattore di scala.
 - Il fattore di scala è utilizzato per convertire le letture dell'ADC in unità fisiche (ad esempio, grammi).
 
-5. Salvataggio della Calibrazione:
+5. **Salvataggio della Calibrazione:**
 
 - I dati di calibrazione, inclusi il valore di tara e il fattore di scala, vengono salvati in un file CSV.
 
