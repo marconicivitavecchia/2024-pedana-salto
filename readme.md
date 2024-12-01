@@ -219,6 +219,79 @@ Nota: questa è la risoluzione teorica dell'ADC. La risoluzione effettiva sarà 
 * Rumore elettrico
 * Deriva termica
 * Altri fattori ambientali
+
+## Analisi Range ADC e Guadagno per Celle di Carico (ADS1232)
+
+### Specifiche di Base
+* ADS1232: range ingresso = ±VREF (tipicamente ±2.5V, range totale 5V)
+* Celle di carico: 
+ * Sensibilità = 2.0±0.05 mV/V
+ * Tensione eccitazione raccomandata = 5-12V
+
+### Calcolo Output Celle e Guadagno
+* Output cella a fondo scala = 5V × 2mV/V = 10mV
+* Guadagno teorico = 2.5V/10mV = 250
+* Guadagni disponibili ADS1232: 1, 2, 64, 128
+* Scelta: G=128 (massimo disponibile)
+
+### Analisi Range Effettivo
+* Segnale amplificato massimo = 10mV × 128 = 1280mV
+* Range totale ADC = 5V (da -2.5V a +2.5V) 
+* Utilizzo range ADC = 1280mV/5000mV = 25.6%
+
+### Risoluzione Effettiva
+* Range totale ADC = 2^24 = 16.777.216 livelli
+* Livelli effettivi utilizzati = 16.777.216 × 0.256 = 4.295.167 livelli
+* La rimanente amplificazione necessaria (circa 2×) dovrà essere gestita via software
+
+### Conclusione
+Utilizzando il 25.6% del range disponibile, abbiamo oltre 4 milioni di livelli effettivi, che è ampiamente sufficiente considerando che per misure di peso sono tipicamente necessari 50.000-100.000 livelli per una buona risoluzione.
+
+L'ADS1232, con il suo PGA a 128x, permette di sfruttare meglio il range dell'ADC rispetto all'ADS1256 (25.6% vs 12.8%), risultando in una migliore risoluzione effettiva nonostante entrambi siano ADC a 24 bit.
+
+## Calcolo Risoluzione Sensore 500kg con ADS1232
+
+### Dati
+* Capacità = 500kg
+* Sensibilità = 2mV/V
+* Vcc = 5V
+* Guadagno ADS1232 = 128
+* ADC = 24 bit = 16.777.216 livelli
+* Utilizzo range = 25.6%
+* Livelli effettivi = 4.295.167
+
+### Calcolo
+* Risoluzione = 500kg/4.295.167 = 0.116 grammi
+
+Nota: questa è la risoluzione teorica dell'ADC. La risoluzione effettiva sarà limitata da:
+* Classe di precisione del sensore (C2)
+* Rumore elettrico
+* Deriva termica
+* Altri fattori ambientali
+
+## Calcolo Risoluzione Sensore 2t con ADS1232
+
+### Dati
+* Capacità = 2000kg
+* Sensibilità = 2mV/V
+* Vcc = 5V
+* Guadagno ADS1232 = 128
+* ADC = 24 bit = 16.777.216 livelli
+* Utilizzo range = 25.6%
+* Livelli effettivi = 4.295.167
+
+### Calcolo
+* Risoluzione = 2000kg/4.295.167 = 0.465 grammi
+
+Nota: questa è la risoluzione teorica dell'ADC. La risoluzione effettiva sarà limitata da:
+* Classe di precisione del sensore (C2)
+* Rumore elettrico
+* Deriva termica 
+* Altri fattori ambientali
+
+Come si può vedere, grazie al maggior guadagno disponibile (128x vs 64x) e al conseguente maggior utilizzo del range dell'ADC (25.6% vs 12.8%), l'ADS1232 offre una risoluzione teorica migliore rispetto all'ADS1256:
+- Per cella da 500kg: 0.116g vs 0.233g
+- Per cella da 2t: 0.465g vs 0.931g
   
 ## Non linearità cella di carico
 
