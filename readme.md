@@ -335,6 +335,10 @@ CALIBRAZIONE
 •	La posizione dello zero a metà range è una scelta progettuale che:
 •	Massimizza range dinamico bidirezionale
 
-Materiale:
+**Materiale**:
 - ADC ADS1232 https://it.aliexpress.com/item/1005007195802960.html?spm=a2g0o.order_list.order_list_main.5.31183696R6xAH9&gatewayAdapt=glo2ita
 - ADC ADS1256 https://it.aliexpress.com/item/1005006296794440.html?spm=a2g0o.order_list.order_list_main.21.76bc3696RICV2y&gatewayAdapt=glo2ita
+
+**Tutorial su ADS1234:**
+- https://www.youtube.com/watch?v=NklVhEleiHI
+- https://www.youtube.com/watch?v=4HYsbSOxGqY
