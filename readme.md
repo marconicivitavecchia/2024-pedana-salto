@@ -88,9 +88,9 @@ Dove:
 
 | V+ Input | Formula | Calcolo | Codice Decimale | Codice Hex |
 |----------|---------|---------|-----------------|------------|
-| +Vref | $2^{23} \cdot \frac{V_{\text{REF}}}{2V_{\text{REF}}}$ | $2^{23} \cdot (\frac{1}{2}) = \frac{2^{23}}{2}$ | 4.194.304 | 0x400000 |
+| +2Vref | $2^{23} \cdot \frac{2V_{\text{REF}}}{2V_{\text{REF}}}$ | $2^{23} \cdot 1 = 2^{23}$ | 8.388.608 | 0x800000 |
 | 0 | $2^{23} \cdot \frac{0}{2V_{\text{REF}}}$ | $2^{23} \cdot 0 = 0$ | 0 | 0x000000 |
-| -Vref | $2^{23} \cdot \frac{-V_{\text{REF}}}{2V_{\text{REF}}}$ | $2^{23} \cdot (-\frac{1}{2}) = -\frac{2^{23}}{2}$ | -4.194.304 | 0xC00000 |
+| -2Vref | $2^{23} \cdot \frac{-2V_{\text{REF}}}{2V_{\text{REF}}}$ | $2^{23} \cdot (-1) = -2^{23}$ | -8.388.608 | 0x800000 |
 
 ## Formula ADS1256 consigliata per ingressi single ended (non duali)
 
