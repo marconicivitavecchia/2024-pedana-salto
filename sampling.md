@@ -246,6 +246,132 @@ except KeyboardInterrupt:
 4. **Compatibilità con MicroPython:**
    - Adattato alla lentezza del linguaggio, mantenendo una frequenza consigliata di 250-500 Hz per canale.
 
----
+
+```python
+import time
+from machine import SPI, Pin
+
+# Configurazione dei pin
+CS_PIN = 5       # Chip Select
+DRDY_PIN = 4     # Data Ready
+SYNC_PIN = 16    # Pin di sincronizzazione (trigger esterno)
+
+cs = Pin(CS_PIN, Pin.OUT)
+drdy = Pin(DRDY_PIN, Pin.IN)
+sync_pin = Pin(SYNC_PIN, Pin.IN, Pin.PULL_UP)
+
+# Configurazione SPI
+spi = SPI(1, baudrate=10000000, polarity=0, phase=1, sck=Pin(18), mosi=Pin(23), miso=Pin(19))
+
+# Variabile globale per segnalare che i dati sono pronti
+data_ready = False
+
+def drdy_interrupt(pin):
+    """Interrupt handler per DRDY: segnala che i dati sono pronti."""
+    global data_ready
+    data_ready = True
+
+# Configurazione interrupt su DRDY
+drdy.irq(trigger=Pin.IRQ_FALLING, handler=drdy_interrupt)
+
+def send_command(command):
+    """Invia un comando all'ADS1256."""
+    cs.off()
+    spi.write(bytearray([command]))
+    cs.on()
+
+def select_channel(channel):
+    """Seleziona il canale nel multiplexer interno dell'ADS1256."""
+    mux_config = channel * 8  # Configura il registro MUX per il canale
+    cs.off()
+    spi.write(bytearray([0x50 | 0x01, 0x00, mux_config]))  # Scrive nel registro MUX
+    cs.on()
+    send_command(0xFC)  # Comando SYNC per sincronizzare
+    send_command(0x00)  # Comando WAKEUP per iniziare la conversione
+
+def read_adc():
+    """Legge un valore a 24 bit dall'ADS1256."""
+    cs.off()
+    spi.write(bytearray([0x01]))  # Comando RDATA
+    result = spi.read(3)  # Legge 3 byte di dati
+    cs.on()
+    # Conversione in valore signed a 24 bit
+    raw_value = (result[0] << 16) | (result[1] << 8) | result[2]
+    if raw_value & 0x800000:  # Controlla il bit di segno
+        raw_value -= 0x1000000
+    return raw_value
+
+def read_all_channels(channels=4):
+    """Legge i dati da tutti i canali configurati."""
+    global data_ready
+    readings = []
+    for i in range(channels):
+        # Seleziona il canale
+        select_channel(i)
+        # Aspetta che DRDY segnali che i dati sono pronti
+        data_ready = False
+        while not data_ready:
+            pass
+        # Legge il valore grezzo
+        raw_data = read_adc()
+        readings.append(raw_data)
+    return readings
+
+def apply_low_pass_filter(data, filtered_data, alpha=0.1):
+    """Applica un filtro passa-basso semplice (media esponenziale)."""
+    for i in range(len(data)):
+        filtered_data[i] = alpha * data[i] + (1 - alpha) * filtered_data[i]
+    return filtered_data
+
+# Buffer per memorizzare i campioni
+FREQUENZA_CAMPIONAMENTO = 200  # Hz per canale
+DURATA_SALTO = 2  # Durata massima del salto in secondi
+NUM_CANALI = 4
+
+BUFFER_DIM = FREQUENZA_CAMPIONAMENTO * DURATA_SALTO
+buffer = [[0] * NUM_CANALI for _ in range(BUFFER_DIM)]
+filtered_data = [0] * NUM_CANALI  # Per il filtro passa-basso
+buffer_index = 0  # Indice per il buffer circolare
+
+# File per salvare i dati
+FILE_PATH = "/sd/salto.csv"
+
+# Funzione per salvare i dati su file
+def save_to_file(file_path, data):
+    """Salva i dati nel file specificato."""
+    with open(file_path, "w") as file:
+        for row in data:
+            file.write(",".join(map(str, row)) + "\n")
+
+try:
+    print("In attesa di sincronizzazione hardware...")
+    while sync_pin.value() == 1:
+        time.sleep(0.01)  # Aspetta il trigger di sincronizzazione
+    
+    print("Sincronizzazione ricevuta! Inizio acquisizione dati...")
+    start_time = time.ticks_ms()
+
+    while time.ticks_diff(time.ticks_ms(), start_time) < DURATA_SALTO * 1000:
+        # Legge i dati dai canali
+        values = read_all_channels(channels=NUM_CANALI)
+        
+        # Applica il filtro passa-basso
+        filtered_data = apply_low_pass_filter(values, filtered_data)
+        
+        # Salva i dati filtrati nel buffer
+        buffer[buffer_index] = filtered_data[:]
+        buffer_index = (buffer_index + 1) % BUFFER_DIM
+        
+        # Pausa per mantenere la frequenza di campionamento
+        time.sleep(1 / FREQUENZA_CAMPIONAMENTO)
+
+    print("Acquisizione completata. Salvataggio su file...")
+    save_to_file(FILE_PATH, buffer)
+    print(f"Dati salvati su {FILE_PATH}")
+except KeyboardInterrupt:
+    print("Esecuzione interrotta.")
+```
+
+
 
 
