@@ -36,9 +36,7 @@ Per leggere correttamente 4 celle di carico:
 ## 3. Frequenza di campionamento consigliata
 Per leggere 4 canali a una frequenza di **200 Hz per canale**, la frequenza totale richiesta è:
 
-\[
-f_{\text{totale}} = 200 \, \text{Hz} \times 4 = 800 \, \text{Hz}
-\]
+$$f_{\text{totale}}=200\,\text{Hz}\times4=800\,\text{Hz}$$
 
 Questa frequenza è raggiungibile configurando il Data Rate dell'ADS1256 a **1000 SPS** o superiore, ma è necessario considerare anche i tempi di elaborazione.
 
@@ -49,33 +47,22 @@ Questa frequenza è raggiungibile configurando il Data Rate dell'ADS1256 a **100
 ### Tempo di conversione
 Con un Data Rate massimo di **30.000 SPS** (registro `DRATE = 0xF0`):
 
-\[
-t_{\text{conv}} = \frac{1}{30.000} = 33.33 \, \mu\text{s}
-\]
+$$t_{\text{conv}} = \frac{1}{30.000} = 33.33 \, \mu\text{s}$$
 
 ### Tempo totale su 4 canali
 Il tempo totale per un ciclo completo di 4 canali è:
 
-\[
-t_{\text{ciclo}} = 4 \times t_{\text{conv}} = 4 \times 33.33 \, \mu\text{s} = 133.33 \, \mu\text{s}
-\]
+$$t_{\text{ciclo}} = 4 \times t_{\text{conv}} = 4 \times 33.33 \, \mu\text{s} = 133.33 \, \mu\text{s}$$
 
 La frequenza massima per canale è:
 
-\[
-f_{\text{canale}} = \frac{1}{t_{\text{ciclo}}} = 7.5 \, \text{kHz}
-\]
-
+$$f_{\text{canale}} = \frac{1}{t_{\text{ciclo}}} = 7.5 \, \text{kHz}$$
 ### Considerando tempi di guardia
 Aggiungendo **15 µs** di ritardo per canale (comando SPI, commutazione MUX):
 
-\[
-t_{\text{ciclo}} = 4 \times (33.33 + 15) = 193.33 \, \mu\text{s}
-\]
+$$t_{\text{ciclo}} = 4 \times (33.33 + 15) = 193.33 \, \mu\text{s}$$
 
-\[
-f_{\text{canale}} \approx 5.17 \, \text{kHz}
-\]
+$$f_{\text{canale}} \approx 5.17 \, \text{kHz}$$
 
 ---
 
