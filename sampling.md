@@ -382,7 +382,7 @@ Il file generato avrà questo formato:
 Canale1,Canale2,Canale3,Canale4
 123456,234567,345678,456789
 123460,234570,345680,456790
-...
+```
 
 ## Timestamp
 
