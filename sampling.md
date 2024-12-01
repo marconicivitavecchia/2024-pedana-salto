@@ -525,5 +525,29 @@ Timestamp,Canale1,Canale2,Canale3,Canale4
 10,123470,234580,345690,456800
 ...
 
+## Calibrazione
+
+Processo in 3 fasi:
+
+1. Lettura a Vuoto (Tara):
+
+   - I valori di uscita grezzi delle 4 celle vengono letti e sommati.
+   - Questo valore rappresenta la tara totale del sistema.
+
+1. Lettura con Peso di Riferimento:
+
+   - Un peso noto (ad esempio, 1000 grammi) viene posizionato sulla pedana.
+   - I valori letti dalle 4 celle vengono sommati.
+
+3. Calcolo del Fattore di Scala:
+
+   - Il fattore di scala viene calcolato come:
+
+$$Fattore di scala = Somma dei valori con peso − Somma dei valori di taraPeso noto\text{Fattore di scala} = \frac{\text{Somma dei valori con peso} - \text{Somma dei valori di tara}}{\text{Peso noto}}Fattore di scala = Peso notoSomma dei valori con peso−Somma dei valori di tara$$
+​
+ 
+4. Memorizzazione dei Parametri:
+
+   - I valori di tara per ciascuna cella e il fattore di scala complessivo vengono salvati in un file CSV.
 
 
