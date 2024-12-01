@@ -44,20 +44,20 @@
 
 # ADC per Celle di Carico in Ordine di Velocità
 
-| ADC      | Max Sample Rate | PGA Max | Note |
-|----------|----------------|---------|------|
-| ADS1256  | 30k SPS        | 64x     | Più veloce ma PGA insufficiente |
-| MCP3561  | 15k SPS        | 64x     | Buon compromesso velocità/prestazioni |
-| ADS1232  | 1.6k SPS       | 128x    | Progettato per celle di carico |
-| NAU7802  | 320 SPS        | 128x    | I2C limita la velocità |
-| HX711    | 80 SPS         | 128x    | Lento ma ampiamente utilizzato |
+| ADC      | Max Sample Rate | PGA Max | Canali Diff. | Note |
+|----------|----------------|---------|--------------|------|
+| ADS1256  | 30k SPS        | 64x     | 4            | Più veloce ma PGA insufficiente |
+| MCP3561  | 15k SPS        | 64x     | 2            | Buon compromesso velocità/prestazioni |
+| ADS1232  | 1.6k SPS       | 128x    | 2            | Progettato per celle di carico |
+| NAU7802  | 320 SPS        | 128x    | 1            | I2C limita la velocità |
+| HX711    | 80 SPS         | 128x    | 1            | Lento ma ampiamente utilizzato |
 
 ## Note aggiuntive
-* ADS1256: miglior scelta per applicazioni veloci che non richiedono tutto il range
-* MCP3561: buon compromesso con chopper stabilization
-* ADS1232: specifico per celle di carico con buona velocità
-* NAU7802: semplice da usare (I2C) ma limitato in velocità
-* HX711: ottimo per bilance statiche, inadatto per misure dinamiche
+* ADS1256: 8 canali single-ended configurabili come 4 differenziali 
+* MCP3561: 4 canali single-ended / 2 differenziali con multiplexer
+* ADS1232: versione a 2 canali, esiste ADS1234 a 4 canali
+* NAU7802: singolo canale differenziale dedicato
+* HX711: singolo canale differenziale più un canale ausiliario
 
 ## ADS1256 - Specifiche Tecniche
 
