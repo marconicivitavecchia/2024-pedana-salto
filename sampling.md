@@ -13,27 +13,27 @@ No, l'ADS1256 non campiona automaticamente gli ingressi in modalità multiplexin
 
 ---
 
-## 2. Approfondimento sulla lettura in multiplexing di 4 celle di carico
+### 2. Approfondimento sulla lettura in multiplexing di 4 celle di carico
 Per leggere correttamente 4 celle di carico:
 
-1. **Configurazione del multiplexer (MUX):**
+**1. Configurazione del multiplexer (MUX):**
    - Impostare il registro MUX per selezionare il canale da leggere.
    
-2. **Avviare la conversione:**
+**2. Avviare la conversione:**
    - Inviare il comando `SYNC` per sincronizzare e `WAKEUP` per iniziare la conversione.
 
-3. **Attendere che il dato sia pronto:**
+**3. Attendere che il dato sia pronto:**
    - Controllare il pin `DRDY` o utilizzare un **interrupt**.
 
-4. **Leggere il dato:**
+**4. Leggere il dato:**
    - Inviare il comando `RDATA` e leggere i 3 byte di dati a 24 bit tramite SPI.
 
-5. **Passare al canale successivo:**
+**5. Passare al canale successivo:**
    - Ripetere i passaggi per ciascun canale, tenendo conto del tempo di commutazione.
 
 ---
 
-## 3. Frequenza di campionamento consigliata
+### 3. Frequenza di campionamento consigliata
 Per leggere 4 canali a una frequenza di **200 Hz per canale**, la frequenza totale richiesta è:
 
 $$f_{\text{totale}}=200\,\text{Hz}\times4=800\,\text{Hz}$$
@@ -42,14 +42,14 @@ Questa frequenza è raggiungibile configurando il Data Rate dell'ADS1256 a **100
 
 ---
 
-## 4. Calcolo della massima frequenza di campionamento per canale
+### 4. Calcolo della massima frequenza di campionamento per canale
 
-### Tempo di conversione
+#### Tempo di conversione
 Con un Data Rate massimo di **30.000 SPS** (registro `DRATE = 0xF0`):
 
 $$t_{\text{conv}} = \frac{1}{30.000} = 33.33 \, \mu\text{s}$$
 
-### Tempo totale su 4 canali
+#### Tempo totale su 4 canali
 Il tempo totale per un ciclo completo di 4 canali è:
 
 $$t_{\text{ciclo}} = 4 \times t_{\text{conv}} = 4 \times 33.33 \, \mu\text{s} = 133.33 \, \mu\text{s}$$
@@ -66,7 +66,7 @@ $$f_{\text{canale}} \approx 5.17 \, \text{kHz}$$
 
 ---
 
-## 5. Frequenza consigliata in MicroPython
+### 5. Frequenza consigliata in MicroPython
 Dato che MicroPython è un linguaggio interpretato e relativamente lento rispetto al codice nativo, si consiglia:
 
 - **250-500 Hz per canale** (1000-2000 SPS totali).
@@ -75,9 +75,9 @@ Per frequenze superiori (>1 kHz per canale), è meglio considerare l'uso di C/C+
 
 ---
 
-## 6. Implementazione in MicroPython
+### 6. Implementazione in MicroPython
 
-### Loop senza blocchi
+#### Loop senza blocchi
 Gestione del pin `DRDY` con un timeout:
 
 ```python
@@ -529,24 +529,24 @@ Timestamp,Canale1,Canale2,Canale3,Canale4
 
 Processo in 3 fasi:
 
-1. **Lettura a Vuoto (Tara):**
+**1. Lettura a Vuoto (Tara):**
 
    - I valori di uscita grezzi delle 4 celle vengono letti e sommati.
    - Questo valore rappresenta la tara totale del sistema.
 
-1. **Lettura con Peso di Riferimento:**
+**2. Lettura con Peso di Riferimento:**
 
    - Un peso noto (ad esempio, 1000 grammi) viene posizionato sulla pedana.
    - I valori letti dalle 4 celle vengono sommati.
 
-3. **Calcolo del Fattore di Scala:**
+**3. Calcolo del Fattore di Scala:**
 
    - Il fattore di scala viene calcolato come:
 
       $$\text{Fattore di scala} = \frac{\text{Somma dei valori con peso} - \text{Somma dei valori di tara}}{\text{Peso noto}}$$
 ​
  
-4. **Memorizzazione dei Parametri:**
+**4. Memorizzazione dei Parametri:**
 
    - I valori di tara per ciascuna cella e il fattore di scala complessivo vengono salvati in un file CSV.
 
@@ -564,23 +564,23 @@ Per introdurre la calibrazione basata su transizioni di peso rilevate (fronte di
 
 #### Descrizione delle Funzionalità
 
-1. **Configurazione SPI:**
+**1. Configurazione SPI:**
 
 - L'ESP32 utilizza il protocollo SPI per comunicare con l'ADS1256.
 - ```CS_PIN```: Pin di selezione chip (```CS```) per l'ADS1256.
 - ```DRDY_PIN```: Pin di ready (```DRDY```) che indica quando i dati sono pronti.
 
-2. **Comandi per l'ADS1256:**
+**2. Comandi per l'ADS1256:**
 
 - Funzioni send_command e select_channel per interagire con il registri dell'ADS1256.
 - La funzione read_adc esegue la lettura dei dati grezzi a 24 bit.
 
-3. **Rilevazione delle Transizioni di Peso:**
+**3. Rilevazione delle Transizioni di Peso:**
 
 - ```detect_weight_change``` monitora la variazione del peso rilevato dalle celle.
 - Se la differenza tra le letture supera un valore di soglia (```target_delta```), si rileva una transizione di peso.
 
-4. **Calibrazione del Sistema:**
+**4. Calibrazione del Sistema:**
 
 - Durante la calibrazione, il programma prima rileva la tara (peso a vuoto), poi rileva un peso noto e calcola un fattore di scala.
 - Il fattore di scala è utilizzato per convertire le letture dell'ADC in unità fisiche (ad esempio, grammi).
