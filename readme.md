@@ -74,33 +74,6 @@
   - Migliorare le prestazioni
   - Aumentare la flessibilità di interfacciamento
 
-## ADS1256 - Specifiche Tecniche
-
-### Caratteristiche Principali
-- Risoluzione: 24 bit
-- Velocità di campionamento massima: 30 ksps
-- Canali di ingresso: 8
-- Interfaccia: SPI
-- Architettura: Delta-Sigma
-- Rating: Catalog
-
-### Configurazione Ingressi
-- Tipo: Differenziale o Single-ended
-- Configurazione multicanale: Multiplexata
-- Range tensione di ingresso: 0V - 5.25V
-- Modalità di riferimento: Esterna
-
-### Alimentazione
-- Consumo tipico: 36 mW
-- Alimentazione analogica: 4.75V - 5.25V
-- Alimentazione digitale: 1.8V - 3.6V
-
-### Caratteristiche Operative
-- Range temperatura operativa: -40°C a +85°C
-- Caratteristiche speciali:
-  - Reiezione 50/60 Hz
-  - GPIO
-  - PGA (Amplificatore a Guadagno Programmabile)
 
 # CALCOLO DEL GUADAGNO DELL’ADC
 
@@ -134,11 +107,11 @@ Dove:
 
 ## Quattro celle in parallelo
 
-<img src="img/multiple_bridge.png" alt="alt text" width="700">
+<img src="img/multiple_bridge.png" alt="alt text" width="1000">
 
 ## Quattro celle multiplexate
 
-<img src="img/four_bridges.png" alt="alt text" width="700">
+<img src="img/four_bridges.png" alt="alt text" width="1000">
 
 Riassunto configurazione:
 <img src="img/bridge_config.png" alt="alt text" width="1000">
@@ -147,6 +120,35 @@ Effetti delle due configurazioni precedenti sulla distribuzione del carico:
 <img src="img/pedana.png" alt="alt text" width="1000">
 
 ## Dimensionamento di una singola cella
+
+## ADS1256 - Specifiche Tecniche
+
+### Caratteristiche Principali
+- Risoluzione: 24 bit
+- Velocità di campionamento massima: 30 ksps
+- Canali di ingresso: 8
+- Interfaccia: SPI
+- Architettura: Delta-Sigma
+- Rating: Catalog
+
+### Configurazione Ingressi
+- Tipo: Differenziale o Single-ended
+- Configurazione multicanale: Multiplexata
+- Range tensione di ingresso: 0V - 5.25V
+- Modalità di riferimento: Esterna
+
+### Alimentazione
+- Consumo tipico: 36 mW
+- Alimentazione analogica: 4.75V - 5.25V
+- Alimentazione digitale: 1.8V - 3.6V
+
+### Caratteristiche Operative
+- Range temperatura operativa: -40°C a +85°C
+- Caratteristiche speciali:
+  - Reiezione 50/60 Hz
+  - GPIO
+  - PGA (Amplificatore a Guadagno Programmabile)
+
 
 ## Analisi Range ADC e Guadagno per Celle di Carico
 
