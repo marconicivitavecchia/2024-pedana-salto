@@ -42,6 +42,23 @@
 - Cavo schermato standard
 - Connessione aerea su richiesta
 
+# ADC per Celle di Carico in Ordine di Velocità
+
+| ADC      | Max Sample Rate | PGA Max | Canali Diff. | Alimentazione | Note |
+|----------|----------------|---------|--------------|---------------|------|
+| ADS1256  | 30k SPS        | 64x     | 4            | AVDD: 5V, DVDD: 1.8-3.6V | Più veloce ma PGA insufficiente |
+| MCP3561  | 15k SPS        | 64x     | 2            | 2.7-3.6V     | Buon compromesso velocità/prestazioni |
+| ADS1232  | 1.6k SPS       | 128x    | 2            | AVDD: 5V, DVDD: 2.7-5.25V | Progettato per celle di carico |
+| NAU7802  | 320 SPS        | 128x    | 1            | 2.7-3.6V     | I2C limita la velocità |
+| HX711    | 80 SPS         | 128x    | 1            | AVDD: 4.8-5.5V | Lento ma ampiamente utilizzato |
+
+## Note aggiuntive
+* ADS1256: richiede alimentazioni separate per parte analogica e digitale
+* MCP3561: singola alimentazione, ottimo per sistemi a batteria
+* ADS1232: alimentazioni separate permettono interfacciamento flessibile
+* NAU7802: singola alimentazione bassa, ideale per sistemi portatili
+* HX711: richiede 5V, meno flessibile per sistemi a batteria
+
 # Gestione Alimentazioni ADC
 
 | ADC      | Configurazione Alimentazione | Note |
