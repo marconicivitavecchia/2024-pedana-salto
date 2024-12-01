@@ -51,7 +51,8 @@
 | ADS1262  | 38k SPS        | 32x     | 4            | AVDD: 2.7-3.6V, DVDD: 1.65-3.6V | Alta risoluzione, basso rumore |
 | ADS1263  | 38k SPS        | 128x    | 6            | AVDD: 2.7-3.6V, DVDD: 1.65-3.6V | Come 1262 ma con più canali e gain esteso |
 | MCP3561  | 15k SPS        | 64x     | 2            | 2.7-3.6V     | Buon compromesso velocità/prestazioni |
-| ADS1232  | 1.6k SPS       | 128x    | 2            | AVDD: 5V, DVDD: 2.7-5.25V | Progettato per celle di carico |
+| ADS1234  | 2k SPS         | 128x    | 4            | AVDD: 5V, DVDD: 2.7-5.25V | 24-bit ottimizzato per celle di carico |
+| ADS1232  | 1.6k SPS       | 128x    | 2            | AVDD: 5V, DVDD: 2.7-5.25V | Versione 2 canali dell'ADS1234 |
 | NAU7802  | 320 SPS        | 128x    | 1            | 2.7-3.6V     | I2C limita la velocità |
 | HX711    | 80 SPS         | 128x    | 1            | AVDD: 4.8-5.5V | Lento ma ampiamente utilizzato |
 
@@ -61,10 +62,10 @@
 * ADS1262: PGA fino a 32x e alta velocità, ottimo per celle di carico
 * ADS1263: Come ADS1262 ma con 6 canali diff. e PGA fino a 128x
 * MCP3561: 4 canali single-ended / 2 differenziali con multiplexer
-* ADS1232: versione a 2 canali, esiste ADS1234 a 4 canali
+* ADS1234: 4 canali differenziali, 24-bit, ottimizzato per celle di carico
+* ADS1232: Come ADS1234 ma con 2 canali differenziali
 * NAU7802: singolo canale differenziale dedicato
 * HX711: singolo canale differenziale più un canale ausiliario
-
 ## Note sulla Separazione A/D
 - I chip più moderni tendono ad avere generazione interna delle tensioni
 - La separazione fisica delle alimentazioni (quando richiesta) aiuta a:
