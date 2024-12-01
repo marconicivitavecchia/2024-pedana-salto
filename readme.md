@@ -42,6 +42,23 @@
 - Cavo schermato standard
 - Connessione aerea su richiesta
 
+# ADC per Celle di Carico in Ordine di Velocità
+
+| ADC      | Max Sample Rate | PGA Max | Note |
+|----------|----------------|---------|------|
+| ADS1256  | 30k SPS        | 64x     | Più veloce ma PGA insufficiente |
+| MCP3561  | 15k SPS        | 64x     | Buon compromesso velocità/prestazioni |
+| ADS1232  | 1.6k SPS       | 128x    | Progettato per celle di carico |
+| NAU7802  | 320 SPS        | 128x    | I2C limita la velocità |
+| HX711    | 80 SPS         | 128x    | Lento ma ampiamente utilizzato |
+
+## Note aggiuntive
+* ADS1256: miglior scelta per applicazioni veloci che non richiedono tutto il range
+* MCP3561: buon compromesso con chopper stabilization
+* ADS1232: specifico per celle di carico con buona velocità
+* NAU7802: semplice da usare (I2C) ma limitato in velocità
+* HX711: ottimo per bilance statiche, inadatto per misure dinamiche
+
 ## ADS1256 - Specifiche Tecniche
 
 ### Caratteristiche Principali
