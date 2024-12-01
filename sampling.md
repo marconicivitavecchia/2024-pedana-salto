@@ -550,4 +550,171 @@ Processo in 3 fasi:
 
    - I valori di tara per ciascuna cella e il fattore di scala complessivo vengono salvati in un file CSV.
 
+#### Esempio di Utilizzo
+1. Posizionare la pedana senza alcun carico e avviare il programma.
+2. Posizionare il peso noto (es. 1000 grammi) quando richiesto.
+3. I dati di calibrazione verranno salvati nel file /sd/calibrazione_sistema.csv.
 
+Per introdurre la calibrazione basata su transizioni di peso rilevate (fronte di discesa e fronte di salita), possiamo implementare un sistema che rilevi variazioni significative nel peso totale misurato dalle 4 celle di carico. Questo approccio sostituisce il ritardo fisso con un monitoraggio dinamico delle misurazioni, reagendo a eventi di sollevamento del peso e applicazione del peso di riferimento.
+
+#### Strategia
+
+- **Rilevazione di discesa (togli):** La lettura del peso diminuisce significativamente e rimane stabile (si stabilizza sotto una certa soglia).
+- **Rilevazione di salita (metti):** Subito dopo una discesa, il peso inizia ad aumentare e raggiunge un valore stabile sopra una soglia predefinita.
+
+```python
+import time
+from machine import Pin, SPI
+
+# Configurazione dei pin
+CS_PIN = 5
+DRDY_PIN = 4
+cs = Pin(CS_PIN, Pin.OUT)
+drdy = Pin(DRDY_PIN, Pin.IN)
+
+# Configurazione SPI
+spi = SPI(1, baudrate=10000000, polarity=0, phase=1, sck=Pin(18), mosi=Pin(23), miso=Pin(19))
+
+def send_command(command):
+    """Invia un comando all'ADS1256."""
+    cs.value(0)
+    spi.write(bytearray([command]))
+    cs.value(1)
+
+def select_channel(channel):
+    """Seleziona il canale nel multiplexer interno dell'ADS1256."""
+    mux_config = channel * 8  # Configura il registro MUX per il canale
+    cs.value(0)
+    spi.write(bytearray([0x50 | 0x01, 0x00, mux_config]))  # Scrive nel registro MUX
+    cs.value(1)
+    send_command(0xFC)  # Comando SYNC per sincronizzare
+    send_command(0x00)  # Comando WAKEUP per iniziare la conversione
+
+def read_adc():
+    """Legge un valore a 24 bit dall'ADS1256."""
+    cs.value(0)
+    spi.write(bytearray([0x01]))  # Comando RDATA
+    result = spi.read(3)  # Legge 3 byte di dati
+    cs.value(1)
+    raw_value = (result[0] << 16) | (result[1] << 8) | result[2]
+    if raw_value & 0x800000:  # Controlla il bit di segno
+        raw_value -= 0x1000000
+    return raw_value
+
+def read_all_channels(channels=4):
+    """Legge i dati da tutti i canali configurati."""
+    readings = []
+    for i in range(channels):
+        select_channel(i)
+        time.sleep(0.01)  # Pausa per stabilizzare
+        readings.append(read_adc())
+    return readings
+
+def detect_weight_change(target_delta, channels=4):
+    """
+    Rileva un cambio significativo di peso basato su una variazione target.
+    - target_delta: variazione di peso (in unità ADC) considerata significativa.
+    - channels: numero di canali da leggere (default: 4).
+    Restituisce True se il cambio viene rilevato, altrimenti False.
+    """
+    previous_sum = sum(read_all_channels(channels))
+    while True:
+        current_sum = sum(read_all_channels(channels))
+        delta = abs(current_sum - previous_sum)
+        if delta > target_delta:
+            return current_sum
+        previous_sum = current_sum
+        time.sleep(0.1)  # Ritardo minimo tra le letture
+
+def detect_togli_metti(target_delta, channels=4):
+    """
+    Rileva una transizione completa da "togli" (discesa) a "metti" (salita) del peso.
+    Restituisce True se la transizione è stata rilevata, altrimenti False.
+    """
+    print("Inizio rilevazione della transizione (togli -> metti)...")
+    previous_sum = sum(read_all_channels(channels))
+    weight_removed = False
+    weight_added = False
+    
+    while True:
+        current_sum = sum(read_all_channels(channels))
+        delta = abs(current_sum - previous_sum)
+
+        # Rilevazione di discesa (togli)
+        if not weight_removed and delta > target_delta and current_sum < previous_sum:
+            print("Peso rimosso (fase di discesa rilevata)...")
+            weight_removed = True
+        
+        # Rilevazione di salita (metti) dopo discesa
+        if weight_removed and not weight_added and delta > target_delta and current_sum > previous_sum:
+            print("Peso aggiunto (fase di salita rilevata)...")
+            weight_added = True
+
+        # Se entrambe le fasi sono rilevate, la transizione è completata
+        if weight_removed and weight_added:
+            return True
+
+        previous_sum = current_sum
+        time.sleep(0.1)  # Ritardo tra le letture per evitare il sovraccarico
+
+def calibrate_system(weight, channels=4, target_delta=5000):
+    """
+    Calibra il sistema basandosi sulle transizioni di peso.
+    - weight: peso noto (in unità fisiche, ad esempio grammi o chilogrammi).
+    - channels: numero di canali (default: 4).
+    - target_delta: soglia di variazione del peso per rilevare transizioni.
+    Restituisce i valori di tara e il fattore di scala.
+    """
+    print("Calibrazione del sistema...")
+
+    # Fase 1: Lettura a vuoto (tara)
+    print("Rimuovere tutto il peso dalla pedana...")
+    tare_sum = detect_weight_change(target_delta)
+    print(f"Tara totale rilevata: {tare_sum}")
+
+    # Fase 2: Lettura con peso noto
+    print(f"Posizionare un peso noto di {weight} unità sulla pedana...")
+    weight_sum = detect_weight_change(target_delta)
+    print(f"Somma dei valori con peso: {weight_sum}")
+
+    # Calcolo del fattore di scala
+    scale_factor = (weight_sum - tare_sum) / weight
+    print(f"Fattore di scala calcolato: {scale_factor}")
+
+    return tare_sum, scale_factor
+
+def save_calibration_to_file(file_path, tare_sum, scale_factor):
+    """
+    Salva i dati di calibrazione su file.
+    - file_path: percorso del file.
+    - tare_sum: valore totale di tara.
+    - scale_factor: fattore di scala calcolato.
+    """
+    with open(file_path, "w") as file:
+        file.write("Tara,Fattore_di_Scala\n")
+        file.write(f"{tare_sum},{scale_factor}\n")
+    print(f"Dati di calibrazione salvati su {file_path}")
+
+# Percorso del file di calibrazione
+CALIBRATION_FILE = "/sd/calibrazione_sistema.csv"
+
+try:
+    print("Inizio calibrazione...")
+    # Peso noto utilizzato per la calibrazione (es. 1000 grammi)
+    WEIGHT = 1000
+
+    # Esegui la calibrazione del sistema
+    tare_sum, scale_factor = calibrate_system(WEIGHT)
+
+    # Salva i dati di calibrazione su file
+    save_calibration_to_file(CALIBRATION_FILE, tare_sum, scale_factor)
+
+    print("Calibrazione completata con successo.")
+    
+    # Rilevazione della transizione
+    detect_togli_metti(target_delta=5000)
+
+except KeyboardInterrupt:
+    print("Calibrazione interrotta.")
+
+```
