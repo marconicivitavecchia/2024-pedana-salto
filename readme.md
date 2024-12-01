@@ -342,3 +342,7 @@ CALIBRAZIONE
 **Tutorial su ADS1234:**
 - https://www.youtube.com/watch?v=NklVhEleiHI
 - https://www.youtube.com/watch?v=4HYsbSOxGqY
+
+**Tutorials filtraggio digitale:**
+- https://ww1.microchip.com/downloads/en/Appnotes/ProcessAnalogSensorDataDigitalFiltering-DS00004515.pdf
+- http://musicweb.ucsd.edu/~trsmyth/filters/filters.html
