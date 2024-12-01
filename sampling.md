@@ -160,3 +160,74 @@ except KeyboardInterrupt:
     print("Esecuzione interrotta.")
 ```
 
+# Lettura di 4 Celle di Carico con ADS1256 in MicroPython
+
+Questo codice permette di leggere i dati da 4 celle di carico collegate a un ADC **ADS1256**, utilizzando un **ESP32** programmato in **MicroPython**. La lettura dei dati avviene attraverso l'interfaccia SPI, sfruttando un interrupt sul pin `DRDY` per sapere quando i dati sono pronti.
+
+---
+
+## Funzionalità principali
+
+### 1. **Configurazione dei Pin**
+- **CS_PIN (Chip Select):** controlla la comunicazione con l'ADS1256.
+- **DRDY_PIN (Data Ready):** monitora lo stato del segnale `DRDY` per sapere quando i dati sono pronti.
+
+### 2. **Interrupt su `DRDY`**
+L'interrupt viene configurato per attivarsi sul fronte di discesa del segnale `DRDY`. Quando l'ADS1256 segnala che i dati sono pronti, l'handler dell'interrupt imposta la variabile globale `data_ready` a `True`.
+
+### 3. **Funzioni Principali**
+#### **`send_command(command)`**
+Invia un comando generico all'ADS1256 utilizzando SPI:
+- **Parametri:** comando a 1 byte.
+- **Esempio:** invio del comando `0xFC` per sincronizzare (`SYNC`).
+
+#### **`select_channel(channel)`**
+Configura il registro MUX per selezionare il canale desiderato:
+- **Parametri:** numero del canale (0-7).
+- Invia il comando per scrivere nel registro MUX, seguito dai comandi `SYNC` e `WAKEUP` per avviare la conversione.
+
+#### **`read_adc()`**
+Legge un valore a 24 bit dall'ADS1256:
+- Invia il comando `RDATA` per leggere i dati.
+- Converte i 3 byte ricevuti in un valore signed a 24 bit.
+
+#### **`read_all_channels(channels=4)`**
+Legge i dati da tutti i canali configurati:
+- Itera sui canali da 0 a `channels-1`.
+- Seleziona ogni canale con `select_channel()`.
+- Aspetta che l'interrupt su `DRDY` segnali che i dati sono pronti.
+- Legge e memorizza il valore campionato con `read_adc()`.
+
+---
+
+### 4. **Loop Principale**
+Il loop principale legge i valori dai 4 canali e li stampa sulla console:
+1. Chiama `read_all_channels()` per ottenere i dati da tutti i canali.
+2. Stampa i valori grezzi per ciascun canale.
+3. Include una pausa (`time.sleep(0.01)`) per evitare un sovraccarico del ciclo.
+
+---
+
+## Vantaggi del Codice
+1. **Efficienza con Interrupt su `DRDY`:**
+   - Elimina il polling continuo del segnale `DRDY`, riducendo il carico della CPU.
+
+2. **Configurazione ottimizzata di SPI:**
+   - Utilizza una velocità di 10 MHz per comunicare rapidamente con l'ADS1256.
+
+3. **Gestione Multi-Canale:**
+   - Permette di leggere fino a 8 canali, con 4 preconfigurati.
+
+4. **Compatibilità con MicroPython:**
+   - Adattato alla lentezza del linguaggio, mantenendo una frequenza consigliata di 250-500 Hz per canale.
+
+---
+
+## Struttura del Codice
+
+### **1. Configurazioni**
+```python
+CS_PIN = 5
+DRDY_PIN = 4
+spi = SPI(1, baudrate=10000000, polarity=0, phase=1, sck=Pin(18), mosi=Pin(23), miso=Pin(19))
+
