@@ -334,6 +334,9 @@ La non linearità dell'ADC è circa 20 volte migliore della cella di carico, qui
 -	Corregge non linearità del sistema
 -	La posizione dello zero a metà range è una scelta progettuale che massimizza range dinamico bidirezionale
 
+## Fasi progetto:
+- [Fase 1. Campionamento](smpling.md)
+
 **Materiale**:
 - ADC ADS1232 https://it.aliexpress.com/item/1005007195802960.html?spm=a2g0o.order_list.order_list_main.5.31183696R6xAH9&gatewayAdapt=glo2ita
 - ADC ADS1256 https://it.aliexpress.com/item/1005006296794440.html?spm=a2g0o.order_list.order_list_main.21.76bc3696RICV2y&gatewayAdapt=glo2ita
