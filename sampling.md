@@ -172,6 +172,13 @@ Questo codice permette di leggere i dati da 4 celle di carico collegate a un ADC
 - **CS_PIN (Chip Select):** controlla la comunicazione con l'ADS1256.
 - **DRDY_PIN (Data Ready):** monitora lo stato del segnale `DRDY` per sapere quando i dati sono pronti.
 
+```python
+CS_PIN = 5
+DRDY_PIN = 4
+spi = SPI(1, baudrate=10000000, polarity=0, phase=1, sck=Pin(18), mosi=Pin(23), miso=Pin(19))
+
+```
+
 ### 2. **Interrupt su `DRDY`**
 L'interrupt viene configurato per attivarsi sul fronte di discesa del segnale `DRDY`. Quando l'ADS1256 segnala che i dati sono pronti, l'handler dell'interrupt imposta la variabile globale `data_ready` a `True`.
 
@@ -241,11 +248,4 @@ except KeyboardInterrupt:
 
 ---
 
-## Struttura del Codice
-
-### **1. Configurazioni**
-```python
-CS_PIN = 5
-DRDY_PIN = 4
-spi = SPI(1, baudrate=10000000, polarity=0, phase=1, sck=Pin(18), mosi=Pin(23), miso=Pin(19))
 
