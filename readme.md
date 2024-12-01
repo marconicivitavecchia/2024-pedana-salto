@@ -346,3 +346,5 @@ CALIBRAZIONE
 **Tutorials filtraggio digitale:**
 - https://ww1.microchip.com/downloads/en/Appnotes/ProcessAnalogSensorDataDigitalFiltering-DS00004515.pdf
 - http://musicweb.ucsd.edu/~trsmyth/filters/filters.html
+- https://www.ti.com/lit/ab/sbaa587/sbaa587.pdf?ts=1732984488882#:~:text=Digital%20filters%20are%20commonly%20implemented,micro%2Dcontrollers%2C%20and%20FPGAs.&text=In%20general%2C%20there%20are%20three,)%20filters%2C%20and%20sinc%20filters.
+- https://www.ti.com/lit/an/sbaa230a/sbaa230a.pdf?ts=1732979002663
