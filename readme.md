@@ -86,6 +86,12 @@ Dove:
 - $V_{REF}$ è la tensione di riferimento
 - $2^{23}$ rappresenta metà della risoluzione totale (24 bit)
 
+| V+ Input | Formula | Calcolo | Codice Decimale | Codice Hex |
+|----------|---------|---------|-----------------|------------|
+| Vref | $\frac{2^{23}}{2} \cdot \left(\frac{2V_{REF}}{V_{REF}} - 1\right)$ | $\frac{2^{23}}{2} \cdot (2-1) = \frac{2^{23}}{2}$ | 4.194.304 | 0x400000 |
+| 0 | $\frac{2^{23}}{2} \cdot \left(\frac{V_{REF}}{V_{REF}} - 1\right)$ | $\frac{2^{23}}{2} \cdot (1-1) = 0$ | 0 | 0x000000 |
+| -Vref | $\frac{2^{23}}{2} \cdot \left(\frac{0}{V_{REF}} - 1\right)$ | $\frac{2^{23}}{2} \cdot (0-1) = -\frac{2^{23}}{2}$ | -4.194.304 | 0xC00000 |
+
 ## Formula ADS1256 consigliata per ingressi single ended (non duali)
 
 <img src="img/ads1256_single_ended.png" alt="alt text" width="600">
