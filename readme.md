@@ -141,21 +141,21 @@ $$Code = G \cdot 2^{23} \cdot \left(\frac{V_+}{V_{REF}} - 1\right) + 2^{23}$$
 
 ## Dimensionamento di una singola cella
 
-P# Analisi Range ADC e Guadagno per Celle di Carico
+## Analisi Range ADC e Guadagno per Celle di Carico
 
-## Specifiche di Base
+### Specifiche di Base
 * ADS1256: range ingresso = ±VREF (tipicamente ±2.5V, range totale 5V)
 * Celle di carico: 
  * Sensibilità = 2.0±0.05 mV/V
  * Tensione eccitazione raccomandata = 5-12V
 
-## Calcolo Output Celle e Guadagno
+### Calcolo Output Celle e Guadagno
 * Output cella a fondo scala = 5V × 2mV/V = 10mV
 * Guadagno teorico = 2.5V/10mV = 250
 * Guadagni disponibili ADS1256: 1, 2, 4, 8, 16, 32, 64
 * Scelta: G=64 (massimo disponibile)
 
-## Analisi Range Effettivo
+### Analisi Range Effettivo
 * Segnale amplificato massimo = 10mV × 64 = 640mV
 * Range totale ADC = 5V (da -2.5V a +2.5V)
 * Utilizzo range ADC = 640mV/5000mV = 12.8%
@@ -173,7 +173,7 @@ Considerando che per misure di peso servono tipicamente 50,000-100,000 livelli p
 
 ## Calcolo Risoluzione Sensore 500kg
 
-## Dati
+### Dati
 * Capacità = 500kg
 * Sensibilità = 2mV/V
 * Vcc = 5V
@@ -191,9 +191,9 @@ Nota: questa è la risoluzione teorica dell'ADC. La risoluzione effettiva sarà 
 * Deriva termica
 * Altri fattori ambientali
 
-# Calcolo Risoluzione Sensore 2t
+## Calcolo Risoluzione Sensore 2t
 
-## Dati
+### Dati
 * Capacità = 2000kg
 * Sensibilità = 2mV/V
 * Vcc = 5V
@@ -202,7 +202,7 @@ Nota: questa è la risoluzione teorica dell'ADC. La risoluzione effettiva sarà 
 * Utilizzo range = 12.8%
 * Livelli effettivi = 2.147.483
 
-## Calcolo
+### Calcolo
 * Risoluzione = 2000kg/2.147.483 = 0.931 grammi
 
 Nota: questa è la risoluzione teorica dell'ADC. La risoluzione effettiva sarà limitata da:
