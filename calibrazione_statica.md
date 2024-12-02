@@ -240,36 +240,26 @@ Vediamo perché questo accade.
 
 ## Errore Relativo: Tara e Peso Statico
 
-1. Con errore relativo costante (ε) nel sistema:
+1. Errore relativo costante ($\varepsilon$) nel sistema:
    
-```
-Tmisurata = T⋅(1+ε)
-F0,misurato = F0⋅(1+ε)
-Fs,misurato = Fs⋅(1+ε)
-```
+$$T_{misurata} = T \cdot (1 + \varepsilon)$$
+$$F_{0,misurato} = F_0 \cdot (1 + \varepsilon)$$
+$$F_{s,misurato} = F_s \cdot (1 + \varepsilon)$$
 
 ## Calcolo dell'Accelerazione
 
 Formula base:
-```
-a = g⋅(Fs−F0)/F0
-```
+$$a = g \cdot \left( \frac{F_s - F_0}{F_0} \right)$$
 
 Con valori misurati:
-```
-amisurata = g⋅(Fs,misurato−F0,misurato)/F0,misurato
-```
+$$a_{misurata} = g \cdot \left( \frac{F_{s,misurato} - F_{0,misurato}}{F_{0,misurato}} \right)$$
 
 Sostituendo le espressioni:
-```
-amisurata = g⋅(Fs⋅(1+ε)−F0⋅(1+ε))/(F0⋅(1+ε))
-```
+$$a_{misurata} = g \cdot \left( \frac{F_s \cdot (1 + \varepsilon) - F_0 \cdot (1 + \varepsilon)}{F_0 \cdot (1 + \varepsilon)} \right)$$
 
 Semplificando:
-```
-amisurata = g⋅((Fs−F0)⋅(1+ε))/(F0⋅(1+ε))
-amisurata = g⋅(Fs−F0)/F0
-```
+$$a_{misurata} = g \cdot \left( \frac{(F_s - F_0) \cdot (1 + \varepsilon)}{F_0 \cdot (1 + \varepsilon)} \right)$$
+$$a_{misurata} = g \cdot \left( \frac{F_s - F_0}{F_0} \right)$$
 
 ## Implicazioni
 
