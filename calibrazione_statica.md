@@ -386,3 +386,61 @@ Dove:
 - $N$: Campione finale (accelerazione zero)
 - $F_{\text{pedana}}[n]$: Forza misurata al campione $n$
 - $\Delta t$: Intervallo di campionamento
+
+Ecco un codice Python per calcolare la velocità di caduta utilizzando i dati della forza misurata dalla pedana durante l'atterraggio.
+```python
+# Parametri e dati iniziali
+g = 9.81  # Accelerazione di gravità (m/s^2)
+F_statico = 700  # Peso statico dell'atleta in Newton (esempio)
+delta_t = 0.01  # Intervallo di campionamento (secondi)
+
+# Forza misurata dalla pedana durante l'atterraggio (esempio)
+F_pedana = [700, 900, 1200, 1500, 1200, 900, 700]
+
+# Calcolo della velocità di caduta
+def calcola_velocita_caduta(F_pedana, F_statico, delta_t, g):
+    v_caduta = 0  # Velocità iniziale
+    inizio_impulso = False
+    
+    for F in F_pedana:
+        # Individua l'inizio del contatto (quando F > F_statico)
+        if F > F_statico:
+            inizio_impulso = True
+        
+        # Calcola solo dopo il contatto
+        if inizio_impulso:
+            relativa = (F - F_statico) / F_statico  # Accelerazione relativa
+            v_caduta += g * relativa * delta_t  # Somma discreta
+    
+    return v_caduta
+
+# Calcolo della velocità di caduta
+v_caduta = calcola_velocita_caduta(F_pedana, F_statico, delta_t, g)
+
+# Risultato
+print(f"Velocità di caduta: {v_caduta:.2f} m/s")
+```
+
+# Calcolo dell'Altezza dal Salto
+
+## Formula dell'Altezza
+$$h = \frac{v_{\text{iniziale}}^2}{2g}$$
+
+Dove:
+- $v_{\text{iniziale}}$: Velocità verticale iniziale
+- $g = 9.81 \, \text{m/s}^2$: Accelerazione di gravità
+
+## Derivazione dalla Conservazione dell'Energia
+
+1. Energia cinetica iniziale:
+   $$E_{\text{cinetica}} = \frac{1}{2} m v_{\text{iniziale}}^2$$
+
+2. Energia potenziale al punto massimo:
+   $$E_{\text{potenziale}} = m g h$$
+
+Uguagliando le energie:
+$$\frac{1}{2} m v_{\text{iniziale}}^2 = m g h$$
+
+Risolvendo per $h$:
+$$h = \frac{v_{\text{iniziale}}^2}{2g}$$
+
