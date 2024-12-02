@@ -366,3 +366,23 @@ v_iniziale *= g
 # Risultato
 print("Velocità iniziale:", v_iniziale, "m/s")
 ```
+
+# Calcolo della Velocità di Caduta
+
+## Formula nel Dominio Continuo
+
+L'accelerazione relativa:
+$$a_{\text{relativa}}(t) = \frac{F_{\text{pedana}}(t) - F_{\text{statico}}}{F_{\text{statico}}} \cdot g$$
+
+Velocità di caduta:
+$$v_{\text{caduta}} = g \int_{t_{\text{impatto}}}^{t_{\text{stabilizzato}}} \frac{F_{\text{pedana}}(t) - F_{\text{statico}}}{F_{\text{statico}}} \, dt$$
+
+## Formula nel Dominio Discreto
+
+$$v_{\text{caduta}} = g \cdot \Delta t \cdot \sum_{n=M}^{N-1} \frac{F_{\text{pedana}}[n] - F_{\text{statico}}}{F_{\text{statico}}}$$
+
+Dove:
+- $M$: Primo campione dopo il contatto
+- $N$: Campione finale (accelerazione zero)
+- $F_{\text{pedana}}[n]$: Forza misurata al campione $n$
+- $\Delta t$: Intervallo di campionamento
