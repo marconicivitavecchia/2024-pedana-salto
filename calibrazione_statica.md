@@ -343,3 +343,26 @@ Dove:
 - $F_{\text{statico}}$: Forza statica pre-salto
 - $\Delta t$: Intervallo di campionamento
 - $N$: Numero totale di campioni da $t_0$ a $t_{\text{distacco}}$
+
+Esempio in python:
+
+```python
+# Dati
+F_statico = 700  # Peso statico dell'atleta in N
+g = 9.81         # Accelerazione di gravità in m/s^2
+delta_t = 0.01   # Intervallo di campionamento in secondi
+F_pedana = [700, 750, 800, 850, 900, 1000, 1200, 1400]  # Forza misurata (esempio)
+N = len(F_pedana)  # Numero di campioni
+
+# Calcolo velocità iniziale
+v_iniziale = 0
+for n in range(N):
+    relativa = (F_pedana[n] - F_statico) / F_statico
+    v_iniziale += relativa * delta_t
+
+# Moltiplicazione per g per ottenere velocità iniziale in m/s
+v_iniziale *= g
+
+# Risultato
+print("Velocità iniziale:", v_iniziale, "m/s")
+```
