@@ -16,9 +16,9 @@ Se tara e peso dell'atleta vengono campionati nello stesso momento e con lo stes
 
 Vediamo perché questo accade.
 
-# Errore Relativo nelle Misure della Pedana
+## Errore Relativo nelle Misure della Pedana
 
-## Errore Relativo: Tara e Peso Statico
+### Errore Relativo: Tara e Peso Statico
 
 1. Errore relativo costante ($\varepsilon$) nel sistema:
    
@@ -41,7 +41,7 @@ Semplificando:
 $$a_{misurata} = g \cdot \left( \frac{(F_s - F_0) \cdot (1 + \varepsilon)}{F_0 \cdot (1 + \varepsilon)} \right)$$
 $$a_{misurata} = g \cdot \left( \frac{F_s - F_0}{F_0} \right)$$
 
-## Implicazioni
+### Implicazioni
 
 1. **Robustezza**: L'errore relativo costante si cancella nel calcolo
 2. **Calibrazione**: Rimane importante per errori non relativi (drift, bias)
@@ -55,7 +55,7 @@ La risposta è che una pedana misura la forza applicata su di essa, e quindi, in
 
 Vediamo passo passo come funziona il ragionamento e perché la velocità iniziale è effettivamente condivisa tra atleta e pedana al momento del distacco.
 
-# Relazione tra Accelerazione Pedana e Atleta
+## Relazione tra Accelerazione Pedana e Atleta
 
 L'accelerazione della pedana ($a_{pedana}$) non coincide con quella dell'atleta ($a_{atleta}$), ma i movimenti sono correlati.
 
@@ -72,9 +72,9 @@ $$v_{\text{iniziale, atleta}} = v_{\text{pedana al distacco}}$$
 La velocità iniziale dell'atleta può quindi essere calcolata integrando la forza misurata dalla pedana nel tempo.
 
 
-# Integrazione dell'Accelerazione Relativa
+## Integrazione dell'Accelerazione Relativa
 
-## 1. Accelerazione relativa della pedana
+### 1. Accelerazione relativa della pedana
 
 $$a_{\text{relativa}}(t) = \frac{F_{\text{pedana}}(t) - F_{\text{statico}}}{F_{\text{statico}}} \cdot g$$
 
@@ -83,7 +83,7 @@ Dove:
 - $F_{\text{statico}}$: Forza statica (peso dell'atleta)
 - $g$: Accelerazione di gravità
 
-## 2. Integrazione dell'accelerazione relativa
+### 2. Integrazione dell'accelerazione relativa
 
 Velocità relativa:
 $$v_{\text{relativa}}(t) = \int_{t_0}^{t_{\text{distacco}}} a_{\text{relativa}}(t) \, dt$$
@@ -91,14 +91,14 @@ $$v_{\text{relativa}}(t) = \int_{t_0}^{t_{\text{distacco}}} a_{\text{relativa}}(
 Sostituendo $a_{\text{relativa}}(t)$:
 $$v_{\text{relativa}}(t) = g \int_{t_0}^{t_{\text{distacco}}} \frac{F_{\text{pedana}}(t) - F_{\text{statico}}}{F_{\text{statico}}} \, dt$$
 
-## 3. Velocità iniziale dell'atleta
+### 3. Velocità iniziale dell'atleta
 
 $$v_{\text{iniziale}} = v_{\text{relativa}}(t_{\text{distacco}})$$
 
 Quindi:
 $$v_{\text{iniziale}} = g \int_{t_0}^{t_{\text{distacco}}} \frac{F_{\text{pedana}}(t) - F_{\text{statico}}}{F_{\text{statico}}} \, dt$$
 
-## Considerazioni
+### Considerazioni
 
 1. **Peso assoluto non necessario**:
    - Calcolo basato solo su valori relativi rispetto a $F_{\text{statico}}$
@@ -110,12 +110,12 @@ $$v_{\text{iniziale}} = g \int_{t_0}^{t_{\text{distacco}}} \frac{F_{\text{pedana
    - Calcolo valido fino al momento $t_{\text{distacco}}$
   
 
-# Integrale Discreto per il Calcolo della Velocità
+## Integrale Discreto per il Calcolo della Velocità
 
-## Formula Continua
+### Formula Continua
 $$v_{\text{iniziale}} = g \int_{t_0}^{t_{\text{distacco}}} \frac{F_{\text{pedana}}(t) - F_{\text{statico}}}{F_{\text{statico}}} \, dt$$
 
-## Versione Discreta
+### Versione Discreta
 $$v_{\text{iniziale}} = g \sum_{n=0}^{N-1} \frac{F_{\text{pedana}}[n] - F_{\text{statico}}}{F_{\text{statico}}} \cdot \Delta t$$
 
 Dove:
@@ -147,9 +147,9 @@ v_iniziale *= g
 print("Velocità iniziale:", v_iniziale, "m/s")
 ```
 
-# Calcolo della Velocità di Caduta
+## Calcolo della Velocità di Caduta
 
-## Formula nel Dominio Continuo
+### Formula nel Dominio Continuo
 
 L'accelerazione relativa:
 $$a_{\text{relativa}}(t) = \frac{F_{\text{pedana}}(t) - F_{\text{statico}}}{F_{\text{statico}}} \cdot g$$
@@ -157,7 +157,7 @@ $$a_{\text{relativa}}(t) = \frac{F_{\text{pedana}}(t) - F_{\text{statico}}}{F_{\
 Velocità di caduta:
 $$v_{\text{caduta}} = g \int_{t_{\text{impatto}}}^{t_{\text{stabilizzato}}} \frac{F_{\text{pedana}}(t) - F_{\text{statico}}}{F_{\text{statico}}} \, dt$$
 
-## Formula nel Dominio Discreto
+### Formula nel Dominio Discreto
 
 $$v_{\text{caduta}} = g \cdot \Delta t \cdot \sum_{n=M}^{N-1} \frac{F_{\text{pedana}}[n] - F_{\text{statico}}}{F_{\text{statico}}}$$
 
@@ -201,16 +201,16 @@ v_caduta = calcola_velocita_caduta(F_pedana, F_statico, delta_t, g)
 print(f"Velocità di caduta: {v_caduta:.2f} m/s")
 ```
 
-# Calcolo dell'Altezza dal Salto
+## Calcolo dell'Altezza dal Salto
 
-## Formula dell'Altezza
+### Formula dell'Altezza
 $$h = \frac{v_{\text{iniziale}}^2}{2g}$$
 
 Dove:
 - $v_{\text{iniziale}}$: Velocità verticale iniziale
 - $g = 9.81 \, \text{m/s}^2$: Accelerazione di gravità
 
-## Derivazione dalla Conservazione dell'Energia
+### Derivazione dalla Conservazione dell'Energia
 
 1. Energia cinetica iniziale:
    $$E_{\text{cinetica}} = \frac{1}{2} m v_{\text{iniziale}}^2$$
