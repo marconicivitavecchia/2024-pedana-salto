@@ -328,3 +328,18 @@ $$v_{\text{iniziale}} = g \int_{t_0}^{t_{\text{distacco}}} \frac{F_{\text{pedana
 
 3. **Importanza del distacco**:
    - Calcolo valido fino al momento $t_{\text{distacco}}$
+  
+
+# Integrale Discreto per il Calcolo della Velocità
+
+## Formula Continua
+$$v_{\text{iniziale}} = g \int_{t_0}^{t_{\text{distacco}}} \frac{F_{\text{pedana}}(t) - F_{\text{statico}}}{F_{\text{statico}}} \, dt$$
+
+## Versione Discreta
+$$v_{\text{iniziale}} = g \sum_{n=0}^{N-1} \frac{F_{\text{pedana}}[n] - F_{\text{statico}}}{F_{\text{statico}}} \cdot \Delta t$$
+
+Dove:
+- $F_{\text{pedana}}[n]$: Forza campionata al tempo $t_n$
+- $F_{\text{statico}}$: Forza statica pre-salto
+- $\Delta t$: Intervallo di campionamento
+- $N$: Numero totale di campioni da $t_0$ a $t_{\text{distacco}}$
