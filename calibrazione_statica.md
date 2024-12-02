@@ -219,3 +219,13 @@ Dopo aver determinato i kᵢ, verifica che il peso totale calcolato con W_totale
 1. Che il peso noto sia stato posizionato al centro della pedana
 2. Che le celle siano correttamente livellate e funzionanti
 3. Eventuali errori nell'acquisizione dei dati
+
+L'accelerazione netta può essere calcolata come:
+
+a=g(PsP0−1)a = g \left( \frac{P_s}{P_0} - 1 \right)a=g(P0​Ps​​−1)
+
+Dove:
+
+PsP_sPs​ è la forza totale misurata durante il salto.
+
+P0P_0P0​ è la forza a riposo (peso statico dell'atleta).
