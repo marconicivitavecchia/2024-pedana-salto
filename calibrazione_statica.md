@@ -231,3 +231,48 @@ $$P_s​$$ è la forza totale misurata durante il salto.
 $$P_0$$ è la forza a riposo (peso statico dell'atleta).
 
 La tara della pedana è già inclusa nel calcolo del peso statico $$P_0$$​, quindi non serve sottrarre una massa separata come $$m_t$$.
+
+Se tara e peso dell'atleta vengono campionati nello stesso momento e con lo stesso sistema, l'errore relativo associato a queste misure si cancella nei calcoli che utilizzano differenze relative.
+
+Vediamo perché questo accade.
+
+# Errore Relativo nelle Misure della Pedana
+
+## Errore Relativo: Tara e Peso Statico
+
+1. Con errore relativo costante (ε) nel sistema:
+   
+```
+Tmisurata = T⋅(1+ε)
+F0,misurato = F0⋅(1+ε)
+Fs,misurato = Fs⋅(1+ε)
+```
+
+## Calcolo dell'Accelerazione
+
+Formula base:
+```
+a = g⋅(Fs−F0)/F0
+```
+
+Con valori misurati:
+```
+amisurata = g⋅(Fs,misurato−F0,misurato)/F0,misurato
+```
+
+Sostituendo le espressioni:
+```
+amisurata = g⋅(Fs⋅(1+ε)−F0⋅(1+ε))/(F0⋅(1+ε))
+```
+
+Semplificando:
+```
+amisurata = g⋅((Fs−F0)⋅(1+ε))/(F0⋅(1+ε))
+amisurata = g⋅(Fs−F0)/F0
+```
+
+## Implicazioni
+
+1. **Robustezza**: L'errore relativo costante si cancella nel calcolo
+2. **Calibrazione**: Rimane importante per errori non relativi (drift, bias)
+3. **Precisione**: Sistema valido con precisione relativa accettabile
