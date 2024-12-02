@@ -222,7 +222,7 @@ Dopo aver determinato i kᵢ, verifica che il peso totale calcolato con W_totale
 
 L'accelerazione netta può essere calcolata come:
 
-a=g(PsP0−1)a = g \left( \frac{P_s}{P_0} - 1 \right)a=g(P0​Ps​​−1)
+$$a=g(PsP0−1)a = g \left( \frac{P_s}{P_0} - 1 \right)a=g(P0​Ps​​−1)$$
 
 Dove:
 
