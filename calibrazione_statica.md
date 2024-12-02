@@ -226,6 +226,6 @@ $$a = g \left( \frac{P_s}{P_0} - 1 \right)$$
 
 Dove:
 
-P_s​ è la forza totale misurata durante il salto.
+$$P_s​$$ è la forza totale misurata durante il salto.
 
-P_0 è la forza a riposo (peso statico dell'atleta).
+$$P_0$$ è la forza a riposo (peso statico dell'atleta).
