@@ -1,4 +1,4 @@
-
+>[Torna all'indice](readme.md#fasi-progetto)
 
 # ADS1256 e Multiplexing in MicroPython
 
@@ -747,3 +747,4 @@ except KeyboardInterrupt:
 
 ```
 
+>[Torna all'indice](readme.md#fasi-progetto)
