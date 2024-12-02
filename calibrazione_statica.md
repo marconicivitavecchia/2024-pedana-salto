@@ -29,7 +29,7 @@ Processo in 3 fasi:
    - I valori di tara per ciascuna cella e il fattore di scala complessivo vengono salvati in un file CSV insieme alle altre informazioni di calibrazione statica della pedana.
 
 ## Esempio di Utilizzo
-1. 2. Posizionare il saltatore quando richiesto.
+1. Posizionare il saltatore quando richiesto.
 3. I dati di calibrazione verranno salvati nel file /sd/calibrazione_sistema.csv.
 
 # Calibrazione Statica di una Singola Cella di Carico
