@@ -266,3 +266,27 @@ $$a_{misurata} = g \cdot \left( \frac{F_s - F_0}{F_0} \right)$$
 1. **Robustezza**: L'errore relativo costante si cancella nel calcolo
 2. **Calibrazione**: Rimane importante per errori non relativi (drift, bias)
 3. **Precisione**: Sistema valido con precisione relativa accettabile
+
+## Accelerazione
+
+Ma con una pedana in realtà misuro l'accelerazione della pedana o quella dell'atleta? Integrandola trovo la velocità iniziale che invece è uguale per entrambi, pedana e atleta?
+
+La risposta è che una pedana misura la forza applicata su di essa, e quindi, indirettamente, l'accelerazione della pedana stessa. Tuttavia, con alcune considerazioni, possiamo ottenere l'accelerazione e la velocità dell'atleta, dato che il sistema pedana-atleta è interconnesso durante il salto.
+
+Vediamo passo passo come funziona il ragionamento e perché la velocità iniziale è effettivamente condivisa tra atleta e pedana al momento del distacco.
+
+# Relazione tra Accelerazione Pedana e Atleta
+
+L'accelerazione della pedana ($a_{pedana}$) non coincide con quella dell'atleta ($a_{atleta}$), ma i movimenti sono correlati.
+
+## Velocità al Distacco
+
+Al momento del distacco:
+- L'atleta smette di esercitare forza sulla pedana
+- La pedana si ferma, l'atleta continua il moto ascendente
+
+Fino al distacco, le velocità sono identiche per il vincolo di contatto:
+
+$$v_{\text{iniziale, atleta}} = v_{\text{pedana al distacco}}$$
+
+La velocità iniziale dell'atleta può quindi essere calcolata integrando la forza misurata dalla pedana nel tempo.
