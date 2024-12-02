@@ -1,6 +1,8 @@
 
 
-# Calibrazione
+# Calibrazione statica saltatore
+
+E' una operazione che si fa prima di ogni salto.
 
 Processo in 3 fasi:
 
@@ -8,10 +10,11 @@ Processo in 3 fasi:
 
    - I valori di uscita grezzi delle 4 celle vengono letti e sommati.
    - Questo valore rappresenta la tara totale del sistema.
+   - questo valore è stato già salvato in fse di calibrazione statica della pedana
 
 **2. Lettura con Peso di Riferimento:**
 
-   - Un peso noto (ad esempio, 1000 grammi) viene posizionato sulla pedana.
+   - Un peso noto (ad esempio, 75Kg) viene posizionato sulla pedana.
    - I valori letti dalle 4 celle vengono sommati.
 
 **3. Calcolo del Fattore di Scala:**
@@ -23,11 +26,10 @@ Processo in 3 fasi:
  
 **4. Memorizzazione dei Parametri:**
 
-   - I valori di tara per ciascuna cella e il fattore di scala complessivo vengono salvati in un file CSV.
+   - I valori di tara per ciascuna cella e il fattore di scala complessivo vengono salvati in un file CSV insieme alle altre informazioni di calibrazione statica della pedana.
 
 ## Esempio di Utilizzo
-1. Posizionare la pedana senza alcun carico e avviare il programma.
-2. Posizionare il peso noto (es. 1000 grammi) quando richiesto.
+1. 2. Posizionare il saltatore quando richiesto.
 3. I dati di calibrazione verranno salvati nel file /sd/calibrazione_sistema.csv.
 
 # Calibrazione Statica di una Singola Cella di Carico
@@ -67,7 +69,9 @@ L'offset è la lettura che una cella di carico fornisce anche quando non c'è ne
 
 L'offset deve essere sottratto da ogni misura per ottenere il valore effettivo della forza applicata.
 
-## Esempio Pratico
+## Esempio Pratico calibrazione statica della pedana 
+
+E'una operazione che si fa di tanto in tanto.
 
 ### Setup
 - Hai una pedana con 4 celle di carico collegate a un ADC (es. ADS1256)
