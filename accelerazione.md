@@ -223,3 +223,25 @@ $$\frac{1}{2} m v_{\text{iniziale}}^2 = m g h$$
 
 Risolvendo per $h$:
 $$h = \frac{v_{\text{iniziale}}^2}{2g}$$
+
+# Conclusione: Metodo di Calcolo Indipendente
+
+## Calcolo della Velocità Iniziale
+La pedana opera in modo autonomo attraverso:
+
+1. **Misurazione peso statico**
+   - Acquisizione diretta con atleta fermo
+
+2. **Analisi differenze relative**
+   - Rapporto tra forza dinamica e statica
+
+3. **Integrazione accelerazione relativa**
+   - Calcolo velocità iniziale
+
+## Vantaggi
+Il metodo è:
+- Indipendente dal peso assoluto
+- Autonomo nei calcoli
+- Versatile nell'utilizzo
+
+Non richiede parametri esterni come peso o massa dell'atleta.
