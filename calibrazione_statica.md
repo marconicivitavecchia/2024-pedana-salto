@@ -1,6 +1,6 @@
 >[Torna all'indice](readme.md#fasi-progetto)
 
-# Calibrazione statica saltatore
+# Calibrazione statica pedana
 
 E' una operazione che si fa prima di ogni salto.
 
