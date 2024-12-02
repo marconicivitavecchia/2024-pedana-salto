@@ -1,5 +1,5 @@
->[Torna all'indice](readme.md)
->
+>[Torna all'indice](readme.md#fasi-progetto)
+
 # CALCOLO ALTEZZA DA MISURE DI ACCELERAZIONE
 
 L'accelerazione netta può essere calcolata come:
@@ -247,3 +247,5 @@ Il metodo è:
 - Versatile nell'utilizzo
 
 Non richiede parametri esterni come peso o massa dell'atleta.
+
+>[Torna all'indice](readme.md#fasi-progetto)
