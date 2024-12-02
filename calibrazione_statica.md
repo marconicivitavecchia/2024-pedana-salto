@@ -1,4 +1,4 @@
-
+>[Torna all'indice](readme.md#fasi-progetto)
 
 # Calibrazione statica saltatore
 
@@ -220,4 +220,4 @@ Dopo aver determinato i kᵢ, verifica che il peso totale calcolato con W_totale
 2. Che le celle siano correttamente livellate e funzionanti
 3. Eventuali errori nell'acquisizione dei dati
 
-
+>[Torna all'indice](readme.md#fasi-progetto)
