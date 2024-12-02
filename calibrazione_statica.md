@@ -222,10 +222,10 @@ Dopo aver determinato i kᵢ, verifica che il peso totale calcolato con W_totale
 
 L'accelerazione netta può essere calcolata come:
 
-$$a=g(PsP0−1)a = g \left( \frac{P_s}{P_0} - 1 \right)a=g(P0​Ps​​−1)$$
+$$a = g \left( \frac{P_s}{P_0} - 1 \right)$$
 
 Dove:
 
-PsP_sPs​ è la forza totale misurata durante il salto.
+P_s​ è la forza totale misurata durante il salto.
 
-P0P_0P0​ è la forza a riposo (peso statico dell'atleta).
+P_0 è la forza a riposo (peso statico dell'atleta).
