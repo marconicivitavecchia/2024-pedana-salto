@@ -746,3 +746,28 @@ except KeyboardInterrupt:
     print("Calibrazione interrotta.")
 
 ```
+
+# Calibrazione Statica di una Singola Cella di Carico
+
+## Materiali necessari
+- Un sistema per acquisire i dati da ciascuna cella (ad esempio, un ADC come l'ADS1256)
+- Pesi noti di precisione (ad esempio, 1 kg, 2 kg, 5 kg)
+- Un supporto stabile per applicare il peso in modo uniforme su ciascuna cella
+
+## Procedura
+
+### 1. Azzeramento della cella
+- Collega la cella di carico al sistema di acquisizione e leggi il valore "a vuoto" (senza peso)
+- Registra questo valore e sottrai questa lettura da tutte le misurazioni successive (offset)
+
+### 2. Applicazione di pesi noti
+- Applica un peso noto alla cella e registra l'output del sistema (ad esempio, la lettura in unità ADC o millivolt)
+- Ripeti per una serie di pesi crescenti (ad esempio, 0 kg, 1 kg, 2 kg, 5 kg)
+
+### 3. Calcolo del coefficiente di calibrazione
+- Costruisci un grafico dell'output della cella (valore ADC o millivolt) rispetto al peso noto
+- Calcola la pendenza della retta risultante (slope): `slope = Δoutput / Δpeso`
+- Questo coefficiente sarà utilizzato per convertire l'output della cella in unità di peso o forza: `F = slope × output`
+
+### 4. Verifica della linearità
+- Verifica che la relazione sia lineare e, se necessario, correggi eventuali deviazioni con un'interpolazione o un'approssimazione polinomiale
