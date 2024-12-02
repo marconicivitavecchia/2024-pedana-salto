@@ -337,6 +337,7 @@ La non linearità dell'ADC è circa 20 volte migliore della cella di carico, qui
 ## Fasi progetto:
 - [Campionamento](sampling.md)
 - [Calibrazione statica](calibrazione_statica.md)
+- [Calcolo altezza](accelerazione.md)
 
 **Materiale**:
 - ADC ADS1232 https://it.aliexpress.com/item/1005007195802960.html?spm=a2g0o.order_list.order_list_main.5.31183696R6xAH9&gatewayAdapt=glo2ita
