@@ -229,3 +229,5 @@ Dove:
 $$P_s​$$ è la forza totale misurata durante il salto.
 
 $$P_0$$ è la forza a riposo (peso statico dell'atleta).
+
+La tara della pedana è già inclusa nel calcolo del peso statico $$P_0$$​, quindi non serve sottrarre una massa separata come $$m_t$$.
