@@ -290,3 +290,41 @@ Fino al distacco, le velocità sono identiche per il vincolo di contatto:
 $$v_{\text{iniziale, atleta}} = v_{\text{pedana al distacco}}$$
 
 La velocità iniziale dell'atleta può quindi essere calcolata integrando la forza misurata dalla pedana nel tempo.
+
+
+# Integrazione dell'Accelerazione Relativa
+
+## 1. Accelerazione relativa della pedana
+
+$$a_{\text{relativa}}(t) = \frac{F_{\text{pedana}}(t) - F_{\text{statico}}}{F_{\text{statico}}} \cdot g$$
+
+Dove:
+- $F_{\text{pedana}}(t)$: Forza misurata dalla pedana nel tempo
+- $F_{\text{statico}}$: Forza statica (peso dell'atleta)
+- $g$: Accelerazione di gravità
+
+## 2. Integrazione dell'accelerazione relativa
+
+Velocità relativa:
+$$v_{\text{relativa}}(t) = \int_{t_0}^{t_{\text{distacco}}} a_{\text{relativa}}(t) \, dt$$
+
+Sostituendo $a_{\text{relativa}}(t)$:
+$$v_{\text{relativa}}(t) = g \int_{t_0}^{t_{\text{distacco}}} \frac{F_{\text{pedana}}(t) - F_{\text{statico}}}{F_{\text{statico}}} \, dt$$
+
+## 3. Velocità iniziale dell'atleta
+
+$$v_{\text{iniziale}} = v_{\text{relativa}}(t_{\text{distacco}})$$
+
+Quindi:
+$$v_{\text{iniziale}} = g \int_{t_0}^{t_{\text{distacco}}} \frac{F_{\text{pedana}}(t) - F_{\text{statico}}}{F_{\text{statico}}} \, dt$$
+
+## Considerazioni
+
+1. **Peso assoluto non necessario**:
+   - Calcolo basato solo su valori relativi rispetto a $F_{\text{statico}}$
+
+2. **Velocità condivisa**:
+   - Atleta e pedana hanno stessa velocità durante il contatto
+
+3. **Importanza del distacco**:
+   - Calcolo valido fino al momento $t_{\text{distacco}}$
