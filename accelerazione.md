@@ -1,4 +1,4 @@
-# CALCOLO ACCELERAZIONE
+# CALCOLO ALTEZZA DA MISURE DI ACCELERAZIONE
 
 L'accelerazione netta può essere calcolata come:
 
