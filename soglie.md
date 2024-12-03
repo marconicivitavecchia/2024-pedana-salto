@@ -1,6 +1,6 @@
 >[Torna all'indice](readme.md#fasi-progetto)
 
-pippo: $ \dot{F}\text{pedana}(t) = \frac{dF\text{pedana}(t)}{dt} $
+$ pippo:  \dot{F}\text{pedana}(t) = \frac{dF\text{pedana}(t)}{dt} $
 
 $$ {\dot{F}}_pedana(t) > \text{soglia}_\text{positivo} $$
 
