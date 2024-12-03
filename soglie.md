@@ -1,4 +1,4 @@
-
+>[Torna all'indice](readme.md#fasi-progetto)
 
 # Metodi di Rilevamento per Analisi del Salto
 
@@ -60,3 +60,5 @@ $$E(t) = F_{\text{pedana}}(t)^2$$
 | Statistico | Robusto, semplice | Meno adatto a movimenti complessi |
 | Filtro adattivo | Migliore stabilità | Richiede regolazione fine |
 | Energia | Facile implementazione | Sensibile a picchi accidentali |
+
+>[Torna all'indice](readme.md#fasi-progetto)
