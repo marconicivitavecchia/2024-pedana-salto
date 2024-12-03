@@ -102,3 +102,4 @@
 - https://www.youtube.com/watch?v=D0lEiOFf9TM
 - https://www.youtube.com/watch?v=ts23oF3AZmc
 - https://moodle2.units.it/mod/folder/view.php?id=296060
+- https://github.com/rlabbe/Kalman-and-Bayesian-Filters-in-Python
