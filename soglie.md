@@ -2,7 +2,6 @@
 
 Ecco il contenuto completo dei metodi descritti, formattato in **Markdown**, pronto per essere incollato su GitHub:
 
-```markdown
 # Metodi per Stabilire Soglie e Rilevare Eventi nei Salti
 
 Questi metodi sono utili per rilevare automaticamente gli eventi chiave di un salto, come:
@@ -152,7 +151,7 @@ Utilizza modelli predittivi per identificare automaticamente i momenti chiave.
 - Per segnali rumorosi o variabili: **Filtro adattivo** o **energia del segnale**.
 - Per analisi avanzate: **Machine Learning**.
 
-```
+
 
 ## Esempi in python
 
