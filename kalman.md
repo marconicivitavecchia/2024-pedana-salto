@@ -1,4 +1,5 @@
-
+>[Torna all'indice](readme.md#fasi-progetto)>[Torna a filtri](filtri.md)
+>
 # Filtro di Kalman: Dal Concetto alla Teoria
 
 ## Livello 1: L'Idea Base
@@ -112,3 +113,5 @@ Punti critici:
 - **Livello 3**: Competenze di ottimizzazione
 - **Livello 4**: Comprensione dei limiti
 - **Livello 5**: Capacità di estensione
+
+>[Torna all'indice](readme.md#fasi-progetto)>[Torna a filtri](filtri.md)
