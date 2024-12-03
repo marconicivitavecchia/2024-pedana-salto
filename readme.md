@@ -293,6 +293,7 @@ La non linearità dell'ADC è circa 20 volte migliore della cella di carico, qui
 -	La posizione dello zero a metà range è una scelta progettuale che massimizza range dinamico bidirezionale
 
 ## Fasi progetto:
+- [Polarizzazione celle](polarizzazione.md)
 - [Campionamento](sampling.md)
 - [Calibrazione statica](calibrazione_statica.md)
 - [Calcolo altezza](accelerazione.md)
