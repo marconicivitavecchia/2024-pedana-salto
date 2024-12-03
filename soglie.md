@@ -16,12 +16,12 @@ Utilizza la derivata del segnale della forza per rilevare le transizioni chiave.
 
 ### **Descrizione**
 1. Calcola la derivata del segnale:
-   $$ \dot{F}_{\text{pedana}}(t) = \frac{dF_{\text{pedana}}(t)}{dt} $$
+  $$\dot{F}_{\text{pedana}}(t) = \frac{dF_{\text{pedana}}(t)}{dt}$$
 2. Rileva le soglie in base a variazioni significative:
-   - **Inizio salto**: Quando $$ \dot{F}_{\text{pedana}}(t) > \text{soglia}_\text{positivo} $$.
-   - **Stacco**: Quando $$ F_{\text{pedana}}(t) \approx 0 $$.
-   - **Attacco alla pedana**: Picco negativo significativo di $$ \dot{F}_{\text{pedana}}(t) $$.
-   - **Fine caduta**: Stabilizzazione di $$ F_{\text{pedana}}(t) $$ intorno al peso iniziale.
+   - **Inizio salto**: Quando$$\dot{F}_{\text{pedana}}(t) > \text{soglia}_\text{positivo}$$.
+   - **Stacco**: Quando$$F_{\text{pedana}}(t) \approx 0$$.
+   - **Attacco alla pedana**: Picco negativo significativo di$$\dot{F}_{\text{pedana}}(t)$$.
+   - **Fine caduta**: Stabilizzazione di$$F_{\text{pedana}}(t)$$intorno al peso iniziale.
 
 ### **Vantaggi**
 - Alta precisione per transizioni rapide.
@@ -37,15 +37,15 @@ Rileva gli eventi basandosi su soglie fisse definite rispetto al segnale a ripos
 
 ### **Descrizione**
 1. Calibra la pedana per ottenere il valore medio del segnale a riposo:
-   $$ F_{\text{pedana, riposo}} $$
+  $$F_{\text{pedana, riposo}}$$
 2. Imposta soglie relative:
-   - $$ \text{soglia}_\text{positivo} $$: Transizioni verso l’alto.
-   - $$ \text{soglia}_\text{negativo} $$: Transizioni verso il basso.
+   -$$\text{soglia}_\text{positivo}$$: Transizioni verso l’alto.
+   -$$\text{soglia}_\text{negativo}$$: Transizioni verso il basso.
 3. Rileva gli eventi:
-   - **Inizio salto**: Quando $$ F_{\text{pedana}}(t) > F_{\text{pedana, riposo}} + \text{soglia}_\text{positivo} $$.
-   - **Stacco**: Quando $$ F_{\text{pedana}}(t) < \text{soglia}_\text{negativo} $$.
-   - **Attacco alla pedana**: Quando $$ F_{\text{pedana}}(t) > F_{\text{pedana, riposo}} + \text{soglia}_\text{positivo} $$ dopo uno zero-crossing.
-   - **Fine caduta**: Stabilizzazione del segnale intorno a $$ F_{\text{pedana, riposo}} $$.
+   - **Inizio salto**: Quando$$F_{\text{pedana}}(t) > F_{\text{pedana, riposo}} + \text{soglia}_\text{positivo}$$.
+   - **Stacco**: Quando$$F_{\text{pedana}}(t) < \text{soglia}_\text{negativo}$$.
+   - **Attacco alla pedana**: Quando$$F_{\text{pedana}}(t) > F_{\text{pedana, riposo}} + \text{soglia}_\text{positivo}$$dopo uno zero-crossing.
+   - **Fine caduta**: Stabilizzazione del segnale intorno a$$F_{\text{pedana, riposo}}$$.
 
 ### **Vantaggi**
 - Semplice da implementare.
@@ -61,15 +61,15 @@ Utilizza un filtro adattivo per rilevare transizioni significative rispetto alla
 
 ### **Descrizione**
 1. Calcola la media mobile del segnale:
-   $$ \text{Media}_n = \frac{1}{w} \sum_{i=n-w}^{n} F_{\text{pedana}}[i] $$
-   Dove $$ w $$ è la finestra temporale (es. 50 ms).
+  $$\text{Media}_n = \frac{1}{w} \sum_{i=n-w}^{n} F_{\text{pedana}}[i]$$
+   Dove$$w$$è la finestra temporale (es. 50 ms).
 2. Calcola le deviazioni dal segnale:
-   $$ \Delta F = F_{\text{pedana}}(t) - \text{Media}_n $$
+  $$\Delta F = F_{\text{pedana}}(t) - \text{Media}_n$$
 3. Rileva gli eventi:
-   - **Inizio salto**: $$ \Delta F > \text{soglia}_\text{positivo} $$.
-   - **Stacco**: $$ \Delta F < -\text{soglia}_\text{negativo} $$.
+   - **Inizio salto**:$$\Delta F > \text{soglia}_\text{positivo}$$.
+   - **Stacco**:$$\Delta F < -\text{soglia}_\text{negativo}$$.
    - **Attacco alla pedana**: Picco positivo dopo uno zero-crossing.
-   - **Fine caduta**: Stabilizzazione di $$ \Delta F $$ intorno a zero.
+   - **Fine caduta**: Stabilizzazione di$$\Delta F$$intorno a zero.
 
 ### **Vantaggi**
 - Adattivo, robusto contro variazioni lente e graduali.
@@ -84,12 +84,12 @@ Analizza l’energia del segnale per rilevare le transizioni.
 
 ### **Descrizione**
 1. Calcola l’energia istantanea del segnale:
-   $$ E(t) = F_{\text{pedana}}(t)^2 $$
+  $$E(t) = F_{\text{pedana}}(t)^2$$
 2. Rileva gli eventi analizzando i picchi:
-   - **Inizio salto**: Picco positivo di $$ \dot{E}(t) $$.
-   - **Stacco**: Minimo locale di $$ E(t) $$ vicino a zero.
+   - **Inizio salto**: Picco positivo di$$\dot{E}(t)$$.
+   - **Stacco**: Minimo locale di$$E(t)$$vicino a zero.
    - **Attacco alla pedana**: Picco positivo dopo il minimo.
-   - **Fine caduta**: Stabilizzazione di $$ E(t) $$.
+   - **Fine caduta**: Stabilizzazione di$$E(t)$$.
 
 ### **Vantaggi**
 - Facile da implementare.
@@ -105,7 +105,7 @@ Utilizza modelli predittivi per identificare automaticamente i momenti chiave.
 
 ### **Descrizione**
 1. **Preparazione**:
-   - Raccogli dati di salti e annota manualmente gli eventi ($$ t_{\text{inizio}}, t_{\text{stacco}}, t_{\text{attacco}}, t_{\text{fine}} $$).
+   - Raccogli dati di salti e annota manualmente gli eventi ($$t_{\text{inizio}}, t_{\text{stacco}}, t_{\text{attacco}}, t_{\text{fine}}$$).
 2. **Feature Extraction**:
    - Derivata del segnale, varianza, deviazioni dalla media, etc.
 3. **Allenamento**:
