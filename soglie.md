@@ -2,30 +2,27 @@
 
 
 
-Ok, convertirò queste formule in un formato più semplice e funzionale per GitHub:
+Ecco il contenuto tradotto in Markdown per GitHub, seguendo le istruzioni che hai fornito:
 
-# Metodo della Derivata del Segnale
+**1. Metodo della derivata del segnale**
 
-Questo metodo si basa sul calcolo della variazione temporale della forza ($$F_p(t)$$) per rilevare cambiamenti improvvisi.
+Questo metodo si basa sul calcolo della variazione temporale della forza (F_pedana(t)) per rilevare cambiamenti improvvisi (indicativi di stacco o attacco).
 
-## Fasi
+**Fasi**
 
 1. **Derivata temporale**:
-   * Calcola la derivata del segnale: $$ \dot{F}(t) = \frac{F_p(t_{i+1}) - F_p(t_i)}{\Delta t} $$
-   * Nel dominio discreto: $$ \dot{F}[n] = \frac{F_p[n+1] - F_p[n]}{\Delta t} $$
+   * Calcola la derivata del segnale: $\dot{F}(t) = \frac{F_{\text{pedana}}(t_{i+1}) - F_{\text{pedana}}(t_i)}{\Delta t}$
+   * Nel dominio discreto: $\dot{F}[n] = \frac{F_{\text{pedana}}[n+1] - F_{\text{pedana}}[n]}{\Delta t}$
 
 2. **Soglie**:
-   * **Inizio salto**: Identifica il primo punto in cui $$ \dot{F}(t) > k_d $$
-   * **Stacco**: Trova il momento in cui $$ F_p(t) $$ scende sotto 5% del peso statico
-   * **Attacco**: Identifica quando $$ F_p(t) $$ aumenta sopra 5% del peso statico
-   * **Fine**: Quando $$ \dot{F}(t) \approx 0 $$
+   * **Inizio salto**: Identifica il primo punto in cui $\dot{F}(t) > \text{soglia}_\text{derivata}$. Questo indica un aumento rapido della forza (pre-caricamento del salto).
+   * **Stacco**: Trova il momento in cui $F_{\text{pedana}}(t)$ scende sotto una soglia minima (es. 5% del peso statico), segnalando che l'atleta ha lasciato la pedana.
+   * **Attacco alla pedana (caduta)**: Identifica il primo punto in cui $F_{\text{pedana}}(t)$ aumenta rapidamente sopra il 5% del peso statico.
+   * **Fine caduta**: Quando la derivata torna a valori vicini a zero, segnalando che la forza si è stabilizzata.
 
-3. **Calibrazione**:
-   * $$k_d$$: Calcolata in base al rumore (3σ del rumore di fondo)
-   * 5% del peso statico per stacco e attacco
-
-Vuoi che continui con il resto del documento?
-
+3. **Calibrazione delle soglie**:
+   * $\text{soglia}_\text{derivata}$: Calcolata in base al rumore del segnale (ad esempio, 3σ del rumore di fondo).
+   * 5% del peso statico come riferimento pratico per rilevare stacco e attacco.
 
 
 
