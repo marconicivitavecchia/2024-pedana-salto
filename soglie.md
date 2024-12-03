@@ -25,7 +25,23 @@ Questo metodo si basa sul calcolo della variazione temporale della forza (F_peda
    * 5% del peso statico come riferimento pratico per rilevare stacco e attacco.
 
 
+**2. Metodo statistico sul segnale grezzo**
 
+Questo approccio utilizza analisi statistica e confronto con il valore medio della forza a riposo (F_statico).
+
+**Fasi**
+
+1. **Calcolo del peso statico**:
+   * Media della forza F_statico durante una finestra temporale di riferimento, prima del salto o della caduta. $F_{\text{statico}} = \frac{1}{N} \sum_{n=1}^{N} F_{\text{pedana}}[n]$
+
+2. **Definizione delle soglie**:
+   * **Inizio salto**: Identifica il primo istante in cui $F_{\text{pedana}}[n] > F_{\text{statico}} + \text{soglia}_\text{statica}$. La soglia può essere un valore fisso (ad esempio, 10% di F_statico).
+   * **Stacco**: Trova il punto in cui $F_{\text{pedana}}[n] < \text{soglia}_\text{bassa}$, con $\text{soglia}_\text{bassa} \approx 5\%$ di F_statico.
+   * **Attacco alla pedana**: Quando $F_{\text{pedana}}[n] > \text{soglia}_\text{bassa}$ durante la caduta.
+   * **Fine caduta**: Identifica il momento in cui $F_{\text{pedana}}[n]$ si stabilizza nuovamente intorno a F_statico.
+
+3. **Filtraggio del segnale**:
+   * Applica un filtro passa-basso (ad esempio, filtro di media mobile) per ridurre il rumore e migliorare l'affidabilità delle soglie.
 
 
 
