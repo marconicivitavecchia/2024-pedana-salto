@@ -1,4 +1,6 @@
 >[Torna all'indice](readme.md#fasi-progetto)
+>
+>$$ \dot{F}_\text{pedana}(t) = \frac{dF_\text{pedana}(t)}{dt} $$
 
 # Metodi per Stabilire Soglie e Rilevare Eventi nei Salti
 
