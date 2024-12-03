@@ -1,4 +1,5 @@
-
+>[Torna all'indice](readme.md#fasi-progetto)
+>
 # Filtri per Motion Tracking
 
 ## Filtro EMA (Exponential Moving Average)
@@ -135,3 +136,5 @@ Offre benefici significativi:
 - EMA: Requisiti minimi
 - Kalman: Richiede risorse significative
 - Complementare: Necessità moderate
+
+>[Torna all'indice](readme.md#fasi-progetto)
