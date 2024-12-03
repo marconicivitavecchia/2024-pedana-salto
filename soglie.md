@@ -1,8 +1,6 @@
 >[Torna all'indice](readme.md#fasi-progetto)
 
-Ecco il contenuto modificato, con le formule racchiuse da `$$` sulla stessa linea, pronte per essere utilizzate su GitHub:
 
-```markdown
 # Metodi per Stabilire Soglie e Rilevare Eventi nei Salti
 
 Questi metodi sono utili per rilevare automaticamente gli eventi chiave di un salto, come:
@@ -142,7 +140,6 @@ Utilizza modelli predittivi per identificare automaticamente i momenti chiave.
 - Per segnali rumorosi o variabili: **Filtro adattivo** o **energia del segnale**.
 - Per analisi avanzate: **Machine Learning**.
 
-```
 
 
 ## Esempi in python
