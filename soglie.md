@@ -128,7 +128,7 @@ Questo metodo analizza l'energia del segnale per identificare transizioni signif
 
 **Confronto tra i metodi**
 
-**Metodo|Vantaggi|Svantaggi**
+**Metodo**|**Vantaggi**|**Svantaggi**
 ---|---|---
 Derivata del segnale|Preciso per transizioni rapide|Sensibile al rumore
 Statistico|Robusto al rumore, semplice|Meno adatto a movimenti complessi  
