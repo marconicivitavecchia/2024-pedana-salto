@@ -50,7 +50,7 @@ Questo metodo utilizza un filtro adattivo per rilevare transizioni significative
 **Fasi**
 
 1. **Calcolo della media mobile**:
-   * Applica un filtro di media mobile su F_pedana(t): $$\text{Media}_n = \frac{1}{w} \sum_{i=n-w}^{n} F_{\text{pedana}}[i]$$ Dove w è la finestra di media mobile (es. 50 ms).
+   * Applica un filtro di media mobile su F_pedana(t):  $$\text{Media}n = \frac{1}{w} \sum{i=n-w+1}^{n} F_{\text{pedana}}[i]$$ Dove w è la finestra di media mobile (es. 50 ms).
   
 2. **Calcolo delle deviazioni**:
    * Determina la differenza tra il segnale F_pedana(t) e la media mobile: $\Delta F = F_{\text{pedana}}(t) - \text{Media}_n$
