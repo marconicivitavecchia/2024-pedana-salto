@@ -2,6 +2,8 @@
 
 $$ \dot{F}\text{pedana}(t) = \frac{dF\text{pedana}(t)}{dt} $$
 
+$$ \dot{F}_pedana(t) > \text{soglia}_\text{positivo} $$
+
 Ciascun metodo implementa una strategia diversa per rilevare gli eventi chiave del salto:
 
 - **Derivata:** usa il tasso di cambio della forza
