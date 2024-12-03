@@ -1,5 +1,6 @@
 >[Torna all'indice](readme.md#fasi-progetto)
 
+$$ \dot{F}\text{pedana}(t) = \frac{dF\text{pedana}(t)}{dt} $$
 
 # Metodi per Rilevare Eventi nei Salti
 
