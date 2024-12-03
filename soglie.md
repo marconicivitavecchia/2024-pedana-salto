@@ -1,9 +1,6 @@
 >[Torna all'indice](readme.md#fasi-progetto)
 
 
-Hai ragione, adatterò tutto il contenuto mantenendolo completo ma con il formato LaTeX corretto per GitHub. 
-
-```markdown
 # Metodi per Stabilire Soglie e Rilevare Eventi nei Salti
 
 ## Eventi Chiave
@@ -132,7 +129,6 @@ $$ E(t) = F_{\text{pedana}}(t)^2 $$
 - Salti semplici: Metodo statistico/derivata
 - Segnali rumorosi: Filtro adattivo/energia
 - Analisi avanzate: Machine Learning
-```
 
 Ciascun metodo implementa una strategia diversa per rilevare gli eventi chiave del salto:
 
