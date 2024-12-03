@@ -17,7 +17,7 @@ Utilizza la derivata del segnale della forza per rilevare le transizioni chiave.
 
 ### **Descrizione**
 1. Calcola la derivata del segnale:  
-   `dF_pedana(t)/dt`
+   $$ \frac{dF_\text{pedana}(t)}{dt} $$
 2. Rileva le soglie in base a variazioni significative:
    - **Inizio salto**: Quando `dF_pedana(t)/dt > soglia_positivo`.
    - **Stacco**: Quando `F_pedana(t) ≈ 0`.
