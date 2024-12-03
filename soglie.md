@@ -1,5 +1,8 @@
 >[Torna all'indice](readme.md#fasi-progetto)
 
+Ecco il codice Markdown che puoi copiare e incollare direttamente:
+
+```markdown
 # Metodi per Stabilire Soglie e Rilevare Eventi nei Salti
 
 Questi metodi sono utili per rilevare automaticamente gli eventi chiave di un salto, come:
@@ -14,13 +17,13 @@ Questi metodi sono utili per rilevare automaticamente gli eventi chiave di un sa
 Utilizza la derivata del segnale della forza per rilevare le transizioni chiave.
 
 ### **Descrizione**
-1. Calcola la derivata del segnale:
-   $$ \dot{F}_{\text{pedana}}(t) = \frac{dF_{\text{pedana}}(t)}{dt} $$
+1. Calcola la derivata del segnale:  
+   `dF_pedana(t)/dt`
 2. Rileva le soglie in base a variazioni significative:
-   - **Inizio salto**: Quando $$ \dot{F}_{\text{pedana}}(t) > \text{soglia}_\text{positivo} $$.
-   - **Stacco**: Quando $$ F_{\text{pedana}}(t) \approx 0 $$.
-   - **Attacco alla pedana**: Picco negativo significativo di $$ \dot{F}_{\text{pedana}}(t) $$.
-   - **Fine caduta**: Stabilizzazione di $$ F_{\text{pedana}}(t) $$ intorno al peso iniziale.
+   - **Inizio salto**: Quando `dF_pedana(t)/dt > soglia_positivo`.
+   - **Stacco**: Quando `F_pedana(t) ≈ 0`.
+   - **Attacco alla pedana**: Picco negativo significativo di `dF_pedana(t)/dt`.
+   - **Fine caduta**: Stabilizzazione di `F_pedana(t)` intorno al peso iniziale.
 
 ### **Vantaggi**
 - Alta precisione per transizioni rapide.
@@ -35,16 +38,16 @@ Utilizza la derivata del segnale della forza per rilevare le transizioni chiave.
 Rileva gli eventi basandosi su soglie fisse definite rispetto al segnale a riposo.
 
 ### **Descrizione**
-1. Calibra la pedana per ottenere il valore medio del segnale a riposo:
-   $$ F_{\text{pedana, riposo}} $$
-2. Imposta soglie relative:
-   - $$ \text{soglia}_\text{positivo} $$: Transizioni verso l’alto.
-   - $$ \text{soglia}_\text{negativo} $$: Transizioni verso il basso.
+1. Calibra la pedana per ottenere il valore medio del segnale a riposo:  
+   `F_pedana, riposo`
+2. Imposta soglie relative:  
+   - `soglia_positivo`: Transizioni verso l’alto.  
+   - `soglia_negativo`: Transizioni verso il basso.
 3. Rileva gli eventi:
-   - **Inizio salto**: Quando $$ F_{\text{pedana}}(t) > F_{\text{pedana, riposo}} + \text{soglia}_\text{positivo} $$.
-   - **Stacco**: Quando $$ F_{\text{pedana}}(t) < \text{soglia}_\text{negativo} $$.
-   - **Attacco alla pedana**: Quando $$ F_{\text{pedana}}(t) > F_{\text{pedana, riposo}} + \text{soglia}_\text{positivo} $$ dopo uno zero-crossing.
-   - **Fine caduta**: Stabilizzazione del segnale intorno a $$ F_{\text{pedana, riposo}} $$.
+   - **Inizio salto**: Quando `F_pedana(t) > F_pedana, riposo + soglia_positivo`.
+   - **Stacco**: Quando `F_pedana(t) < soglia_negativo`.
+   - **Attacco alla pedana**: Quando `F_pedana(t) > F_pedana, riposo + soglia_positivo` dopo uno zero-crossing.
+   - **Fine caduta**: Stabilizzazione del segnale intorno a `F_pedana, riposo`.
 
 ### **Vantaggi**
 - Semplice da implementare.
@@ -59,16 +62,16 @@ Rileva gli eventi basandosi su soglie fisse definite rispetto al segnale a ripos
 Utilizza un filtro adattivo per rilevare transizioni significative rispetto alla media dinamica.
 
 ### **Descrizione**
-1. Calcola la media mobile del segnale:
-   $$ \text{Media}_n = \frac{1}{w} \sum_{i=n-w}^{n} F_{\text{pedana}}[i] $$
-   Dove $$ w $$ è la finestra temporale (es. 50 ms).
-2. Calcola le deviazioni dal segnale:
-   $$ \Delta F = F_{\text{pedana}}(t) - \text{Media}_n $$
+1. Calcola la media mobile del segnale:  
+   `Media_n = (1/w) * Σ_{i=n-w}^{n} F_pedana[i]`  
+   Dove `w` è la finestra temporale (es. 50 ms).
+2. Calcola le deviazioni dal segnale:  
+   `Delta_F = F_pedana(t) - Media_n`
 3. Rileva gli eventi:
-   - **Inizio salto**: $$ \Delta F > \text{soglia}_\text{positivo} $$.
-   - **Stacco**: $$ \Delta F < -\text{soglia}_\text{negativo} $$.
+   - **Inizio salto**: Quando `Delta_F > soglia_positivo`.
+   - **Stacco**: Quando `Delta_F < -soglia_negativo`.
    - **Attacco alla pedana**: Picco positivo dopo uno zero-crossing.
-   - **Fine caduta**: Stabilizzazione di $$ \Delta F $$ intorno a zero.
+   - **Fine caduta**: Stabilizzazione di `Delta_F` intorno a zero.
 
 ### **Vantaggi**
 - Adattivo, robusto contro variazioni lente e graduali.
@@ -82,13 +85,13 @@ Utilizza un filtro adattivo per rilevare transizioni significative rispetto alla
 Analizza l’energia del segnale per rilevare le transizioni.
 
 ### **Descrizione**
-1. Calcola l’energia istantanea del segnale:
-   $$ E(t) = F_{\text{pedana}}(t)^2 $$
+1. Calcola l’energia istantanea del segnale:  
+   `E(t) = F_pedana(t)^2`
 2. Rileva gli eventi analizzando i picchi:
-   - **Inizio salto**: Picco positivo di $$ \dot{E}(t) $$.
-   - **Stacco**: Minimo locale di $$ E(t) $$ vicino a zero.
+   - **Inizio salto**: Picco positivo di `dE(t)/dt`.
+   - **Stacco**: Minimo locale di `E(t)` vicino a zero.
    - **Attacco alla pedana**: Picco positivo dopo il minimo.
-   - **Fine caduta**: Stabilizzazione di $$ E(t) $$.
+   - **Fine caduta**: Stabilizzazione di `E(t)`.
 
 ### **Vantaggi**
 - Facile da implementare.
@@ -104,7 +107,7 @@ Utilizza modelli predittivi per identificare automaticamente i momenti chiave.
 
 ### **Descrizione**
 1. **Preparazione**:
-   - Raccogli dati di salti e annota manualmente gli eventi ($$ t_{\text{inizio}}, t_{\text{stacco}}, t_{\text{attacco}}, t_{\text{fine}} $$).
+   - Raccogli dati di salti e annota manualmente gli eventi (`t_inizio`, `t_stacco`, `t_attacco`, `t_fine`).
 2. **Feature Extraction**:
    - Derivata del segnale, varianza, deviazioni dalla media, etc.
 3. **Allenamento**:
@@ -138,8 +141,6 @@ Utilizza modelli predittivi per identificare automaticamente i momenti chiave.
 - Per salti semplici e segnali stabili: **Metodo statistico** o **derivata del segnale**.
 - Per segnali rumorosi o variabili: **Filtro adattivo** o **energia del segnale**.
 - Per analisi avanzate: **Machine Learning**.
-
-
 
 Ciascun metodo implementa una strategia diversa per rilevare gli eventi chiave del salto:
 
