@@ -1,95 +1,26 @@
 >[Torna all'indice](readme.md#fasi-progetto)
 
-$$ \dot{F}\text{pedana}(t) = \frac{dF\text{pedana}(t)}{dt} $$
-
-# Metodi per Rilevare Eventi nei Salti
+# Metodi per Stabilire Soglie e Rilevare Eventi nei Salti
 
 ## Eventi Chiave
-- **Inizio salto** 
-- **Stacco**
-- **Attacco alla pedana**
-- **Fine caduta**
+- **Inizio salto**: Avvio fase attiva
+- **Stacco**: Momento del distacco
+- **Attacco alla pedana**: Atterraggio
+- **Fine caduta**: Stabilizzazione finale
 
-## 1. Metodo della Derivata
-
-### Descrizione
-1. Derivata del segnale:
-$$ \dot{F}(t) = \frac{dF(t)}{dt} $$
-
-2. Soglie:
-- Inizio: $$ \dot{F}(t) > k_{pos} $$
-- Stacco: $$ F(t) \approx 0 $$
-- Attacco: Picco negativo di $$ \dot{F}(t) $$
-- Fine: $$ F(t) \approx F_0 $$
-
-### Pro/Contro
-✓ Alta precisione transizioni
-✗ Sensibile al rumore
-
-## 2. Metodo Statistico
+## 1. Metodo della Derivata del Segnale
 
 ### Descrizione
-1. Riposo: $$ F_0 $$
+1. Calcola la derivata del segnale:
+$$ \dot{F}_\text{pedana}(t) = \frac{dF_\text{pedana}(t)}{dt} $$
 
-2. Soglie: $$ k_{pos}, k_{neg} $$
+2. Rileva le soglie:
+- Inizio salto: $$ \dot{F}_\text{pedana}(t) > \text{soglia}_\text{positivo} $$
+- Stacco: $$ F_\text{pedana}(t) \approx 0 $$
+- Attacco: Picco negativo di $$ \dot{F}_\text{pedana}(t) $$
+- Fine caduta: $$ F_\text{pedana}(t) \approx F_\text{iniziale} $$
 
-3. Eventi:
-- Inizio: $$ F(t) > F_0 + k_{pos} $$
-- Stacco: $$ F(t) < k_{neg} $$
-- Attacco: $$ F(t) > F_0 + k_{pos} $$
-- Fine: $$ F(t) \approx F_0 $$
 
-### Pro/Contro
-✓ Semplice
-✗ Bassa precisione
-
-## 3. Filtro Adattivo
-
-### Formula
-$$ M_n = \frac{1}{w} \sum_{i=n-w}^{n} F[i] $$
-$$ \Delta F = F(t) - M_n $$
-
-### Eventi:
-- Inizio: $$ \Delta F > k_{pos} $$
-- Stacco: $$ \Delta F < -k_{neg} $$
-- Fine: $$ \Delta F \approx 0 $$
-
-### Pro/Contro
-✓ Robusto 
-✗ Setup complesso
-
-## 4. Energia
-
-### Formula
-$$ E(t) = F(t)^2 $$
-
-### Eventi
-- Inizio: max $$ \dot{E}(t) $$
-- Stacco: min $$ E(t) $$
-- Attacco: picco
-- Fine: $$ E(t) $$ stabile
-
-### Pro/Contro  
-✓ Semplice
-✗ Sensibile picchi
-
-## 5. Machine Learning
-
-### Features
-$$ (t_i, t_s, t_a, t_f) $$
-
-### Pro/Contro
-✓ Adattabile
-✗ Dataset richiesto
-
-## Confronto
-| Metodo | Pro | Contro |
-|--------|-----|--------|
-| Derivata | Preciso | Rumore |
-| Statistico | Facile | Impreciso |
-| Adattivo | Robusto | Setup |
-| Energia | Semplice | Picchi |
-| ML | Flessibile | Dataset |
 Ciascun metodo implementa una strategia diversa per rilevare gli eventi chiave del salto:
 
 - **Derivata:** usa il tasso di cambio della forza
