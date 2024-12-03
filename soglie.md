@@ -16,8 +16,7 @@
 $$ \dot{F}_{\text{pedana}}(t) = \frac{dF_{\text{pedana}}(t)}{dt} $$
 
 2. Rileva le soglie:
-- Inizio salto:
-     $$\dot{F}_{\text{pedana}}(t) > \text{soglia}_\text{positivo}$$
+- Inizio salto: $$\dot{F}_{\text{pedana}}(t) > \text{soglia}_\text{positivo}$$
 - Stacco: $$ F_{\text{pedana}}(t) \approx 0 $$
 - Attacco: Picco negativo di $$ \dot{F}_{\text{pedana}}(t) $$
 - Fine caduta: $$ F_{\text{pedana}}(t) \approx F_{\text{iniziale}} $$
