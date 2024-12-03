@@ -1,129 +1,93 @@
 >[Torna all'indice](readme.md#fasi-progetto)
 
-# Metodi per Stabilire Soglie e Rilevare Eventi nei Salti
+# Metodi per Rilevare Eventi nei Salti
 
 ## Eventi Chiave
-- **Inizio salto**: Avvio fase attiva
-- **Stacco**: Momento del distacco
-- **Attacco alla pedana**: Atterraggio
-- **Fine caduta**: Stabilizzazione finale
+- **Inizio salto** 
+- **Stacco**
+- **Attacco alla pedana**
+- **Fine caduta**
 
-## 1. Metodo della Derivata del Segnale
-
-### Descrizione
-1. Calcola la derivata del segnale:
-2. 
-$$ \dot{F}_{\text{pedana}}(t) = \frac{dF_{\text{pedana}}(t)}{dt} $$
-
-3. Rileva le soglie:
-- Inizio salto: $$ \dot{F}_{\text{pedana}}(t) > \text{soglia}_\text{positivo} $$
-- Stacco: $$ F_{\text{pedana}}(t) \approx 0 $$
-- Attacco: Picco negativo di $$ \dot{F}_{\text{pedana}}(t) $$
-- Fine caduta: $$ F_{\text{pedana}}(t) \approx F_{\text{iniziale}} $$
-
-### Vantaggi
-- Alta precisione per transizioni rapide
-- Ottimo per movimenti esplosivi
-
-### Svantaggi
-- Sensibile al rumore
-- Richiede filtraggio
-
-## 2. Metodo Statistico (Soglie Fisse)
+## 1. Metodo della Derivata
 
 ### Descrizione
-1. Calibrazione con valore a riposo:
-$$ F_{\text{pedana, riposo}} $$
+1. Derivata del segnale:
+$$ \dot{F}(t) = \frac{dF(t)}{dt} $$
 
-2. Soglie relative:
-$$ \text{soglia}_\text{positivo}, \text{soglia}_\text{negativo} $$
+2. Soglie:
+- Inizio: $$ \dot{F}(t) > k_{pos} $$
+- Stacco: $$ F(t) \approx 0 $$
+- Attacco: Picco negativo di $$ \dot{F}(t) $$
+- Fine: $$ F(t) \approx F_0 $$
 
-3. Rilevamento eventi:
-- Inizio: $$ F_{\text{pedana}}(t) > F_{\text{pedana, riposo}} + \text{soglia}_\text{positivo} $$
-- Stacco: $$ F_{\text{pedana}}(t) < \text{soglia}_\text{negativo} $$
-- Attacco: $$ F_{\text{pedana}}(t) > F_{\text{pedana, riposo}} + \text{soglia}_\text{positivo} $$
-- Fine: $$ F_{\text{pedana}}(t) \approx F_{\text{pedana, riposo}} $$
+### Pro/Contro
+✓ Alta precisione transizioni
+✗ Sensibile al rumore
 
-### Vantaggi
-- Implementazione semplice
-- Robusto con segnali stabili
-
-### Svantaggi
-- Precisione limitata su salti complessi
-
-## 3. Metodo del Filtro Adattivo
+## 2. Metodo Statistico
 
 ### Descrizione
-1. Media mobile:
-$$ \text{Media}_n = \frac{1}{w} \sum_{i=n-w}^{n} F_{\text{pedana}}[i] $$
+1. Riposo: $$ F_0 $$
 
-2. Deviazioni:
-$$ \Delta F = F_{\text{pedana}}(t) - \text{Media}_n $$
+2. Soglie: $$ k_{pos}, k_{neg} $$
 
 3. Eventi:
-- Inizio: $$ \Delta F > \text{soglia}_\text{positivo} $$
-- Stacco: $$ \Delta F < -\text{soglia}_\text{negativo} $$
-- Attacco: Picco positivo post zero-crossing
+- Inizio: $$ F(t) > F_0 + k_{pos} $$
+- Stacco: $$ F(t) < k_{neg} $$
+- Attacco: $$ F(t) > F_0 + k_{pos} $$
+- Fine: $$ F(t) \approx F_0 $$
+
+### Pro/Contro
+✓ Semplice
+✗ Bassa precisione
+
+## 3. Filtro Adattivo
+
+### Formula
+$$ M_n = \frac{1}{w} \sum_{i=n-w}^{n} F[i] $$
+$$ \Delta F = F(t) - M_n $$
+
+### Eventi:
+- Inizio: $$ \Delta F > k_{pos} $$
+- Stacco: $$ \Delta F < -k_{neg} $$
 - Fine: $$ \Delta F \approx 0 $$
 
-### Vantaggi
-- Adattivo
-- Robusto al rumore graduale
+### Pro/Contro
+✓ Robusto 
+✗ Setup complesso
 
-### Svantaggi
-- Richiede configurazione soglie
+## 4. Energia
 
-## 4. Metodo dell'Energia del Segnale
+### Formula
+$$ E(t) = F(t)^2 $$
 
-### Descrizione
-1. Energia istantanea:
-$$ E(t) = F_{\text{pedana}}(t)^2 $$
-
-2. Eventi da analisi picchi:
-- Inizio: Massimo di $$ \dot{E}(t) $$
-- Stacco: Minimo di $$ E(t) $$
-- Attacco: Picco dopo minimo
+### Eventi
+- Inizio: max $$ \dot{E}(t) $$
+- Stacco: min $$ E(t) $$
+- Attacco: picco
 - Fine: $$ E(t) $$ stabile
 
-### Vantaggi
-- Facile implementazione
-- Robusto al rumore HF
+### Pro/Contro  
+✓ Semplice
+✗ Sensibile picchi
 
-### Svantaggi
-- Sensibile a picchi spurii
+## 5. Machine Learning
 
-## 5. Metodo Machine Learning
+### Features
+$$ (t_i, t_s, t_a, t_f) $$
 
-### Descrizione
-1. **Preparazione**:
-   Annotazione eventi $$ (t_{\text{inizio}}, t_{\text{stacco}}, t_{\text{attacco}}, t_{\text{fine}}) $$
+### Pro/Contro
+✓ Adattabile
+✗ Dataset richiesto
 
-2. **Features**:
-   - Derivate
-   - Varianze
-   - Deviazioni dalla media
-
-3. **Training & Predizione**:
-   - Classificatori (SVM, RF)
-   - Modelli sequenziali (LSTM)
-
-### Vantaggi
-- Gestione movimenti complessi
-- Buona generalizzazione
-
-### Svantaggi
-- Richiede dataset training
-- Complessità maggiore
-
-## Confronto dei Metodi
-
-| Metodo | Vantaggi | Svantaggi |
-|--------|----------|-----------|
-| Derivata | Preciso su cambi rapidi | Sensibile al rumore |
-| Statistico | Semplice | Poco preciso con rumore |
-| Filtro adattivo | Robusto su variazioni lente | Configurazione soglie |
-| Energia | Facile implementazione | Sensibile a picchi |
-| Machine Learning | Adattabile e robusto | Richiede dataset |
+## Confronto
+| Metodo | Pro | Contro |
+|--------|-----|--------|
+| Derivata | Preciso | Rumore |
+| Statistico | Facile | Impreciso |
+| Adattivo | Robusto | Setup |
+| Energia | Semplice | Picchi |
+| ML | Flessibile | Dataset |
 
 ## Conclusioni
 - Salti semplici: Metodo statistico/derivata
