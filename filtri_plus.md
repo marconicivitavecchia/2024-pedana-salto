@@ -1,3 +1,5 @@
+>[Torna all'indice](readme.md#fasi-progetto)>[Torna a filtri](filtri.md)
+
 # Filtri Avanzati per Motion Tracking
 
 ## Filtro di Madgwick
@@ -124,3 +126,5 @@ K∞ = PH^T(I - θYP + HR⁻¹H^T P)⁻¹R⁻¹
 - **Particle**: Alta precisione, alta complessità
 - **Savitzky-Golay**: Buona precisione, complessità media
 - **Weighted MA**: Precisione moderata, bassa complessità
+
+>[Torna all'indice](readme.md#fasi-progetto)>[Torna a filtri](filtri.md)
