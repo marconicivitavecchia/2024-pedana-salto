@@ -15,15 +15,15 @@ Questi metodi sono utili per rilevare automaticamente gli eventi chiave di un sa
 ## **1. Metodo della Derivata del Segnale**
 Utilizza la derivata del segnale della forza per rilevare le transizioni chiave.z
 
-### Descrizione
-1. Calcola la derivata del segnale:
-$$ \frac{dF_\text{pedana}(t)}{dt} $$
+Proviamo questo formato:
 
-2. Rileva le soglie in base a variazioni significative:
-   - Inizio salto: $$ \frac{dF_\text{pedana}(t)}{dt} > \text{soglia}_\text{positivo} $$
-   - Stacco: $$ F_\text{pedana}(t) \approx 0 $$
-   - Attacco alla pedana: Picco negativo di $$ \frac{dF_\text{pedana}(t)}{dt} $$
-   - Fine caduta: $$ F_\text{pedana}(t) \approx F_\text{iniziale} $$
+$$ \dot{F}_p(t) = \frac{dF_p(t)}{dt} $$
+
+Dove ho semplificato usando:
+- _p invece di _\text{pedana}
+- tolto \text ovunque
+- mantenuto solo i simboli matematici essenziali
+
 
 ### **Descrizione**
 1. Calcola la derivata del segnale:  
