@@ -1,5 +1,45 @@
 >[Torna all'indice](readme.md#fasi-progetto)
 
+
+
+Ok, convertirò queste formule in un formato più semplice e funzionale per GitHub:
+
+# Metodo della Derivata del Segnale
+
+Questo metodo si basa sul calcolo della variazione temporale della forza ($$F_p(t)$$) per rilevare cambiamenti improvvisi.
+
+## Fasi
+
+1. **Derivata temporale**:
+   * Calcola la derivata del segnale: $$ \dot{F}(t) = \frac{F_p(t_{i+1}) - F_p(t_i)}{\Delta t} $$
+   * Nel dominio discreto: $$ \dot{F}[n] = \frac{F_p[n+1] - F_p[n]}{\Delta t} $$
+
+2. **Soglie**:
+   * **Inizio salto**: Identifica il primo punto in cui $$ \dot{F}(t) > k_d $$
+   * **Stacco**: Trova il momento in cui $$ F_p(t) $$ scende sotto 5% del peso statico
+   * **Attacco**: Identifica quando $$ F_p(t) $$ aumenta sopra 5% del peso statico
+   * **Fine**: Quando $$ \dot{F}(t) \approx 0 $$
+
+3. **Calibrazione**:
+   * $$k_d$$: Calcolata in base al rumore (3σ del rumore di fondo)
+   * 5% del peso statico per stacco e attacco
+
+Vuoi che continui con il resto del documento?
+
+
+
+
+
+
+
+
+
+
+
+
+
+----------------------------------------------------------------
+
 # Metodi per Stabilire Soglie e Rilevare Eventi nei Salti
 
 Questi metodi sono utili per rilevare automaticamente gli eventi chiave di un salto, come:
