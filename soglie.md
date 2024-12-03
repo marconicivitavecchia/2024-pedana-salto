@@ -12,13 +12,21 @@
 
 ### Descrizione
 1. Derivata del segnale:
+2. 
 $$ \dot{F}(t) = \frac{dF(t)}{dt} $$
 
-2. Soglie:
-- Inizio: $$ \dot{F}(t) > k_{pos} $$
-- Stacco: $$ F(t) \approx 0 $$
-- Attacco: Picco negativo di $$ \dot{F}(t) $$
-- Fine: $$ F(t) \approx F_0 $$
+3. Soglie:
+- Inizio:
+
+  $$ \dot{F}(t) > k_{pos} $$
+- Stacco:
+
+  $$ F(t) \approx 0 $$
+- Attacco: Picco negativo di
+  $$ \dot{F}(t) $$
+- Fine:
+
+  $$ F(t) \approx F_0 $$
 
 ### Pro/Contro
 ✓ Alta precisione transizioni
