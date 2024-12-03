@@ -1,93 +1,158 @@
 >[Torna all'indice](readme.md#fasi-progetto)
 
-# Metodi di Rilevamento per Analisi del Salto
+Ecco il contenuto completo dei metodi descritti, formattato in **Markdown**, pronto per essere incollato su GitHub:
 
-## 1. Metodo della Derivata del Segnale
+```markdown
+# Metodi per Stabilire Soglie e Rilevare Eventi nei Salti
 
-### Calcolo Derivata
-$$\dot{F}(t) = \frac{F_{\text{pedana}}(t_{i+1}) - F_{\text{pedana}}(t_i)}{\Delta t}$$
+Questi metodi sono utili per rilevare automaticamente gli eventi chiave di un salto, come:
+- **Inizio salto**: Quando l'atleta inizia ad esercitare forza sulla pedana.
+- **Stacco**: Momento in cui l'atleta lascia completamente la pedana.
+- **Attacco alla pedana**: Quando l'atleta riatterra sulla pedana.
+- **Fine caduta**: Stabilizzazione finale del segnale.
 
-Nel dominio discreto:
-$$\dot{F}[n] = \frac{F_{\text{pedana}}[n+1] - F_{\text{pedana}}[n]}{\Delta t}$$
+---
 
-### Soglie
-- **Inizio salto**: $\dot{F}(t) > \text{soglia}_{\text{derivata}}$
-- **Stacco**: $F_{\text{pedana}}(t) < 5\% \text{ del peso statico}$
-- **Attacco**: $F_{\text{pedana}}(t)$ aumenta sopra 5% del peso statico
-- **Fine caduta**: $\dot{F}(t) \approx 0$
+## **1. Metodo della Derivata del Segnale**
+Utilizza la derivata del segnale della forza per rilevare le transizioni chiave.
 
-## 2. Metodo Statistico
+### **Descrizione**
+1. Calcola la derivata del segnale:
+   \[
+   \dot{F}_{\text{pedana}}(t) = \frac{dF_{\text{pedana}}(t)}{dt}
+   \]
+2. Rileva le soglie in base a variazioni significative:
+   - **Inizio salto**: Quando \( \dot{F}_{\text{pedana}}(t) > \text{soglia}_\text{positivo} \).
+   - **Stacco**: Quando \( F_{\text{pedana}}(t) \approx 0 \).
+   - **Attacco alla pedana**: Picco negativo significativo di \( \dot{F}_{\text{pedana}}(t) \).
+   - **Fine caduta**: Stabilizzazione di \( F_{\text{pedana}}(t) \) intorno al peso iniziale.
 
-### Calcolo Peso Statico
-$$F_{\text{statico}} = \frac{1}{N} \sum_{n=1}^N F_{\text{pedana}}[n]$$
+### **Vantaggi**
+- Alta precisione per transizioni rapide.
+- Adatto a segnali di alta qualità e movimenti esplosivi.
 
-### Definizione Eventi
-- **Inizio salto**: $F_{\text{pedana}}[n] > F_{\text{statico}} + \text{soglia}_{\text{statica}}$
-- **Stacco**: $F_{\text{pedana}}[n] < \text{soglia}_{\text{bassa}}$ ($\approx 5\%$ di $F_{\text{statico}}$)
-- **Attacco**: $F_{\text{pedana}}[n] > \text{soglia}_{\text{bassa}}$
-- **Fine caduta**: $F_{\text{pedana}}[n] \approx F_{\text{statico}}$
+### **Svantaggi**
+- Sensibile al rumore, richiede filtraggio del segnale.
 
-## 3. Metodo del Filtro Adattivo
+---
 
-### Media Mobile
-$$\text{Media}_n = \frac{1}{w} \sum_{i=n-w}^n F_{\text{pedana}}[i]$$
+## **2. Metodo Statistico (Soglie Fisse)**
+Rileva gli eventi basandosi su soglie fisse definite rispetto al segnale a riposo.
 
-### Calcolo Deviazioni
-$$\Delta F = F_{\text{pedana}}(t) - \text{Media}_n$$
+### **Descrizione**
+1. Calibra la pedana per ottenere il valore medio del segnale a riposo:
+   \[
+   F_{\text{pedana, riposo}}
+   \]
+2. Imposta soglie relative:
+   - \( \text{soglia}_\text{positivo} \): Transizioni verso l’alto.
+   - \( \text{soglia}_\text{negativo} \): Transizioni verso il basso.
+3. Rileva gli eventi:
+   - **Inizio salto**: Quando \( F_{\text{pedana}}(t) > F_{\text{pedana, riposo}} + \text{soglia}_\text{positivo} \).
+   - **Stacco**: Quando \( F_{\text{pedana}}(t) < \text{soglia}_\text{negativo} \).
+   - **Attacco alla pedana**: Quando \( F_{\text{pedana}}(t) > F_{\text{pedana, riposo}} + \text{soglia}_\text{positivo} \) dopo uno zero-crossing.
+   - **Fine caduta**: Stabilizzazione del segnale intorno a \( F_{\text{pedana, riposo}} \).
 
-### Eventi
-- **Inizio salto**: $\Delta F > \text{soglia}_{\text{positivo}}$
-- **Stacco**: $\Delta F < -\text{soglia}_{\text{negativo}}$
-- **Attacco**: $\Delta F > \text{soglia}_{\text{positivo}}$ dopo zero-crossing
-- **Fine caduta**: $\Delta F \approx 0$
+### **Vantaggi**
+- Semplice da implementare.
+- Robusto in presenza di segnali stabili.
 
-## 4. Metodo dell'Energia
+### **Svantaggi**
+- Meno preciso per salti complessi o segnali rumorosi.
 
-### Energia Istantanea
-$$E(t) = F_{\text{pedana}}(t)^2$$
+---
 
-### Eventi
-- **Inizio salto**: Picco positivo di $\dot{E}(t)$
-- **Stacco**: Minimo locale di $E(t)$
-- **Attacco**: Picco positivo dopo minimo
-- **Fine caduta**: $E(t)$ stabilizzata
+## **3. Metodo del Filtro Adattivo (Moving Average & Outlier Detection)**
+Utilizza un filtro adattivo per rilevare transizioni significative rispetto alla media dinamica.
 
-# 5. Metodo Machine Learning
+### **Descrizione**
+1. Calcola la media mobile del segnale:
+   \[
+   \text{Media}_n = \frac{1}{w} \sum_{i=n-w}^{n} F_{\text{pedana}}[i]
+   \]
+   Dove \( w \) è la finestra temporale (es. 50 ms).
+2. Calcola le deviazioni dal segnale:
+   \[
+   \Delta F = F_{\text{pedana}}(t) - \text{Media}_n
+   \]
+3. Rileva gli eventi:
+   - **Inizio salto**: \( \Delta F > \text{soglia}_\text{positivo} \).
+   - **Stacco**: \( \Delta F < -\text{soglia}_\text{negativo} \).
+   - **Attacco alla pedana**: Picco positivo dopo uno zero-crossing.
+   - **Fine caduta**: Stabilizzazione di \( \Delta F \) intorno a zero.
 
-## Applicazione
-- Dataset significativo di salti esistenti
-- Analisi avanzata con modelli predittivi
+### **Vantaggi**
+- Adattivo, robusto contro variazioni graduali o rumore.
 
-## Feature Extraction
-$$\text{Features} = \{F_{\text{pedana}}(t), \dot{F}(t), \sigma_F, \text{peaks}, \text{crossings}\}$$
+### **Svantaggi**
+- Richiede configurazione delle soglie.
 
-## Eventi da Classificare
-- $t_{\text{inizio}}$: Inizio salto
-- $t_{\text{stacco}}$: Stacco dalla pedana
-- $t_{\text{attacco}}$: Contatto con pedana
-- $t_{\text{fine}}$: Fine movimento
+---
 
-## Caratteristiche
-### Pro
-- Adattabile a scenari diversi
-- Riconosce pattern complessi
+## **4. Metodo dell’Energia del Segnale**
+Analizza l’energia del segnale per rilevare le transizioni.
 
-### Contro
-- Training iniziale necessario
-- Alto costo computazionale
+### **Descrizione**
+1. Calcola l’energia istantanea del segnale:
+   \[
+   E(t) = F_{\text{pedana}}(t)^2
+   \]
+2. Rileva gli eventi analizzando i picchi:
+   - **Inizio salto**: Picco positivo di \( \dot{E}(t) \).
+   - **Stacco**: Minimo locale di \( E(t) \) vicino a zero.
+   - **Attacco alla pedana**: Picco positivo dopo il minimo.
+   - **Fine caduta**: Stabilizzazione di \( E(t) \).
 
-## Uso Ottimale
-Studi di ricerca e sport di alto livello con requisiti di analisi personalizzata
+### **Vantaggi**
+- Facile da implementare.
+- Robusto contro rumore ad alta frequenza.
 
-## Confronto Metodi
+### **Svantaggi**
+- Sensibile a picchi accidentali.
 
-| Metodo | Vantaggi | Svantaggi |
-|--------|----------|-----------|
-| Derivata | Preciso per transizioni rapide | Sensibile al rumore |
-| Statistico | Robusto, semplice | Meno adatto a movimenti complessi |
-| Filtro adattivo | Migliore stabilità | Richiede regolazione fine |
-| Energia | Facile implementazione | Sensibile a picchi accidentali |
-| Machine Learning | Adattabile a scenari diversi, riconosce pattern complessi | Alto costo computazionale, richiede training |
+---
+
+## **5. Metodo del Machine Learning**
+Utilizza modelli predittivi per identificare automaticamente i momenti chiave.
+
+### **Descrizione**
+1. **Preparazione**:
+   - Raccogli dati di salti e annota manualmente gli eventi (\( t_{\text{inizio}}, t_{\text{stacco}}, t_{\text{attacco}}, t_{\text{fine}} \)).
+2. **Feature Extraction**:
+   - Derivata del segnale, varianza, deviazioni dalla media, etc.
+3. **Allenamento**:
+   - Usa classificatori (es. SVM, Random Forest) o modelli sequenziali (es. LSTM).
+4. **Predizione**:
+   - Il modello analizza il segnale in tempo reale e rileva gli eventi.
+
+### **Vantaggi**
+- Adatto a movimenti complessi e segnali rumorosi.
+- Può generalizzare bene su dataset vari.
+
+### **Svantaggi**
+- Richiede un dataset per l'addestramento.
+- Complessità implementativa maggiore.
+
+---
+
+## **Confronto dei Metodi**
+
+| **Metodo**                     | **Vantaggi**                                        | **Svantaggi**                                 |
+|--------------------------------|----------------------------------------------------|----------------------------------------------|
+| **Derivata del segnale**       | Alta precisione per cambiamenti rapidi             | Sensibile al rumore                          |
+| **Statistico (soglie fisse)**  | Semplice da implementare                           | Poco preciso per segnali rumorosi            |
+| **Filtro adattivo**            | Robusto contro variazioni lente e graduali         | Richiede configurazione delle soglie         |
+| **Energia del segnale**        | Facile da implementare e robusto                  | Sensibile a picchi accidentali               |
+| **Machine Learning**           | Adattabile a movimenti complessi e dataset vari    | Richiede dataset e competenze avanzate       |
+
+---
+
+## **Conclusioni**
+- Per salti semplici e segnali stabili: **Metodo statistico** o **derivata del segnale**.
+- Per segnali rumorosi o variabili: **Filtro adattivo** o **energia del segnale**.
+- Per analisi avanzate: **Machine Learning**.
+
+```
 
 ## Esempi in python
 
