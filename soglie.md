@@ -6,20 +6,20 @@
 ## Eventi Chiave
 - **Inizio salto**: Avvio fase attiva
 - **Stacco**: Momento del distacco
-- **Attacco alla pedana**: Atterraggio
+- **Attacco alla pedana**: Atterraggio 
 - **Fine caduta**: Stabilizzazione finale
 
 ## 1. Metodo della Derivata del Segnale
 
 ### Descrizione
 1. Calcola la derivata del segnale:
-$$ \dot{F}_{\text{pedana}}(t) = \frac{dF_{\text{pedana}}(t)}{dt} $$
+$$ \dot{F}_{pedana}(t) = \frac{dF_{pedana}(t)}{dt} $$
 
-2. Rileva le soglie $$ \dot{F}_{{\text{pedana}}}(t) > \text{soglia}_{{\text{positivo}}} $$
-- Inizio salto:  $$ \dot{F}_{pedana}(t) > soglia_{positivo} $$
-- Stacco: $$ F_{\text{pedana}}(t) \approx 0 $$
-- Attacco: Picco negativo di $$ \dot{F}_{\text{pedana}}(t) $$
-- Fine caduta: $$ F_{\text{pedana}}(t) \approx F_{\text{iniziale}} $$
+2. Rileva le soglie:
+- Inizio salto: $$ \dot{F}_{pedana}(t) > soglia_{positivo} $$
+- Stacco: $$ F_{pedana}(t) \approx 0 $$
+- Attacco: Picco negativo di $$ \dot{F}_{pedana}(t) $$
+- Fine caduta: $$ F_{pedana}(t) \approx F_{iniziale} $$
 
 ### Vantaggi
 - Alta precisione per transizioni rapide
@@ -33,16 +33,16 @@ $$ \dot{F}_{\text{pedana}}(t) = \frac{dF_{\text{pedana}}(t)}{dt} $$
 
 ### Descrizione
 1. Calibrazione con valore a riposo:
-$$ F_{\text{pedana, riposo}} $$
+$$ F_{pedana\_riposo} $$
 
 2. Soglie relative:
-$$ \text{soglia}_\text{positivo}, \text{soglia}_\text{negativo} $$
+$$ soglia_{positivo}, soglia_{negativo} $$
 
 3. Rilevamento eventi:
-- Inizio: $$ F_{\text{pedana}}(t) > F_{\text{pedana, riposo}} + \text{soglia}_\text{positivo} $$
-- Stacco: $$ F_{\text{pedana}}(t) < \text{soglia}_\text{negativo} $$
-- Attacco: $$ F_{\text{pedana}}(t) > F_{\text{pedana, riposo}} + \text{soglia}_\text{positivo} $$
-- Fine: $$ F_{\text{pedana}}(t) \approx F_{\text{pedana, riposo}} $$
+- Inizio: $$ F_{pedana}(t) > F_{pedana\_riposo} + soglia_{positivo} $$
+- Stacco: $$ F_{pedana}(t) < soglia_{negativo} $$
+- Attacco: $$ F_{pedana}(t) > F_{pedana\_riposo} + soglia_{positivo} $$
+- Fine: $$ F_{pedana}(t) \approx F_{pedana\_riposo} $$
 
 ### Vantaggi
 - Implementazione semplice
@@ -55,14 +55,14 @@ $$ \text{soglia}_\text{positivo}, \text{soglia}_\text{negativo} $$
 
 ### Descrizione
 1. Media mobile:
-$$ \text{Media}_n = \frac{1}{w} \sum_{i=n-w}^{n} F_{\text{pedana}}[i] $$
+$$ Media_n = \frac{1}{w} \sum_{i=n-w}^{n} F_{pedana}[i] $$
 
 2. Deviazioni:
-$$ \Delta F = F_{\text{pedana}}(t) - \text{Media}_n $$
+$$ \Delta F = F_{pedana}(t) - Media_n $$
 
 3. Eventi:
-- Inizio: $$ \Delta F > \text{soglia}_\text{positivo} $$
-- Stacco: $$ \Delta F < -\text{soglia}_\text{negativo} $$
+- Inizio: $$ \Delta F > soglia_{positivo} $$
+- Stacco: $$ \Delta F < -soglia_{negativo} $$
 - Attacco: Picco positivo post zero-crossing
 - Fine: $$ \Delta F \approx 0 $$
 
@@ -77,7 +77,7 @@ $$ \Delta F = F_{\text{pedana}}(t) - \text{Media}_n $$
 
 ### Descrizione
 1. Energia istantanea:
-$$ E(t) = F_{\text{pedana}}(t)^2 $$
+$$ E(t) = F_{pedana}(t)^2 $$
 
 2. Eventi da analisi picchi:
 - Inizio: Massimo di $$ \dot{E}(t) $$
@@ -96,16 +96,16 @@ $$ E(t) = F_{\text{pedana}}(t)^2 $$
 
 ### Descrizione
 1. **Preparazione**:
-   Annotazione eventi $$ (t_{\text{inizio}}, t_{\text{stacco}}, t_{\text{attacco}}, t_{\text{fine}}) $$
+  Annotazione eventi $$ (t_{inizio}, t_{stacco}, t_{attacco}, t_{fine}) $$
 
 2. **Features**:
-   - Derivate
-   - Varianze
-   - Deviazioni dalla media
+  - Derivate
+  - Varianze
+  - Deviazioni dalla media
 
 3. **Training & Predizione**:
-   - Classificatori (SVM, RF)
-   - Modelli sequenziali (LSTM)
+  - Classificatori (SVM, RF)
+  - Modelli sequenziali (LSTM)
 
 ### Vantaggi
 - Gestione movimenti complessi
