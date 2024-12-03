@@ -137,4 +137,7 @@ Offre benefici significativi:
 - Kalman: Richiede risorse significative
 - Complementare: Necessità moderate
 
+- [Filtri aggiuntivi](filtri_plus.md)
+- [Dettagli Kalman](kalman.md)
+
 >[Torna all'indice](readme.md#fasi-progetto)
