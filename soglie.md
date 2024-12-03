@@ -1,27 +1,6 @@
 >[Torna all'indice](readme.md#fasi-progetto)
->
->$$ \dot{F}_\text{pedana}(t) = \frac{dF_\text{pedana}(t)}{dt} $$
 
-# Metodi per Stabilire Soglie e Rilevare Eventi nei Salti
-
-## Eventi Chiave
-- **Inizio salto**: Avvio fase attiva
-- **Stacco**: Momento del distacco
-- **Attacco alla pedana**: Atterraggio
-- **Fine caduta**: Stabilizzazione finale
-
-## 1. Metodo della Derivata del Segnale
-
-### Descrizione
-1. Calcola la derivata del segnale:
-$$ \dot{F}_\text{pedana}(t) = \frac{dF_\text{pedana}(t)}{dt} $$
-
-2. Rileva le soglie:
-- Inizio salto: $$ \dot{F}_\text{pedana}(t) > \text{soglia}_\text{positivo} $$
-- Stacco: $$ F_\text{pedana}(t) \approx 0 $$
-- Attacco: Picco negativo di $$ \dot{F}_\text{pedana}(t) $$
-- Fine caduta: $$ F_\text{pedana}(t) \approx F_\text{iniziale} $$
-
+$$ \dot{F}\text{pedana}(t) = \frac{dF\text{pedana}(t)}{dt} $$
 
 Ciascun metodo implementa una strategia diversa per rilevare gli eventi chiave del salto:
 
