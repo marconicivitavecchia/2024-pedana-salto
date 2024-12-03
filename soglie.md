@@ -87,5 +87,6 @@ Studi di ricerca e sport di alto livello con requisiti di analisi personalizzata
 | Statistico | Robusto, semplice | Meno adatto a movimenti complessi |
 | Filtro adattivo | Migliore stabilità | Richiede regolazione fine |
 | Energia | Facile implementazione | Sensibile a picchi accidentali |
+| Machine Learning | Adattabile a scenari diversi, riconosce pattern complessi | Alto costo computazionale, richiede training |
 
 >[Torna all'indice](readme.md#fasi-progetto)
