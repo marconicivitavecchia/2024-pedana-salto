@@ -2,7 +2,6 @@
 
 Ecco il codice Markdown che puoi copiare e incollare direttamente:
 
-```markdown
 # Metodi per Stabilire Soglie e Rilevare Eventi nei Salti
 
 Questi metodi sono utili per rilevare automaticamente gli eventi chiave di un salto, come:
@@ -135,7 +134,7 @@ Utilizza modelli predittivi per identificare automaticamente i momenti chiave.
 | **Energia del segnale**        | Facile da implementare e robusto                  | Sensibile a picchi accidentali               |
 | **Machine Learning**           | Adattabile a movimenti complessi e dataset vari    | Richiede dataset e competenze avanzate       |
 
----
+
 
 ## **Conclusioni**
 - Per salti semplici e segnali stabili: **Metodo statistico** o **derivata del segnale**.
