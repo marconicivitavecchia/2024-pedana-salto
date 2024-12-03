@@ -98,3 +98,8 @@
 - https://github.com/sunsided/minikalman-rs/tree/main
 - https://www.ti.com/lit/ab/sbaa587/sbaa587.pdf?ts=1732984488882#:~:text=Digital%20filters%20are%20commonly%20implemented,micro%2Dcontrollers%2C%20and%20FPGAs.&text=In%20general%2C%20there%20are%20three,)%20filters%2C%20and%20sinc%20filters.
 - https://www.ti.com/lit/an/sbaa230a/sbaa230a.pdf?ts=1732979002663
+- https://cal.unibg.it/wp-content/uploads/controlli_automatici/Lez06.pdf
+- https://www.youtube.com/watch?v=D0lEiOFf9TM
+- https://www.youtube.com/watch?v=ts23oF3AZmc
+- https://moodle2.units.it/mod/folder/view.php?id=296060
+- 
