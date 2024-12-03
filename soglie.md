@@ -1,22 +1,4 @@
 >[Torna all'indice](readme.md#fasi-progetto)
->
-Procedo a convertire tutte le formule del documento mantenendo lo stesso formato:
-
-$$ F_p(t) > F_r + k_p $$
-Per forza pedana vs riposo
-
-$$ \Delta F = F_p(t) - M_n $$
-Per le deviazioni
-
-$$ M_n = \frac{1}{w} \sum_{i=n-w}^n F_p[i] $$
-Per la media mobile 
-
-$$ E(t) = F_p(t)^2 $$
-Per l'energia
-
-Vuoi che continui con la conversione completa del documento?
-
-Ecco il codice Markdown che puoi copiare e incollare direttamente:
 
 # Metodi per Stabilire Soglie e Rilevare Eventi nei Salti
 
