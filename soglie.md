@@ -52,6 +52,33 @@ $$E(t) = F_{\text{pedana}}(t)^2$$
 - **Attacco**: Picco positivo dopo minimo
 - **Fine caduta**: $E(t)$ stabilizzata
 
+# 5. Metodo Machine Learning
+
+## Applicazione
+- Dataset significativo di salti esistenti
+- Analisi avanzata con modelli predittivi
+
+## Feature Extraction
+$$\text{Features} = \{F_{\text{pedana}}(t), \dot{F}(t), \sigma_F, \text{peaks}, \text{crossings}\}$$
+
+## Eventi da Classificare
+- $t_{\text{inizio}}$: Inizio salto
+- $t_{\text{stacco}}$: Stacco dalla pedana
+- $t_{\text{attacco}}$: Contatto con pedana
+- $t_{\text{fine}}$: Fine movimento
+
+## Caratteristiche
+### Pro
+- Adattabile a scenari diversi
+- Riconosce pattern complessi
+
+### Contro
+- Training iniziale necessario
+- Alto costo computazionale
+
+## Uso Ottimale
+Studi di ricerca e sport di alto livello con requisiti di analisi personalizzata
+
 ## Confronto Metodi
 
 | Metodo | Vantaggi | Svantaggi |
