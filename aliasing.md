@@ -9,7 +9,7 @@ Il problema è che si tratta di una ripetizione che ha due caratteristiche entra
 - vale per tutte le frequenze campionate dall'ADC, quindi anche per quelle ben **al di sopra** del **segnale base**
 - per una certa banda campionata, si estende in **entrambe le direzioni** dello spettro, quindi questa viene **traslata** sia in alto che in basso, e quindi potenzialmente **pure in banda base**
 
-Se un segnale contiene frequenze superiori a fs/2 (frequenza di Nyquist), queste frequenze vengono "ripiegate", cioè traslate, nello **spettro base**, creando frequenze fantasma le cui componenti si sovrappongono al segnale utile **distorcendolo** irreversibilmente e quindi peggiorando il **rapporto segnale rumore** in ingresso.
+Se un segnale contiene frequenze superiori a fs/2 (frequenza di Nyquist), queste frequenze vengono, per effetto del campionamento, "ripiegate", cioè traslate, nello **spettro base**, creando frequenze fantasma le cui componenti si sovrappongono al segnale utile **distorcendolo** irreversibilmente e quindi peggiorando il **rapporto segnale rumore** in ingresso.
 
 <img src="img\aliasing.png" alt="alt text" width="900">
 
