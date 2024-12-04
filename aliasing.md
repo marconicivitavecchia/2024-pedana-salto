@@ -5,6 +5,8 @@ Lo spettro (trasformata di Fourier) del segnale campionato è una **ripetizione 
 
 Se un segnale contiene frequenze superiori a fs/2 (frequenza di Nyquist), queste frequenze vengono "ripiegate" nello **spettro base**, creando frequenze fantasma le cui componenti si sovrappongono al segnale utile **distorcendolo** irreversibilmente e quindi peggiorando il **rapporto segnale rumore** in ingresso.
 
+<img src="img\aliasing.png" alt="alt text" width="1000">
+
 Sotto certe condizioni il filtro antialiasing è **non necessario** o molto rilassato nel progetto. E' il caso in cui la frequenza di campionamento fs è **molto maggiore** (es. 10-20 volte) della massima frequenza del segnale, allora le componenti alias cadrebbero in **bande molto alte**, dove il segnale è già **naturalmente attenuato** dal normale comportamente passa basso che tutti i dispositivi reali posseggono.
 
 I convertitori sigma-delta relizzano un sovracampionamento intrinseco a frequenza interna molto alta (MHz) OSR tipicamente > 64 volte la frequenza di campionamento Fc. Ne segue che le componenti alias sono spostate a frequenze molto elevate e quindi soggette ad **attenuazione naturale**.
