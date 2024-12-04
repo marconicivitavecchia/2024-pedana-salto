@@ -104,3 +104,4 @@
 - https://www.youtube.com/watch?v=ts23oF3AZmc
 - https://moodle2.units.it/mod/folder/view.php?id=296060
 - https://github.com/rlabbe/Kalman-and-Bayesian-Filters-in-Python
+- https://www.dmi.unict.it/santoro/teaching/psr/slides/KalmanFiltering.pdf
