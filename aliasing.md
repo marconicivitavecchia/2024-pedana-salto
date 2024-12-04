@@ -35,7 +35,7 @@ R_FIT(MAX) è la resistenza massima
 ER è l'error rate
 k è la costante di Boltzmann
 T è la temperatura assoluta
-FD è il fattore di duty cycle
+FD è la frequenza di campionamento dei dati
 
 $$C_{FIT} = \frac{1}{2\pi \times R_{FIT} \times F_D}$$
 
@@ -81,7 +81,7 @@ Il risultato è circa:
 R_{FIT(MAX)} \approx 48.7 \text{ k}\Omega
 ```
 
-Quindi la resistenza massima dell'estensimetro dovrebbe essere inferiore a circa 48.7 kΩ per garantire la precisione a 24 bit con questi parametri.
+Quindi la resistenza massima dovrebbe essere inferiore a circa 48.7 kΩ per garantire la precisione a 24 bit con questi parametri.
 
 **Sitografia:**
 - https://www.edn.com/delta-sigma-antialiasing-filter-with-a-mode-rejection-circuit/
