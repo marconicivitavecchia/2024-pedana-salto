@@ -51,6 +51,38 @@ La resistenza in modo comune e differenziale può variare da centinaia di kilohm
 
 I due condensatori di modo comune, C CM_P e C CM_N , attenuano il rumore di modo comune ad alta frequenza. Il **condensatore differenziale** dovrebbe essere almeno di un ordine di grandezza **maggiore** dei **condensatori di modo comune** perché le discrepanze nei condensatori di modo comune causano rumore differenziale.
 
+
+Calcoliamo RFIT(MAX) con i seguenti parametri:
+
+1. **Temperatura ambiente**:
+   - T = 25°C + 273.15 = 298.15 K
+
+2. **Per 24 bit**:
+   - ER (Error Rate) = 2^-24 = 5.96 × 10^-8
+
+3. **Frequenza di campionamento**:
+   - FD = 500 Hz
+
+4. **Costante di Boltzmann**:
+   - k = 1.38 × 10^-23 J/K
+
+Calcoliamo:
+```math
+R_{FIT(MAX)} = \frac{10^{-(ER \times 0.602)}}{4 \times k \times T \times F_D}
+```
+
+Sostituendo:
+```math
+R_{FIT(MAX)} = \frac{10^{-(5.96 \times 10^{-8} \times 0.602)}}{4 \times 1.38 \times 10^{-23} \times 298.15 \times 500}
+```
+
+Il risultato è circa:
+```math
+R_{FIT(MAX)} \approx 48.7 \text{ k}\Omega
+```
+
+Quindi la resistenza massima dell'estensimetro dovrebbe essere inferiore a circa 48.7 kΩ per garantire la precisione a 24 bit con questi parametri.
+
 **Sitografia:**
 - https://www.edn.com/delta-sigma-antialiasing-filter-with-a-mode-rejection-circuit/
 - https://www.edn.com/analog-filter-eases-delta-sigma-converter-design/
