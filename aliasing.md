@@ -1,10 +1,13 @@
 
 >[Torna all'indice](readme.md#fasi-progetto)
 
+Lo spettro (trasformata di Fourier) del segnale campionato è una **ripetizione periodica** dello **spettro base** del segnale tempo continuo che si estende teoricamente all'**infinito** ma comunque praticamente ben oltre la massima freuenza utile del segnale campionato.
 
-I convertitori delta-sigma sono disponibili con molte funzionalità aggiuntive che li rendono ideali per l'acquisizione dati. Molti di questi tipi di convertitori includono un amplificatore a guadagno programmabile (PGA) e un buffer di ingresso che possono ridurre ulteriormente i requisiti per il condizionamento del segnale esterno. Alcuni hanno anche caratteristiche speciali per i collegamenti dei sensori, come le fonti di corrente di burnout.
+Se un segnale contiene frequenze superiori a fs/2 (frequenza di Nyquist), queste frequenze vengono "ripiegate" nello **spettro base**, creando frequenze fantasma le cui componenti si sovrappongono al segnale utile **distorcendolo** irreversibilmente e quindi peggiorando il **rapporto segnale rumore** in ingresso.
 
-Le applicazioni del convertitore delta-sigma hanno meno componenti rispetto ai circuiti SAR-ADC. Durante il funzionamento, l'ADC delta-sigma sovracampiona continuamente un segnale di tensione in ingresso. L'ADC applica quindi un filtro digitale su questi campioni per ottenere un'uscita digitale multi-bit e a basso rumore. Il sottoprodotto di questo algoritmo è una gamma dinamica più elevata e velocità di uscita inferiori. Molti progettisti si concentrano sul numero di bit di output che questo tipo di convertitore può produrre. Tuttavia, la caratteristica nascosta spesso trascurata è il guadagno di processo. Questa caratteristica consente al progettista di eliminare i circuiti analogici esterni in queste catene di segnali a bassa frequenza.
+Sotto certe condizioni il filtro antialiasing è **non necessario** o molto rilassato nel progetto. E' il caso in cui la frequenza di campionamento fs è **molto maggiore** (es. 10-20 volte) della massima frequenza del segnale, allora le componenti alias cadrebbero in **bande molto alte**, dove il segnale è già **naturalmente attenuato** dal normale comportamente passa basso che tutti i dispositivi reali posseggono.
+
+Per motivi che trascuriamo di spiegare, questo è in parte il caso dei covertitori sigma-delta che quindi hanno la proprietà di richiedere filtri antialiasing passa basso dalle specifiche molto rilassate (filtri BP del primo ordine).
 
 <img src="img\delta-sigma-filter.png" alt="alt text" width="1000">
 
