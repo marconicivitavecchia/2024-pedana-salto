@@ -114,4 +114,8 @@ Punti critici:
 - **Livello 4**: Comprensione dei limiti
 - **Livello 5**: Capacità di estensione
 
+Sitografia:
+- https://www.dmi.unict.it/santoro/teaching/psr/slides/KalmanFiltering.pdf
+- https://moodle2.units.it/course/section.php?id=116470
+
 >[Torna all'indice](readme.md#fasi-progetto)>[Torna a filtri](filtri.md)
