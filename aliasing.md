@@ -83,6 +83,33 @@ R_{FIT(MAX)} \approx 48.7 \text{ k}\Omega
 
 Quindi la resistenza massima dovrebbe essere inferiore a circa 48.7 kΩ per garantire la precisione a 24 bit con questi parametri.
 
+Utilizzando il valore di RFIT che abbiamo appena calcolato:
+
+```math
+C_{FIT} = \frac{1}{2\pi \times 48.7\times10^3 \times 500}
+```
+
+```math
+C_{FIT} = \frac{1}{2\pi \times 48700 \times 500}
+```
+
+```math
+C_{FIT} \approx 6.5 \text{ nF}
+```
+
+Questa è la capacità minima necessaria per il filtro antialiasing, dato:
+- RFIT = 48.7 kΩ
+- Fs (FD) = 500 Hz
+- la precisione richiesta di 24 bit
+- temperatura ambiente
+
+Questo filtro RC passa-basso ha una frequenza di taglio di:
+```math
+f_c = \frac{1}{2\pi \times R_{FIT} \times C_{FIT}} = 500 \text{ Hz}
+```
+
+che coincide con la frequenza di campionamento.
+
 **Sitografia:**
 - https://www.edn.com/delta-sigma-antialiasing-filter-with-a-mode-rejection-circuit/
 - https://www.edn.com/analog-filter-eases-delta-sigma-converter-design/
