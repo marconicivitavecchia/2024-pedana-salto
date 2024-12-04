@@ -71,6 +71,7 @@
 - [Dimensionamento ADC](dimens_ADC.md)
 - [Polarizzazione celle](polarizzazione.md)
 - [Campionamento](sampling.md)
+- [Filtro antialiasing](aliasing.md)
 - [Calibrazione statica](calibrazione_statica.md)
 - [Calcolo altezza](accelerazione.md)
 - [Definizione soglie](soglie.md)
