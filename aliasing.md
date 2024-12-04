@@ -12,7 +12,7 @@ Tra il sensore e il convertitore delta-sigma è presente un filtro passa-basso a
 
 Una volta stabilita la frequenza di antialiasing target di FD, è possibile definire rapidamente le formule di progettazione teorica. Il calcolo per questa valutazione teorica tiene conto del rumore del resistore e dei bit del convertitore. Per determinare la resistenza teorica del filtro (Figura 1), utilizzare la seguente equazione:
 
-R_{FIT(MAX)} = \frac{10^{-(ER \times 0.602)}}{4 \times k \times T \times F_D}
+$$R_{FIT(MAX)} = \frac{10^{-(ER \times 0.602)}}{4 \times k \times T \times F_D}$$
 
 Sitografia:
 - https://www.edn.com/delta-sigma-antialiasing-filter-with-a-mode-rejection-circuit/
