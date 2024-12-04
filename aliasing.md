@@ -10,11 +10,35 @@ Le applicazioni del convertitore delta-sigma hanno meno componenti rispetto ai c
 
 Tra il sensore e il convertitore delta-sigma è presente un filtro passa-basso anti-aliasing. Il design del convertitore delta-sigma e del filtro anti-aliasing SAR-ADC è significativamente diverso. Con un convertitore SAR, il filtro anti-aliasing solitamente ha un'implementazione attiva dal quarto all'ottavo ordine, che richiede da due a quattro amplificatori. Come mostra la Figura 1, l'implementazione dell'anti-aliasing delta-sigma richiede generalmente solo un filtro passivo del primo ordine [1] .
 
-Una volta stabilita la frequenza di antialiasing target di FD, è possibile definire rapidamente le formule di progettazione teorica. Il calcolo per questa valutazione teorica tiene conto del rumore del resistore e dei bit del convertitore. Per determinare la resistenza teorica del filtro (Figura 1), utilizzare la seguente equazione:
+Una volta stabilita la frequenza di antialiasing target di FD, è possibile definire rapidamente le formule di progettazione teorica. Il calcolo per questa valutazione teorica tiene conto del rumore del resistore e dei bit del convertitore. 
+
+Per determinare la **resistenza teorica** del filtro, utilizzare la seguente equazione:
 
 $$R_{FIT(MAX)} = \frac{10^{-(ER \times 0.602)}}{4 \times k \times T \times F_D}$$
 
-Sitografia:
+dove:
+
+R_FIT(MAX) è la resistenza massima
+ER è l'error rate
+k è la costante di Boltzmann
+T è la temperatura assoluta
+FD è il fattore di duty cycle
+
+$$C_{FIT} = \frac{1}{2\pi \times R_{FIT} \times F_D}$$
+
+Si noti che i circuiti e le discussioni presentate riguardano solo la riduzione del **rumore differenziale**, senza tenere conto dell'**impedenza di ingresso** del convertitore o del **rumore di modo comune**.
+
+Si può dimostrare che l'impedenza di ingresso media di un ADC delta-sigma apparentemente sembra essere **resistiva** e dipende da circuiterie di filtraggio interne particolari per questo tipo di convertitori (filtri commutati).
+
+- Per misurare l'**impedenza di ingresso in modo comune** della struttura in figura, collegare AIN P e AIN N insieme e misurare la corrente media che ogni pin consuma durante la conversione. 
+
+- Per misurare l'**impedenza di ingresso differenziale**, applicare un segnale differenziale ad AIN P e AIN N e misurare la corrente media che scorre attraverso il pin a V A.
+
+La resistenza in modo comune e differenziale può variare da centinaia di kilohm a centinaia di megaohm. Il valore di R FLT /2 deve essere almeno 10 volte inferiore alle impedenze di ingresso del convertitore.
+
+I due condensatori di modo comune, C CM_P e C CM_N , attenuano il rumore di modo comune ad alta frequenza. Il **condensatore differenziale** dovrebbe essere almeno di un ordine di grandezza **maggiore** dei **condensatori di modo comune** perché le discrepanze nei condensatori di modo comune causano rumore differenziale.
+
+**Sitografia:**
 - https://www.edn.com/delta-sigma-antialiasing-filter-with-a-mode-rejection-circuit/
 - https://www.edn.com/analog-filter-eases-delta-sigma-converter-design/
 - https://www.planetanalog.com/adc-basics-part-4-using-delta-sigma-adcs-in-your-design/
