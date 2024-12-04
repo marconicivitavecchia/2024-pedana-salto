@@ -3,7 +3,7 @@
 
 Lo spettro (trasformata di Fourier) del segnale campionato è una **ripetizione periodica** dello **spettro base** del segnale tempo continuo che si estende teoricamente all'**infinito** ma comunque praticamente ben oltre la massima freuenza utile del segnale campionato. 
 
-<img src="img\aliasing-spectrum.png" alt="alt text" width="1000">
+<img src="img\aliasing-spectrum.png" alt="alt text" width="800">
 
 Il problema è che si tratta di una ripetizione che ha due caratteristiche entrambe negative:
 - vale per tutte le frequenze campionate dall'ADC, quindi anche per quelle ben **al di sopra** del **segnale base**
@@ -11,7 +11,7 @@ Il problema è che si tratta di una ripetizione che ha due caratteristiche entra
 
 Se un segnale contiene frequenze superiori a fs/2 (frequenza di Nyquist), queste frequenze vengono "ripiegate", cioè traslate, nello **spettro base**, creando frequenze fantasma le cui componenti si sovrappongono al segnale utile **distorcendolo** irreversibilmente e quindi peggiorando il **rapporto segnale rumore** in ingresso.
 
-<img src="img\aliasing.png" alt="alt text" width="1000">
+<img src="img\aliasing.png" alt="alt text" width="800">
 
 Sotto certe condizioni il filtro antialiasing è **non necessario** o molto rilassato nel progetto. E' il caso in cui la frequenza di campionamento fs è **molto maggiore** (es. 10-20 volte) della massima frequenza del segnale, allora le componenti alias cadrebbero in **bande molto alte**, dove il segnale è già **naturalmente attenuato** dal normale comportamente passa basso che tutti i dispositivi reali posseggono.
 
