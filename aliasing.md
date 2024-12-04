@@ -1,9 +1,15 @@
 
 >[Torna all'indice](readme.md#fasi-progetto)
 
-Lo spettro (trasformata di Fourier) del segnale campionato è una **ripetizione periodica** dello **spettro base** del segnale tempo continuo che si estende teoricamente all'**infinito** ma comunque praticamente ben oltre la massima freuenza utile del segnale campionato.
+Lo spettro (trasformata di Fourier) del segnale campionato è una **ripetizione periodica** dello **spettro base** del segnale tempo continuo che si estende teoricamente all'**infinito** ma comunque praticamente ben oltre la massima freuenza utile del segnale campionato. 
 
-Se un segnale contiene frequenze superiori a fs/2 (frequenza di Nyquist), queste frequenze vengono "ripiegate" nello **spettro base**, creando frequenze fantasma le cui componenti si sovrappongono al segnale utile **distorcendolo** irreversibilmente e quindi peggiorando il **rapporto segnale rumore** in ingresso.
+<img src="img\aliasing-spectrum.png" alt="alt text" width="1000">
+
+Il problema è che si tratta di una ripetizione che ha due caratteristiche entrambe negative:
+- vale per tutte le frequenze campionate dall'ADC, quindi anche per quelle ben **al di sopra** del **segnale base**
+- per una certa banda campionata, si estende in **entrambe le direzioni** dello spettro, quindi questa viene **traslata** sia in alto che in basso, e quindi potenzialmente **pure in banda base**
+
+Se un segnale contiene frequenze superiori a fs/2 (frequenza di Nyquist), queste frequenze vengono "ripiegate", cioè traslate, nello **spettro base**, creando frequenze fantasma le cui componenti si sovrappongono al segnale utile **distorcendolo** irreversibilmente e quindi peggiorando il **rapporto segnale rumore** in ingresso.
 
 <img src="img\aliasing.png" alt="alt text" width="1000">
 
