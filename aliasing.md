@@ -8,9 +8,9 @@ Le applicazioni del convertitore delta-sigma hanno meno componenti rispetto ai c
 
 <img src="img\delta-sigma-filter.png" alt="alt text" width="1000">
 
-Tra il sensore e il convertitore delta-sigma è presente un filtro passa-basso anti-aliasing. Il design del convertitore delta-sigma e del filtro anti-aliasing SAR-ADC è significativamente diverso. Con un convertitore SAR, il filtro anti-aliasing solitamente ha un'implementazione attiva dal quarto all'ottavo ordine, che richiede da due a quattro amplificatori. Come mostra la Figura 1, l'implementazione dell'anti-aliasing delta-sigma richiede generalmente solo un filtro passivo del primo ordine [1] .
+Tra il sensore e il convertitore delta-sigma è presente un **filtro passa-basso anti-aliasing**. Il design del convertitore delta-sigma e del filtro anti-aliasing SAR-ADC è significativamente **diverso**. Con un convertitore SAR, il filtro anti-aliasing solitamente ha un'implementazione attiva dal **quarto all'ottavo ordine**, che richiede da due a quattro amplificatori. Come mostra la Figura, l'implementazione dell'**anti-aliasing delta-sigma** richiede generalmente solo un filtro passivo del **primo ordine**.
 
-Una volta stabilita la frequenza di antialiasing target di FD, è possibile definire rapidamente le formule di progettazione teorica. Il calcolo per questa valutazione teorica tiene conto del rumore del resistore e dei bit del convertitore. 
+Una volta stabilita la **frequenza di antialiasing target di FD**, è possibile definire rapidamente le formule di progettazione teorica. Il calcolo per questa valutazione teorica tiene conto del **rumore del resistore** e dei **bit del convertitore**. 
 
 Per determinare la **resistenza teorica** del filtro, utilizzare la seguente equazione:
 
