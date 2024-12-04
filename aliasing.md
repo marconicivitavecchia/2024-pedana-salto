@@ -116,6 +116,7 @@ che coincide con la frequenza di campionamento.
 - https://www.planetanalog.com/adc-basics-part-4-using-delta-sigma-adcs-in-your-design/
 - https://www.edn.com/delta-sigma-antialiasing-filter-with-a-mode-rejection-circuit/
 - https://www.planetanalog.com/adc-basics-part-1-does-your-adc-work-in-the-real-world/
+- http://www.dii.unimore.it/~lbiagiotti/MaterialeDidattico0910/CA-08-ImplementazioneRegolatori.pdf
 
 
 >[Torna all'indice](readme.md#fasi-progetto)
