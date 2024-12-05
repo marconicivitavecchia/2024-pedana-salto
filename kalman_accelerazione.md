@@ -1,99 +1,152 @@
+# **Filtro di Kalman per il Calcolo dell'Altezza**
 
-
-# **Filtro di Kalman per Altezza e Velocità**
-
-Questo repository implementa un filtro di Kalman per stimare altezza, velocità e accelerazione di un atleta utilizzando misure di accelerazione fornite da una pedana di forza. Sono forniti esempi sia per Python standard che per MicroPython.
+Questo progetto implementa un filtro di Kalman per stimare l'altezza, la velocità e l'accelerazione verticale partendo da misure di forza o accelerazione. Utilizza un modello deterministico basato sulle equazioni del moto.
 
 ---
 
-## **Descrizione del Problema**
-### **Calcolo Altezza da Misure di Accelerazione**
-L'accelerazione netta durante un salto può essere calcolata come:
+## **Modello del Sistema**
 
+### Stato del Sistema
+Lo stato del sistema è rappresentato come un vettore:
 \[
-a = g \cdot \left( \frac{F_s}{F_0} - 1 \right)
+x = 
+\begin{bmatrix}
+h \\
+v \\
+a
+\end{bmatrix}
 \]
 
 Dove:
-- \(F_s\): Forza totale misurata durante il salto.
-- \(F_0\): Forza a riposo (peso statico dell'atleta).
-- \(g\): Accelerazione gravitazionale.
+- \( h \): altezza (posizione verticale).
+- \( v \): velocità verticale.
+- \( a \): accelerazione verticale relativa.
 
-Il filtro di Kalman utilizza questo modello per stimare l'altezza e la velocità dell'atleta durante il movimento, considerando che:
-
-1. **Velocità iniziale**: L'atleta e la pedana condividono la stessa velocità fino al distacco.
-2. **Integrale discreto**: Calcolato per derivare la velocità relativa rispetto alla pedana.
-
-### **Relazione tra Pedana e Atleta**
-La velocità iniziale può essere calcolata integrando l'accelerazione relativa della pedana nel tempo:
-
+### Dinamica del Sistema
+L'evoluzione del sistema è descritta dalle equazioni di moto:
 \[
-v_{\text{iniziale}} = g \cdot \int_{t_0}^{t_{\text{distacco}}} \frac{F_{\text{pedana}}(t) - F_{\text{statico}}}{F_{\text{statico}}} \, dt
+h(t + \Delta t) = h(t) + v(t) \cdot \Delta t + 0.5 \cdot a(t) \cdot (\Delta t)^2
 \]
-
-Versione discreta:
-
 \[
-v_{\text{iniziale}} = g \cdot \sum_{n=0}^{N-1} \frac{F_{\text{pedana}}[n] - F_{\text{statico}}}{F_{\text{statico}}} \cdot \Delta t
+v(t + \Delta t) = v(t) + a(t) \cdot \Delta t
+\]
+\[
+a(t + \Delta t) = a(t) \quad (\text{accelerazione costante su piccoli intervalli})
 \]
 
 ---
 
-## **Implementazioni**
+## **Matrici del Modello**
 
-### **1. Python**
-La versione Python utilizza la libreria `numpy` per calcoli matriciali efficienti. È consigliata per ambienti con risorse hardware sufficienti.
+### Matrice di Transizione dello Stato \( F \)
+La matrice \( F \) descrive la relazione tra lo stato attuale e quello futuro, considerando un passo temporale discreto \(\Delta t\):
+\[
+F = 
+\begin{bmatrix}
+1 & \Delta t & 0.5 \cdot (\Delta t)^2 \\
+0 & 1 & \Delta t \\
+0 & 0 & 1
+\end{bmatrix}
+\]
+- La prima riga aggiorna l'altezza usando velocità e accelerazione.
+- La seconda riga aggiorna la velocità usando l'accelerazione.
+- La terza riga assume accelerazione costante in \(\Delta t\).
 
-#### **Codice Python**
-```python
-import numpy as np
+### Matrice di Osservazione \( H \)
+La matrice \( H \) mappa lo stato reale sulle misure disponibili. Poiché si misura solo l'accelerazione relativa, \( H \) è:
+\[
+H = 
+\begin{bmatrix}
+0 & 0 & 1
+\end{bmatrix}
+\]
 
-class KalmanFilter:
-    def __init__(self, dt, process_noise, measurement_noise):
-        self.dt = dt  # Intervallo di tempo
+### Rumore
+- **Rumore di processo \( Q \)**: rappresenta incertezze nel modello (es. accelerazioni variabili).
+- **Rumore di misura \( R \)**: rappresenta incertezze nelle misure di accelerazione.
 
-        # Stato iniziale [altezza, velocità, accelerazione]
-        self.x = np.array([0, 0, 0], dtype=float)  # h, v, a
+---
 
-        # Matrice di transizione dello stato F
-        self.F = np.array([
-            [1, dt, 0.5 * dt ** 2],
-            [0, 1, dt],
-            [0, 0, 1]
-        ])
+## **Filtro di Kalman**
 
-        # Matrice di osservazione H (misura solo accelerazione)
-        self.H = np.array([[0, 0, 1]])
+### Predizione dello Stato
+La fase di predizione calcola lo stato futuro usando il modello:
+\[
+x_{\text{pred}} = F \cdot x_{\text{prev}}
+\]
 
-        # Matrice di covarianza iniziale P
-        self.P = np.eye(3)
+La covarianza dello stato viene aggiornata:
+\[
+P_{\text{pred}} = F \cdot P_{\text{prev}} \cdot F^T + Q
+\]
 
-        # Rumore di processo Q
-        self.Q = np.eye(3) * process_noise
+### Aggiornamento con le Osservazioni
+Si confronta la misura osservata (\( z \)) con quella prevista:
+\[
+y = z - H \cdot x_{\text{pred}}
+\]
+\[
+S = H \cdot P_{\text{pred}} \cdot H^T + R
+\]
+\[
+K = P_{\text{pred}} \cdot H^T \cdot S^{-1}
+\]
 
-        # Rumore di misura R
-        self.R = np.array([[measurement_noise]])
+Lo stato e la covarianza vengono aggiornati:
+\[
+x = x_{\text{pred}} + K \cdot y
+\]
+\[
+P = (I - K \cdot H) \cdot P_{\text{pred}}
+\]
 
-    def predict(self):
-        self.x = np.dot(self.F, self.x)
-        self.P = np.dot(np.dot(self.F, self.P), self.F.T) + self.Q
+---
 
-    def update(self, z):
-        y = z - np.dot(self.H, self.x)
-        S = np.dot(self.H, np.dot(self.P, self.H.T)) + self.R
-        K = np.dot(np.dot(self.P, self.H.T), np.linalg.inv(S))
-        self.x = self.x + np.dot(K, y)
-        I = np.eye(len(self.x))
-        self.P = np.dot(I - np.dot(K, self.H), self.P)
+## **Implementazione Pratica**
 
-    def get_state(self):
-        return self.x
+1. **Stato Iniziale**:
+   \[
+   h(0) = 0, \quad v(0) = 0, \quad a(0) = \text{stimato dalla pedana.}
+   \]
+2. **Passo Temporale**: Determinato dalla frequenza di campionamento.
+3. **Altezza Massima**: Si trova quando \( v = 0 \).
 
-dt = 0.01
-kf = KalmanFilter(dt, process_noise=0.01, measurement_noise=0.1)
+---
 
-measurements = [0.2, 0.25, 0.3, 0.35, 0.4]
-for z in measurements:
-    kf.predict()
-    kf.update(z)
-    print("Stato stimato:", kf.get_state())
+## **Esempio di Calcolo**
+
+### Esempio di Matrici
+Con \(\Delta t = 0.1\) secondi:
+\[
+F = 
+\begin{bmatrix}
+1 & 0.1 & 0.005 \\
+0 & 1 & 0.1 \\
+0 & 0 & 1
+\end{bmatrix}
+\]
+\[
+H = 
+\begin{bmatrix}
+0 & 0 & 1
+\end{bmatrix}
+\]
+
+### Simulazione delle Misure
+Supponiamo di avere misure di accelerazione:
+\[
+z = [0.2, 0.25, 0.3, 0.35, 0.4]
+\]
+
+Il filtro di Kalman stimerà altezza e velocità iterativamente.
+
+---
+
+## **Codice di Implementazione**
+
+Per l'implementazione in **Python** e **MicroPython**, consulta il file [kalman_filter.py](./kalman_filter.py).
+
+---
+
+## **Autore**
+Progetto sviluppato per applicazioni di analisi biomeccanica e controllo dei sistemi dinamici.
