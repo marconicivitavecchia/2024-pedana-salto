@@ -1,4 +1,3 @@
-Ecco la versione formattata in Markdown per GitHub:
 Calcolo dell'Altezza con Filtro di Kalman
 1. Modello del Sistema
 Lo stato del sistema può essere descritto come un vettore:
@@ -37,7 +36,7 @@ Significa che il sistema osserva solo l'accelerazione a.
 Rumore di processo (Q): incertezza nel modello deterministico
 Rumore di misura (R): incertezza nelle misure dell'accelerazione
 
-5. Integrazione del Modello Deterministico
+5. Integrazione del Modello Deterministic
 Predizione dello stato:
 Copyx_pred = F · x_prev
 Aggiornamento con le osservazioni:
@@ -56,4 +55,3 @@ Passo temporale Δt:
 Determinato dalla frequenza di campionamento della pedana
 Calcolo altezza massima:
 Quando la velocità verticale v diventa zero
- CopyRetryClaude does not have the ability to run the code it generates yet.
