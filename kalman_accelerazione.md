@@ -242,7 +242,7 @@ P0: peso statico dell'atleta
 
 Definiamo il vettore di stato:
 
-$$mathCopyx = \begin{bmatrix} h \\ v \\ a \end{bmatrix}$$
+$$x = \begin{bmatrix} h \\ v \\ a \end{bmatrix}$$
 
 dove:
 
