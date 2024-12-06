@@ -1,4 +1,4 @@
-Hai ragione. Per Git (GitHub Flavored Markdown), usa il formato tra i doppi dollari $$ per le equazioni:
+>[Torna all'indice](readme.md#fasi-progetto)
 
 # Calcolo dell'Altezza con Filtro di Kalman
 
@@ -220,4 +220,4 @@ dt: intervallo di campionamento
 process_noise: incertezza nel modello
 measurement_noise: incertezza nelle misure
 
-
+>[Torna all'indice](readme.md#fasi-progetto)
