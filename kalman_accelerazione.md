@@ -220,4 +220,280 @@ dt: intervallo di campionamento
 process_noise: incertezza nel modello
 measurement_noise: incertezza nelle misure
 
+## Da Claude
+
+Filtro di Kalman per Calcolo Altezza da Accelerazione della Pedana di Forza
+Teoria Fisica
+Base del Calcolo
+L'accelerazione netta dell'atleta viene calcolata dalla misura di forza:
+mathCopya = g(\frac{P_s}{P_0} - 1)
+dove:
+
+a: accelerazione netta
+g: accelerazione di gravità (9.81 m/s²)
+Ps: forza misurata dalla pedana
+P0: peso statico dell'atleta
+
+Modello di Stato
+Definiamo il vettore di stato:
+mathCopyx = \begin{bmatrix} h \\ v \\ a \end{bmatrix}
+dove:
+
+h: altezza
+v: velocità
+a: accelerazione
+
+Equazioni del Moto
+mathCopy\begin{align*}
+h_{k+1} &= h_k + v_k\Delta t + \frac{1}{2}a_k\Delta t^2 \\
+v_{k+1} &= v_k + a_k\Delta t \\
+a_{k+1} &= g(\frac{P_{s,k+1}}{P_0} - 1)
+\end{align*}
+Vuoi che continui con:
+
+Matrici del filtro di Kalman
+Implementazione Python
+Implementazione MicroPython
+Esempi di utilizzo ?
+ CopyRetryClaude does not have the ability to run the code it generates yet.EtuttoEditDerivazione Sistema di Stima Altezza da Misure di Forza
+1. Modello Fisico
+Accelerazione dalla Pedana
+mathCopya = g(\frac{P_s}{P_0} - 1)
+Dove:
+
+a: accelerazione netta [m/s²]
+g: accelerazione di gravità (9.81 m/s²)
+Ps: forza istantanea [N]
+P0: peso statico [N]
+
+Variabili di Stato
+mathCopyx = \begin{bmatrix} h \\ v \\ a \end{bmatrix}
+Equazioni del Moto
+mathCopy\begin{align*}
+h_{k+1} &= h_k + v_k\Delta t + \frac{1}{2}a_k\Delta t^2 \\
+v_{k+1} &= v_k + a_k\Delta t \\
+a_{k+1} &= g(\frac{P_{s,k+1}}{P_0} - 1)
+\end{align*}
+2. Filtro di Kalman
+Matrice di Transizione
+mathCopyF = \begin{bmatrix} 
+1 & \Delta t & \frac{1}{2}\Delta t^2 \\
+0 & 1 & \Delta t \\
+0 & 0 & 1
+\end{bmatrix}
+Matrice di Osservazione
+mathCopyH = \begin{bmatrix} 0 & 0 & 1 \end{bmatrix}
+Mi fermo qui per un attimo. Vuoi che prosegua con:
+
+Implementazione Python/MicroPython
+Matrici Q e R del filtro
+Esempi pratici di utilizzo
+Analisi delle prestazioni
+
+Quale aspetto preferisci approfondire per primo? CopyRetryClaude does not have the ability to run the code it generates yet.EtuttoEditContinuo con la derivazione completa e poi l'implementazione.
+Sistema di Misura Altezza da Pedana di Forza
+3. Matrici di Covarianza
+Rumore di Processo Q
+mathCopyQ = \begin{bmatrix} 
+\sigma^2_h & 0 & 0 \\
+0 & \sigma^2_v & 0 \\
+0 & 0 & \sigma^2_a
+\end{bmatrix}
+Rumore di Misura R
+mathCopyR = [\sigma^2_{force}]
+4. Implementazione Python
+pythonCopyimport numpy as np
+
+class ForceKalmanFilter:
+    def __init__(self, dt, peso_statico, process_noise=0.01, measurement_noise=0.1):
+        self.dt = dt
+        self.P0 = peso_statico
+        self.g = 9.81
+        
+        # Stato [h, v, a]
+        self.x = np.array([0., 0., 0.])
+        
+        # Matrice transizione
+        self.F = np.array([
+            [1, dt, 0.5*dt**2],
+            [0, 1, dt],
+            [0, 0, 1]
+        ])
+        
+        # Matrice osservazione
+        self.H = np.array([[0, 0, 1]])
+        
+        # Covarianze
+        self.P = np.eye(3)
+        self.Q = np.eye(3) * process_noise
+        self.R = np.array([[measurement_noise]])
+
+    def force_to_acceleration(self, force):
+        """Converte forza in accelerazione"""
+        return self.g * (force/self.P0 - 1)
+
+    def predict(self):
+        """Predizione stato"""
+        self.x = self.F @ self.x
+        self.P = self.F @ self.P @ self.F.T + self.Q
+
+    def update(self, force):
+        """Aggiornamento con misura"""
+        z = self.force_to_acceleration(force)
+        
+        # Innovazione
+        y = z - self.H @ self.x
+        
+        # Guadagno Kalman
+        S = self.H @ self.P @ self.H.T + self.R
+        K = self.P @ self.H.T @ np.linalg.inv(S)
+        
+        # Aggiornamento stato
+        self.x = self.x + K @ [y]
+        self.P = (np.eye(3) - K @ self.H) @ self.P
+
+    def get_state(self):
+        return {'height': self.x[0],
+                'velocity': self.x[1],
+                'acceleration': self.x[2]}
+5. Implementazione MicroPython
+pythonCopyclass ForceKalmanFilterMicro:
+    def __init__(self, dt, peso_statico, process_noise=0.01, measurement_noise=0.1):
+        self.dt = dt
+        self.P0 = peso_statico
+        self.g = 9.81
+        
+        # Stato [h, v, a]
+        self.x = [0.0, 0.0, 0.0]
+        
+        # Matrice transizione
+        self.F = [
+            [1, dt, 0.5*dt**2],
+            [0, 1, dt],
+            [0, 0, 1]
+        ]
+        
+        # Matrice osservazione
+        self.H = [[0, 0, 1]]
+        
+        # Covarianze
+        self.P = [[1, 0, 0], [0, 1, 0], [0, 0, 1]]
+        self.Q = [[process_noise, 0, 0], 
+                 [0, process_noise, 0],
+                 [0, 0, process_noise]]
+        self.R = [[measurement_noise]]
+
+    def mat_mult(self, A, B):
+        """Moltiplicazione matrici"""
+        if isinstance(B[0], list):
+            return [[sum(a*b for a,b in zip(row, col)) 
+                    for col in zip(*B)] for row in A]
+        return [[sum(a*b for a,b in zip(row, B))] 
+                for row in A]
+
+    def mat_add(self, A, B):
+        """Somma matrici"""
+        return [[A[i][j] + B[i][j] 
+                for j in range(len(A[0]))]
+                for i in range(len(A))]
+
+    def mat_transp(self, A):
+        """Trasposta matrice"""
+        return [[A[j][i] for j in range(len(A))]
+                for i in range(len(A[0]))]
+
+    def force_to_acceleration(self, force):
+        """Converte forza in accelerazione"""
+        return self.g * (force/self.P0 - 1)
+
+    def predict(self):
+        """Predizione stato"""
+        self.x = [sum(self.F[i][j] * self.x[j] 
+                 for j in range(3)) 
+                 for i in range(3)]
+        
+        FP = self.mat_mult(self.F, self.P)
+        FT = self.mat_transp(self.F)
+        self.P = self.mat_add(
+            self.mat_mult(FP, FT),
+            self.Q
+        )
+
+    def update(self, force):
+        """Aggiornamento con misura"""
+        z = self.force_to_acceleration(force)
+        
+        # Innovazione
+        y = z - sum(self.H[0][j] * self.x[j] 
+                   for j in range(3))
+        
+        # Calcolo guadagno Kalman
+        HP = self.mat_mult(self.H, self.P)
+        HT = self.mat_transp(self.H)
+        S = self.mat_add(
+            self.mat_mult(HP, HT),
+            self.R
+        )[0][0]
+        
+        PHT = self.mat_mult(self.P, HT)
+        K = [[k[0]/S] for k in PHT]
+        
+        # Aggiornamento stato
+        self.x = [self.x[i] + K[i][0] * y 
+                 for i in range(3)]
+        
+        # Aggiornamento covarianza
+        KH = self.mat_mult(K, self.H)
+        self.P = self.mat_add(
+            self.P,
+            [[-KH[i][j] * self.P[j][k] 
+              for k in range(3)]
+              for i, j in [(i,j) 
+              for i in range(3) 
+              for j in range(3)]]
+        )
+
+    def get_state(self):
+        return {
+            'height': self.x[0],
+            'velocity': self.x[1],
+            'acceleration': self.x[2]
+        }
+6. Esempio di Utilizzo
+pythonCopydef analizza_salto(forze, dt, peso_statico):
+    # Inizializza filtro
+    kf = ForceKalmanFilter(dt, peso_statico)
+    
+    # Array per salvare risultati
+    heights = []
+    velocities = []
+    accelerations = []
+    
+    # Processa ogni misura
+    for force in forze:
+        kf.predict()
+        kf.update(force)
+        state = kf.get_state()
+        
+        heights.append(state['height'])
+        velocities.append(state['velocity'])
+        accelerations.append(state['acceleration'])
+    
+    # Trova altezza massima
+    max_height = max(heights)
+    
+    return {
+        'max_height': max_height,
+        'heights': heights,
+        'velocities': velocities,
+        'accelerations': accelerations
+    }
+Vuoi che aggiunga:
+
+Analisi delle prestazioni?
+Gestione degli errori?
+Visualizzazione dei risultati?
+Altri aspetti specifici?
+ CopyRetryClaude does not have the ability to run the code it generates yet.
+
 >[Torna all'indice](readme.md#fasi-progetto)
