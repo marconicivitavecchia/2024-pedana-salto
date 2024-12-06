@@ -224,10 +224,13 @@ measurement_noise: incertezza nelle misure
 
 Filtro di Kalman per Calcolo Altezza da Accelerazione della Pedana di Forza
 
-Teoria Fisica
-Base del Calcolo
+# Teoria Fisica
+
+## Base del Calcolo
 L'accelerazione netta dell'atleta viene calcolata dalla misura di forza:
+
 $$a = g(\frac{P_s}{P_0} - 1)$$
+
 dove: 
 
 a: accelerazione netta
@@ -235,9 +238,12 @@ g: accelerazione di gravità (9.81 m/s²)
 Ps: forza misurata dalla pedana
 P0: peso statico dell'atleta
 
-Modello di Stato
+# Modello di Stato
+
 Definiamo il vettore di stato:
+
 $$mathCopyx = \begin{bmatrix} h \\ v \\ a \end{bmatrix}$$
+
 dove:
 
 h: altezza
@@ -245,13 +251,14 @@ v: velocità
 a: accelerazione
 
 Equazioni del Moto
-$$y\begin{align*}$$
-$$h_{k+1} &= h_k + v_k\Delta t + \frac{1}{2}a_k\Delta t^2 \\
+$$y\begin{align*}
+h_{k+1} &= h_k + v_k\Delta t + \frac{1}{2}a_k\Delta t^2 \\
 v_{k+1} &= v_k + a_k\Delta t \\
 a_{k+1} &= g(\frac{P_{s,k+1}}{P_0} - 1)
 \end{align*}$$
 
 1. Modello Fisico
+
 Accelerazione dalla Pedana
 
 $$a = g(\frac{P_s}{P_0} - 1)$$
@@ -276,7 +283,9 @@ a_{k+1} &= g(\frac{P_{s,k+1}}{P_0} - 1)
 \end{align*}$$
 
 2. Filtro di Kalman
+   
 Matrice di Transizione
+
 $$yF = \begin{bmatrix} 
 1 & \Delta t & \frac{1}{2}\Delta t^2 \\
 0 & 1 & \Delta t \\
@@ -284,6 +293,7 @@ $$yF = \begin{bmatrix}
 \end{bmatrix}$$
 
 Matrice di Osservazione
+
 $$H = \begin{bmatrix} 0 & 0 & 1 \end{bmatrix}
 
 
@@ -296,15 +306,20 @@ Analisi delle prestazioni
 Sistema di Misura Altezza da Pedana di Forza
 
 3. Matrici di Covarianza
+
 Rumore di Processo Q
-mathCopyQ = \begin{bmatrix} 
+
+$$yQ = \begin{bmatrix} 
 \sigma^2_h & 0 & 0 \\
 0 & \sigma^2_v & 0 \\
 0 & 0 & \sigma^2_a
-\end{bmatrix}
+\end{bmatrix}$$
+
 Rumore di Misura R
-mathCopyR = [\sigma^2_{force}]
-4. Implementazione Python
+
+$$R = [\sigma^2_{force}]$$
+
+6. Implementazione Python
 
 ```python
 import numpy as np
