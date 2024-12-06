@@ -250,14 +250,15 @@ h: altezza
 v: velocità
 a: accelerazione
 
-Equazioni del Moto
+## Equazioni del Moto
+
 $$y\begin{align*}
 h_{k+1} &= h_k + v_k\Delta t + \frac{1}{2}a_k\Delta t^2 \\
 v_{k+1} &= v_k + a_k\Delta t \\
 a_{k+1} &= g(\frac{P_{s,k+1}}{P_0} - 1)
 \end{align*}$$
 
-1. Modello Fisico
+### 1. Modello Fisico
 
 Accelerazione dalla Pedana
 
@@ -282,9 +283,9 @@ v_{k+1} &= v_k + a_k\Delta t \\
 a_{k+1} &= g(\frac{P_{s,k+1}}{P_0} - 1)
 \end{align*}$$
 
-2. Filtro di Kalman
+## 2. Filtro di Kalman
    
-Matrice di Transizione
+### 1. Matrice di Transizione
 
 $$yF = \begin{bmatrix} 
 1 & \Delta t & \frac{1}{2}\Delta t^2 \\
@@ -292,7 +293,7 @@ $$yF = \begin{bmatrix}
 0 & 0 & 1
 \end{bmatrix}$$
 
-Matrice di Osservazione
+### 2. Matrice di Osservazione
 
 $$H = \begin{bmatrix} 0 & 0 & 1 \end{bmatrix}
 
@@ -305,7 +306,7 @@ Analisi delle prestazioni
 
 Sistema di Misura Altezza da Pedana di Forza
 
-3. Matrici di Covarianza
+## 3. Matrici di Covarianza
 
 Rumore di Processo Q
 
@@ -319,7 +320,7 @@ Rumore di Misura R
 
 $$R = [\sigma^2_{force}]$$
 
-6. Implementazione Python
+## 6. Implementazione Python
 
 ```python
 import numpy as np
