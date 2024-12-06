@@ -116,4 +116,197 @@ Questo filtro è ottimizzato per:
 - Minimizzazione dell'errore quadratico medio
 - Stima in tempo reale dell'altezza
 
-Vuoi approfondire qualche aspetto specifico della derivazione?
+###In python  
+
+```python
+import numpy as np
+
+class KalmanJumpHeight:
+    def __init__(self, dt, measurement_noise=0.1):
+        # Stato: [altezza, tempo_volo]
+        self.x = np.array([0., 0.])
+        self.g = 9.81
+        self.dt = dt
+        
+        # Matrice di transizione 
+        self.F = np.array([
+            [1, self.g*dt/4],  # h = g*t²/8
+            [0, 1]             # tempo volo
+        ])
+        
+        # Matrice di misura (misuriamo il tempo)
+        self.H = np.array([[0, 1]])
+        
+        # Covarianze
+        self.P = np.eye(2)
+        self.Q = np.array([[0.01, 0],
+                          [0, 0.01]])  # Rumore processo
+        self.R = np.array([[measurement_noise]])  # Rumore misura tempo
+        
+    def predict(self):
+        self.x = self.F @ self.x
+        self.P = self.F @ self.P @ self.F.T + self.Q
+        
+    def update(self, t_volo):
+        # Innovazione
+        y = t_volo - self.H @ self.x
+        
+        # Guadagno Kalman
+        S = self.H @ self.P @ self.H.T + self.R
+        K = self.P @ self.H.T @ np.linalg.inv(S)
+        
+        # Aggiornamento
+        self.x = self.x + K @ [y]
+        self.P = (np.eye(2) - K @ self.H) @ self.P
+        
+        # Calcolo altezza
+        return (self.g * self.x[1]**2) / 8
+```
+
+#### Uso in Python
+ 
+```python
+def calcola_salto(forze, freq_camp, peso_statico):
+    dt = 1/freq_camp
+    kf = KalmanJumpHeight(dt)
+    
+    # Trova tempo di volo
+    t_stacco = next(i for i, f in enumerate(forze) 
+                    if f < peso_statico * 0.2)
+    t_atterr = next(i for i, f in enumerate(forze[t_stacco:]) 
+                    if f > peso_statico * 1.5) + t_stacco
+    
+    t_volo = (t_atterr - t_stacco) / freq_camp
+    
+    # Stima con Kalman
+    kf.predict()
+    altezza = kf.update(t_volo)
+    
+    return altezza, t_volo
+```
+
+### In micropython
+
+```python
+class KalmanJumpHeightMicro:
+   def __init__(self, dt, measurement_noise=0.1):
+       # Stato: [altezza, tempo_volo]
+       self.x = [0.0, 0.0]
+       self.g = 9.81
+       self.dt = dt
+       
+       # Matrice di transizione
+       self.F = [
+           [1, self.g*dt/4],  # h = g*t²/8 
+           [0, 1]             # tempo volo
+       ]
+       
+       # Matrice di misura (misuriamo il tempo)
+       self.H = [[0, 1]]
+       
+       # Covarianze
+       self.P = [[1, 0], [0, 1]]
+       self.Q = [[0.01, 0], [0, 0.01]]  # Rumore processo
+       self.R = [[measurement_noise]]    # Rumore misura tempo
+
+   def mat_mult(self, A, B):
+       """Moltiplicazione matrici."""
+       rows_A = len(A)
+       cols_A = len(A[0])
+       cols_B = len(B[0]) if isinstance(B[0], list) else 1
+       
+       result = [[0] * cols_B for _ in range(rows_A)]
+       
+       for i in range(rows_A):
+           for j in range(cols_B):
+               for k in range(cols_A):
+                   if isinstance(B[k], list):
+                       result[i][j] += A[i][k] * B[k][j]
+                   else:
+                       result[i][j] += A[i][k] * B[k]
+       return result
+
+   def mat_add(self, A, B):
+       """Somma matrici."""
+       return [[A[i][j] + B[i][j] 
+               for j in range(len(A[0]))] 
+               for i in range(len(A))]
+
+   def mat_transp(self, A):
+       """Trasposta matrice."""
+       return [[A[j][i] for j in range(len(A))] 
+               for i in range(len(A[0]))]
+
+   def predict(self):
+       # x = F * x
+       self.x = [sum(self.F[i][j] * self.x[j] 
+                for j in range(2)) 
+                for i in range(2)]
+       
+       # P = F * P * F.T + Q
+       FP = self.mat_mult(self.F, self.P)
+       FT = self.mat_transp(self.F)
+       self.P = self.mat_add(
+           self.mat_mult(FP, FT), 
+           self.Q
+       )
+
+   def update(self, t_volo):
+       # Innovazione y = z - H*x
+       y = t_volo - sum(self.H[0][j] * self.x[j] 
+                       for j in range(2))
+       
+       # S = H*P*H.T + R
+       HP = self.mat_mult(self.H, self.P)
+       HT = self.mat_transp(self.H)
+       S = self.mat_add(
+           self.mat_mult(HP, HT), 
+           self.R
+       )[0][0]
+       
+       # K = P*H.T/S
+       PHT = self.mat_mult(self.P, HT)
+       K = [[k[0]/S] for k in PHT]
+       
+       # x = x + K*y
+       self.x = [self.x[i] + K[i][0] * y 
+                for i in range(2)]
+       
+       # P = P - K*H*P
+       KH = self.mat_mult(K, self.H)
+       self.P = self.mat_add(
+           self.P,
+           [[-KH[i][j] * self.P[j][k] 
+             for k in range(2)]
+             for i, j in [(i,j) 
+             for i in range(2) 
+             for j in range(2)]]
+       )
+       
+       # Calcolo altezza
+       return (self.g * self.x[1]**2) / 8
+
+def calcola_salto_micro(forze, freq_camp, peso_statico):
+   dt = 1/freq_camp
+   kf = KalmanJumpHeightMicro(dt)
+   
+   # Trova tempo di volo
+   for i, f in enumerate(forze):
+       if f < peso_statico * 0.2:
+           t_stacco = i
+           break
+   
+   for i, f in enumerate(forze[t_stacco:]):
+       if f > peso_statico * 1.5:
+           t_atterr = i + t_stacco
+           break
+   
+   t_volo = (t_atterr - t_stacco) / freq_camp
+   
+   # Stima con Kalman
+   kf.predict()
+   altezza = kf.update(t_volo)
+   
+   return altezza, t_volo
+```
+
