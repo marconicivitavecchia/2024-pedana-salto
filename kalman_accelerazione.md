@@ -246,9 +246,9 @@ $$x = \begin{bmatrix} h \\ v \\ a \end{bmatrix}$$
 
 dove:
 
-h: altezza
-v: velocità
-a: accelerazione
+- h: altezza
+- v: velocità
+- a: accelerazione
 
 ## Equazioni del Moto
 
@@ -266,10 +266,10 @@ $$a = g(\frac{P_s}{P_0} - 1)$$
 
 Dove:
 
-a: accelerazione netta [m/s²]
-g: accelerazione di gravità (9.81 m/s²)
-Ps: forza istantanea [N]
-P0: peso statico [N]
+- a: accelerazione netta [m/s²]
+- g: accelerazione di gravità (9.81 m/s²)
+- Ps: forza istantanea [N]
+- P0: peso statico [N]
 
 Variabili di Stato
 
@@ -295,16 +295,8 @@ $$yF = \begin{bmatrix}
 
 ### 2. Matrice di Osservazione
 
-$$H = \begin{bmatrix} 0 & 0 & 1 \end{bmatrix}
+$$H = \begin{bmatrix} 0 & 0 & 1 \end{bmatrix}$$
 
-
-Implementazione Python/MicroPython
-
-Matrici Q e R del filtro
-Esempi pratici di utilizzo
-Analisi delle prestazioni
-
-Sistema di Misura Altezza da Pedana di Forza
 
 ## 3. Matrici di Covarianza
 
