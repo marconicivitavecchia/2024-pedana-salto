@@ -76,7 +76,7 @@
 - [Calcolo altezza](accelerazione.md)
 - [Definizione soglie](soglie.md)
 - [Filtri per Motion Tracking](filtri.md)
-- [Filtro di Kalman da accellerazione](kalman_accelerazione.md)
+- [Filtro di Kalman da accelerazione](kalman_accelerazione.md)
 - [Filtro di Kalman da tempo di volo](kalman_tempovolo.md)
 
 
