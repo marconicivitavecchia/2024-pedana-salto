@@ -223,11 +223,12 @@ measurement_noise: incertezza nelle misure
 ## Da Claude
 
 Filtro di Kalman per Calcolo Altezza da Accelerazione della Pedana di Forza
+
 Teoria Fisica
 Base del Calcolo
 L'accelerazione netta dell'atleta viene calcolata dalla misura di forza:
-mathCopya = g(\frac{P_s}{P_0} - 1)
-dove:
+$$a = g(\frac{P_s}{P_0} - 1)$$
+dove: 
 
 a: accelerazione netta
 g: accelerazione di gravità (9.81 m/s²)
@@ -236,7 +237,7 @@ P0: peso statico dell'atleta
 
 Modello di Stato
 Definiamo il vettore di stato:
-mathCopyx = \begin{bmatrix} h \\ v \\ a \end{bmatrix}
+$$mathCopyx = \begin{bmatrix} h \\ v \\ a \end{bmatrix}$$
 dove:
 
 h: altezza
@@ -244,15 +245,17 @@ v: velocità
 a: accelerazione
 
 Equazioni del Moto
-y\begin{align*}
-h_{k+1} &= h_k + v_k\Delta t + \frac{1}{2}a_k\Delta t^2 \\
+$$y\begin{align*}$$
+$$h_{k+1} &= h_k + v_k\Delta t + \frac{1}{2}a_k\Delta t^2 \\
 v_{k+1} &= v_k + a_k\Delta t \\
 a_{k+1} &= g(\frac{P_{s,k+1}}{P_0} - 1)
-\end{align*}
+\end{align*}$$
 
 1. Modello Fisico
 Accelerazione dalla Pedana
-mathCopya = g(\frac{P_s}{P_0} - 1)
+
+$$a = g(\frac{P_s}{P_0} - 1)$$
+
 Dove:
 
 a: accelerazione netta [m/s²]
@@ -261,26 +264,28 @@ Ps: forza istantanea [N]
 P0: peso statico [N]
 
 Variabili di Stato
-mathCopyx = \begin{bmatrix} h \\ v \\ a \end{bmatrix}
+
+$$yx = \begin{bmatrix} h \\ v \\ a \end{bmatrix}$$
+
 Equazioni del Moto
 
-\begin{align*}
+$$\begin{align*}
 h_{k+1} &= h_k + v_k\Delta t + \frac{1}{2}a_k\Delta t^2 \\
 v_{k+1} &= v_k + a_k\Delta t \\
 a_{k+1} &= g(\frac{P_{s,k+1}}{P_0} - 1)
-\end{align*}
+\end{align*}$$
 
 2. Filtro di Kalman
 Matrice di Transizione
-mathCopyF = \begin{bmatrix} 
+$$yF = \begin{bmatrix} 
 1 & \Delta t & \frac{1}{2}\Delta t^2 \\
 0 & 1 & \Delta t \\
 0 & 0 & 1
-\end{bmatrix}
+\end{bmatrix}$$
 
 Matrice di Osservazione
-mathCopyH = \begin{bmatrix} 0 & 0 & 1 \end{bmatrix}
-Mi fermo qui per un attimo. Vuoi che prosegua con:
+$$H = \begin{bmatrix} 0 & 0 & 1 \end{bmatrix}
+
 
 Implementazione Python/MicroPython
 
