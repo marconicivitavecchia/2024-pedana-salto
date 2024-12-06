@@ -116,7 +116,7 @@ Questo filtro è ottimizzato per:
 - Minimizzazione dell'errore quadratico medio
 - Stima in tempo reale dell'altezza
 
-###In python  
+### In python  
 
 ```python
 import numpy as np
