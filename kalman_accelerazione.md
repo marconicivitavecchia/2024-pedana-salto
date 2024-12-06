@@ -244,18 +244,12 @@ v: velocità
 a: accelerazione
 
 Equazioni del Moto
-mathCopy\begin{align*}
+y\begin{align*}
 h_{k+1} &= h_k + v_k\Delta t + \frac{1}{2}a_k\Delta t^2 \\
 v_{k+1} &= v_k + a_k\Delta t \\
 a_{k+1} &= g(\frac{P_{s,k+1}}{P_0} - 1)
 \end{align*}
-Vuoi che continui con:
 
-Matrici del filtro di Kalman
-Implementazione Python
-Implementazione MicroPython
-Esempi di utilizzo ?
- CopyRetryClaude does not have the ability to run the code it generates yet.EtuttoEditDerivazione Sistema di Stima Altezza da Misure di Forza
 1. Modello Fisico
 Accelerazione dalla Pedana
 mathCopya = g(\frac{P_s}{P_0} - 1)
@@ -269,11 +263,13 @@ P0: peso statico [N]
 Variabili di Stato
 mathCopyx = \begin{bmatrix} h \\ v \\ a \end{bmatrix}
 Equazioni del Moto
-mathCopy\begin{align*}
+
+\begin{align*}
 h_{k+1} &= h_k + v_k\Delta t + \frac{1}{2}a_k\Delta t^2 \\
 v_{k+1} &= v_k + a_k\Delta t \\
 a_{k+1} &= g(\frac{P_{s,k+1}}{P_0} - 1)
 \end{align*}
+
 2. Filtro di Kalman
 Matrice di Transizione
 mathCopyF = \begin{bmatrix} 
@@ -281,17 +277,19 @@ mathCopyF = \begin{bmatrix}
 0 & 1 & \Delta t \\
 0 & 0 & 1
 \end{bmatrix}
+
 Matrice di Osservazione
 mathCopyH = \begin{bmatrix} 0 & 0 & 1 \end{bmatrix}
 Mi fermo qui per un attimo. Vuoi che prosegua con:
 
 Implementazione Python/MicroPython
+
 Matrici Q e R del filtro
 Esempi pratici di utilizzo
 Analisi delle prestazioni
 
-Quale aspetto preferisci approfondire per primo? CopyRetryClaude does not have the ability to run the code it generates yet.EtuttoEditContinuo con la derivazione completa e poi l'implementazione.
 Sistema di Misura Altezza da Pedana di Forza
+
 3. Matrici di Covarianza
 Rumore di Processo Q
 mathCopyQ = \begin{bmatrix} 
@@ -302,7 +300,9 @@ mathCopyQ = \begin{bmatrix}
 Rumore di Misura R
 mathCopyR = [\sigma^2_{force}]
 4. Implementazione Python
-pythonCopyimport numpy as np
+
+```python
+import numpy as np
 
 class ForceKalmanFilter:
     def __init__(self, dt, peso_statico, process_noise=0.01, measurement_noise=0.1):
@@ -356,8 +356,13 @@ class ForceKalmanFilter:
         return {'height': self.x[0],
                 'velocity': self.x[1],
                 'acceleration': self.x[2]}
+```
+
 5. Implementazione MicroPython
-pythonCopyclass ForceKalmanFilterMicro:
+
+```python
+
+class ForceKalmanFilterMicro:
     def __init__(self, dt, peso_statico, process_noise=0.01, measurement_noise=0.1):
         self.dt = dt
         self.P0 = peso_statico
@@ -459,8 +464,12 @@ pythonCopyclass ForceKalmanFilterMicro:
             'velocity': self.x[1],
             'acceleration': self.x[2]
         }
-6. Esempio di Utilizzo
-pythonCopydef analizza_salto(forze, dt, peso_statico):
+```
+
+7. Esempio di Utilizzo
+
+```python
+def analizza_salto(forze, dt, peso_statico):
     # Inizializza filtro
     kf = ForceKalmanFilter(dt, peso_statico)
     
@@ -488,12 +497,6 @@ pythonCopydef analizza_salto(forze, dt, peso_statico):
         'velocities': velocities,
         'accelerations': accelerations
     }
-Vuoi che aggiunga:
-
-Analisi delle prestazioni?
-Gestione degli errori?
-Visualizzazione dei risultati?
-Altri aspetti specifici?
- CopyRetryClaude does not have the ability to run the code it generates yet.
+```
 
 >[Torna all'indice](readme.md#fasi-progetto)
