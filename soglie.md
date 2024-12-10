@@ -63,7 +63,7 @@ Questo metodo utilizza un filtro adattivo per rilevare transizioni significative
 
 4. **Calibrazione delle soglie**:
    * $\text{soglia}_\text{positivo}$ e $\text{soglia}_\text{negativo}$ vengono definite come $n\sigma$ (ad esempio, $n=3$) della deviazione standard del segnale a riposo.
-   * soglia_positivo e soglia_negativo vengono definite come n*sigma (ad esempio, n=3)
+   * $\mathrm{soglia}_{\mathrm{positivo}}$
 
 **Vantaggi**
 * Robusto contro il rumore.
