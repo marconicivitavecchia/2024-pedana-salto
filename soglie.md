@@ -21,7 +21,7 @@ Questo metodo si basa sul calcolo della variazione temporale della forza (F_peda
    * **Fine caduta**: Quando la derivata torna a valori vicini a zero, segnalando che la forza si è stabilizzata.
 
 3. **Calibrazione delle soglie**:
-   * $$\text{soglia}_\text{derivata}$$: Calcolata in base al rumore del segnale (ad esempio, 3σ del rumore di fondo).
+   * $soglia_derivata$: Calcolata in base al rumore del segnale (ad esempio, 3σ del rumore di fondo).
    * 5% del peso statico come riferimento pratico per rilevare stacco e attacco.
 
 
