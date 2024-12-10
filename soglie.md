@@ -62,8 +62,7 @@ Questo metodo utilizza un filtro adattivo per rilevare transizioni significative
    * **Fine caduta**: Quando $\Delta F$ torna vicino a zero (stabilizzazione).
 
 4. **Calibrazione delle soglie**:
-   * $\text{soglia}_\text{positivo}$ e $\text{soglia}_\text{negativo}$ vengono definite come $n\sigma$ (ad esempio, $n=3$) della deviazione standard del segnale a riposo.
-   * $\mathrm{soglia}_{\mathrm{positivo}}$ e $\mathrm{soglia}_{\mathrm{negativo}}$ 
+   * Le soglie $\text{soglia}_\text{positivo}$ e $\text{soglia}_\text{negativo}$ vengono definite come $n\sigma$ (ad esempio, $n=3$) della deviazione standard del segnale a riposo.
 
 **Vantaggi**
 * Robusto contro il rumore.
