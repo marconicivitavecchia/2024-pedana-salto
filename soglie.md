@@ -11,7 +11,7 @@ Questo metodo si basa sul calcolo della variazione temporale della forza (F_peda
 **Fasi**
 
 1. **Derivata temporale**:
-   * Calcola la derivata del segnale: $\dot{F}(t) = \frac{F_{\text{pedana}}(t_{i+1}) - F_{\text{pedana}}(t_i)}{\Delta t}$
+   * Calcola la derivata del segnale: $$ \dot{F}(t) = \frac{F_{\text{pedana}}(t_{i+1}) - F_{\text{pedana}}(t_i)}{\Delta t} $$
    * Nel dominio discreto: $\dot{F}[n] = \frac{F_{\text{pedana}}[n+1] - F_{\text{pedana}}[n]}{\Delta t}$
 
 2. **Soglie**:
