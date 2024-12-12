@@ -21,9 +21,9 @@ In altre parole:
 ---
 
 ### **Esempio Pratico**
-Immagina di avere due processi $$P_$$ e $$P_2$$:
+Immagina di avere due processi $$P_1$$ e $$P_2$$:
 - $$P_1 $$: legge $$A$$ e scrive $$B$$.
-- $$P_$$: legge $$B$$ e scrive $$C$$.
+- $$P_2$$: legge $$B$$ e scrive $$C$$.
 
 - $$R_1 = \{ A \}, W_1 = \{ B \}$$
 - $$R_2 = \{ B \}, W_2 = \{ C \}$$
