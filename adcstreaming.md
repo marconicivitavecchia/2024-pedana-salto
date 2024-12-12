@@ -900,7 +900,7 @@ asyncio.run(main())
 - Questo approccio è semplice e funzionale per carichi moderati. Tuttavia, se il carico aumenta (ad esempio, con un flusso dati molto elevato), potrebbe essere più efficiente separare MQTT e WebSocket su thread/core differenti.
 - Puoi testare e ottimizzare i tempi di `await` per bilanciare il carico tra le varie operazioni.
 
-## ** Versione ibrida in C++**
+## **Versione ibrida in C++**
 
 ```C++
 #include <Arduino.h>
