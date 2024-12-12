@@ -900,4 +900,352 @@ asyncio.run(main())
 - Questo approccio è semplice e funzionale per carichi moderati. Tuttavia, se il carico aumenta (ad esempio, con un flusso dati molto elevato), potrebbe essere più efficiente separare MQTT e WebSocket su thread/core differenti.
 - Puoi testare e ottimizzare i tempi di `await` per bilanciare il carico tra le varie operazioni.
 
+## ** Versione ibrida in C++**
+
+```C++
+#include <Arduino.h>
+#include <WiFi.h>
+#include <WebSocketsServer.h>
+#include <PubSubClient.h>
+#include <ArduinoJson.h>
+#include <SPI.h>
+
+// Configurazione hardware
+#define CS_PIN 5
+#define DRDY_PIN 4
+
+// Configurazione acquisizione
+#define QUEUE_SIZE 1024
+#define DEFAULT_SAMPLE_RATE 30000  // Hz
+
+// Struttura configurazione
+struct Config {
+    uint32_t sampleRate;
+    uint8_t gain;
+    bool filterEnabled;
+    float threshold;
+    bool streaming;
+};
+
+// Variabili globali
+QueueHandle_t dataQueue;
+QueueHandle_t eventQueue;
+SemaphoreHandle_t configMutex;
+volatile Config config;
+volatile bool shouldRestart = false;
+
+// Configurazione rete
+const char* WIFI_SSID = "YOUR_SSID";
+const char* WIFI_PASSWORD = "YOUR_PASSWORD";
+const char* MQTT_SERVER = "YOUR_MQTT_SERVER";
+const int MQTT_PORT = 1883;
+const char* MQTT_USER = "YOUR_MQTT_USER";
+const char* MQTT_PASSWORD = "YOUR_MQTT_PASSWORD";
+
+// Topic MQTT
+const char* MQTT_CONFIG_TOPIC = "device/config";
+const char* MQTT_STATUS_TOPIC = "device/status";
+const char* MQTT_EVENT_TOPIC = "device/events";
+
+// Oggetti per comunicazione
+WebSocketsServer webSocket(81);
+WiFiClient espClient;
+PubSubClient mqtt(espClient);
+
+// Struttura per eventi
+struct Event {
+    uint32_t timestamp;
+    char type[32];
+    float value;
+};
+
+// Callback WebSocket
+void webSocketEvent(uint8_t num, WStype_t type, uint8_t* payload, size_t length) {
+    switch(type) {
+        case WStype_CONNECTED:
+            Serial.printf("[WebSocket] Client #%u connesso\n", num);
+            break;
+            
+        case WStype_DISCONNECTED:
+            Serial.printf("[WebSocket] Client #%u disconnesso\n", num);
+            break;
+            
+        case WStype_TEXT:
+            // Gestione comandi WebSocket (se necessario)
+            break;
+    }
+}
+
+// Callback MQTT
+void mqttCallback(char* topic, byte* payload, unsigned int length) {
+    StaticJsonDocument<512> doc;
+    DeserializationError error = deserializeJson(doc, payload, length);
+    
+    if (error) {
+        Serial.println("Errore parsing JSON");
+        return;
+    }
+    
+    if (strcmp(topic, MQTT_CONFIG_TOPIC) == 0) {
+        xSemaphoreTake(configMutex, portMAX_DELAY);
+        
+        if (doc.containsKey("sampleRate")) 
+            config.sampleRate = doc["sampleRate"];
+        if (doc.containsKey("gain"))
+            config.gain = doc["gain"];
+        if (doc.containsKey("filterEnabled"))
+            config.filterEnabled = doc["filterEnabled"];
+        if (doc.containsKey("threshold"))
+            config.threshold = doc["threshold"];
+        if (doc.containsKey("streaming"))
+            config.streaming = doc["streaming"];
+            
+        xSemaphoreGive(configMutex);
+        
+        // Segnala necessità restart acquisizione
+        shouldRestart = true;
+        
+        // Pubblica conferma
+        publishStatus();
+    }
+}
+
+// Pubblica stato corrente
+void publishStatus() {
+    StaticJsonDocument<512> doc;
+    
+    xSemaphoreTake(configMutex, portMAX_DELAY);
+    doc["sampleRate"] = config.sampleRate;
+    doc["gain"] = config.gain;
+    doc["filterEnabled"] = config.filterEnabled;
+    doc["threshold"] = config.threshold;
+    doc["streaming"] = config.streaming;
+    doc["freeHeap"] = ESP.getFreeHeap();
+    doc["uptime"] = millis() / 1000;
+    xSemaphoreGive(configMutex);
+    
+    char buffer[512];
+    serializeJson(doc, buffer);
+    mqtt.publish(MQTT_STATUS_TOPIC, buffer);
+}
+
+// Task acquisizione ADC
+void adcTask(void* pvParameters) {
+    SPIClass spi(VSPI);
+    spi.begin(18, 19, 23, CS_PIN);
+    pinMode(CS_PIN, OUTPUT);
+    pinMode(DRDY_PIN, INPUT);
+    
+    uint32_t lastSample = 0;
+    uint32_t sampleInterval;
+    
+    while (true) {
+        xSemaphoreTake(configMutex, portMAX_DELAY);
+        if (!config.streaming) {
+            xSemaphoreGive(configMutex);
+            vTaskDelay(100 / portTICK_PERIOD_MS);
+            continue;
+        }
+        sampleInterval = 1000000 / config.sampleRate;
+        xSemaphoreGive(configMutex);
+        
+        if (digitalRead(DRDY_PIN) == LOW && 
+            (micros() - lastSample) >= sampleInterval) {
+            
+            // Lettura ADC
+            digitalWrite(CS_PIN, LOW);
+            uint8_t data[3] = {0x01, 0x02, 0x03}; // Simulato
+            digitalWrite(CS_PIN, HIGH);
+            
+            int32_t value = (data[0] << 16) | (data[1] << 8) | data[2];
+            if (value & 0x800000) value -= 0x1000000;
+            
+            // Applica filtro se abilitato
+            xSemaphoreTake(configMutex, portMAX_DELAY);
+            if (config.filterEnabled) {
+                // Implementa qui il filtro
+            }
+            
+            // Verifica threshold
+            if (abs(value) > config.threshold) {
+                Event evt = {
+                    .timestamp = millis(),
+                    .value = value
+                };
+                strcpy(evt.type, "threshold_exceeded");
+                xQueueSend(eventQueue, &evt, 0);
+            }
+            xSemaphoreGive(configMutex);
+            
+            // Invia alla coda
+            if (xQueueSend(dataQueue, &value, 0) != pdTRUE) {
+                // Coda piena, gestione overflow
+                Event evt = {
+                    .timestamp = millis(),
+                    .value = 0
+                };
+                strcpy(evt.type, "queue_overflow");
+                xQueueSend(eventQueue, &evt, 0);
+            }
+            
+            lastSample = micros();
+        }
+        
+        // Controlla flag restart
+        if (shouldRestart) {
+            shouldRestart = false;
+            lastSample = 0;
+            // Pulizia code
+            xQueueReset(dataQueue);
+        }
+    }
+}
+
+// Task streaming WebSocket
+void webSocketTask(void* pvParameters) {
+    webSocket.begin();
+    webSocket.onEvent(webSocketEvent);
+    
+    while (true) {
+        webSocket.loop();
+        
+        int32_t value;
+        if (xQueueReceive(dataQueue, &value, 0) == pdTRUE) {
+            // Invia solo se ci sono client connessi
+            if (webSocket.connectedClients() > 0) {
+                char buffer[32];
+                snprintf(buffer, sizeof(buffer), "%ld", value);
+                webSocket.broadcastTXT(buffer);
+            }
+        } else {
+            // Nessun dato disponibile, yield
+            vTaskDelay(1);
+        }
+    }
+}
+
+// Task gestione eventi
+void eventTask(void* pvParameters) {
+    while (true) {
+        Event evt;
+        if (xQueueReceive(eventQueue, &evt, 1000 / portTICK_PERIOD_MS) == pdTRUE) {
+            StaticJsonDocument<256> doc;
+            doc["timestamp"] = evt.timestamp;
+            doc["type"] = evt.type;
+            doc["value"] = evt.value;
+            
+            char buffer[256];
+            serializeJson(doc, buffer);
+            mqtt.publish(MQTT_EVENT_TOPIC, buffer);
+        }
+        
+        // Pubblica stato periodicamente
+        static uint32_t lastStatus = 0;
+        if (millis() - lastStatus > 10000) {  // Ogni 10 secondi
+            publishStatus();
+            lastStatus = millis();
+        }
+    }
+}
+
+// Task reconnessione MQTT
+void mqttReconnectTask(void* pvParameters) {
+    while (true) {
+        if (!mqtt.connected()) {
+            Serial.println("Tentativo connessione MQTT...");
+            if (mqtt.connect("ESP32Client", MQTT_USER, MQTT_PASSWORD)) {
+                Serial.println("Connesso a MQTT");
+                mqtt.subscribe(MQTT_CONFIG_TOPIC);
+                publishStatus();
+            }
+        }
+        mqtt.loop();
+        vTaskDelay(100 / portTICK_PERIOD_MS);
+    }
+}
+
+void setup() {
+    Serial.begin(115200);
+    
+    // Inizializza strutture
+    dataQueue = xQueueCreate(QUEUE_SIZE, sizeof(int32_t));
+    eventQueue = xQueueCreate(32, sizeof(Event));
+    configMutex = xSemaphoreCreateMutex();
+    
+    // Configurazione default
+    config.sampleRate = DEFAULT_SAMPLE_RATE;
+    config.gain = 1;
+    config.filterEnabled = false;
+    config.threshold = 1000000;
+    config.streaming = true;
+    
+    // Connessione WiFi
+    WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+    while (WiFi.status() != WL_CONNECTED) {
+        delay(500);
+        Serial.print(".");
+    }
+    Serial.println("\nConnesso al WiFi");
+    
+    // Setup MQTT
+    mqtt.setServer(MQTT_SERVER, MQTT_PORT);
+    mqtt.setCallback(mqttCallback);
+    
+    // Creazione task
+    xTaskCreatePinnedToCore(adcTask, "ADC", 8192, NULL, 1, NULL, 0);
+    xTaskCreatePinnedToCore(webSocketTask, "WebSocket", 8192, NULL, 1, NULL, 1);
+    xTaskCreatePinnedToCore(eventTask, "Events", 4096, NULL, 1, NULL, 1);
+    xTaskCreatePinnedToCore(mqttReconnectTask, "MQTT", 4096, NULL, 1, NULL, 1);
+}
+
+void loop() {
+    vTaskDelete(NULL);  // Non necessario nel loop principale
+}
+```
+
+I semafori (in particolare il mutex nel codice) e le code servono a scopi diversi:
+
+Le code (QueueHandle_t) si usano per passare dati tra task in modo thread-safe, come nel caso dei campioni ADC che passano dal task di acquisizione al task WebSocket. È corretto che le code già garantiscono la sincronizzazione per i dati che vengono scambiati.
+
+Il mutex (configMutex) invece serve a proteggere l'accesso alla struttura `config` che è una variabile globale condivisa tra più task:
+
+```cpp
+struct Config {
+    uint32_t sampleRate;
+    uint8_t gain;
+    bool filterEnabled;
+    float threshold;
+    bool streaming;
+};
+volatile Config config;
+```
+
+Questa struttura viene:
+1. Letta dal task ADC per sapere frequenza e parametri di acquisizione
+2. Modificata dal callback MQTT quando arriva un comando di configurazione
+3. Letta dal task eventi per pubblicare lo stato
+
+Senza il mutex, potrebbero verificarsi race condition, per esempio:
+- Il task ADC sta leggendo sampleRate mentre il callback MQTT lo sta modificando
+- Il task eventi sta leggendo i parametri per pubblicarli mentre vengono cambiati
+
+Con il mutex invece:
+
+```cpp
+// Task ADC legge configurazione
+xSemaphoreTake(configMutex, portMAX_DELAY);
+sampleInterval = 1000000 / config.sampleRate;
+xSemaphoreGive(configMutex);
+
+// Callback MQTT modifica configurazione
+xSemaphoreTake(configMutex, portMAX_DELAY);
+config.sampleRate = doc["sampleRate"];
+xSemaphoreGive(configMutex);
+```
+
+Si potrebbe evitare il mutex:
+1. Usando solo code anche per la configurazione
+2. Copiando localmente i parametri necessari all'avvio di ogni task
+3. Usando strutture dati lock-free 
+
 >[Torna all'indice](readme.md#fasi-progetto)
