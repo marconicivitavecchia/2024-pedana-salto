@@ -48,7 +48,7 @@ Nel tuo caso con il buffer circolare:
   
 Verifichiamo:
 - L'ISR scrive $$W_{\text{ISR}} = \{\text{buffer}, \text{writeIndex}, \text{bufferCount}\}$$.
-- Il task WebSocket legge \( R_{\text{WebSocket}} = \{\text{buffer}, \text{readIndex}, \text{bufferCount}\}$$ e scrive $$W_{\text{WebSocket}} = \{\text{readIndex}, \text{bufferCount}\}$$.
+- Il task WebSocket legge \$$R_{\text{WebSocket}} = \{\text{buffer}, \text{readIndex}, \text{bufferCount}\}$$ e scrive $$W_{\text{WebSocket}} = \{\text{readIndex}, \text{bufferCount}\}$$.
 
 In questo caso, $$W_{\text{ISR}} \cap R_{\text{WebSocket}} = \{\text{bufferCount}\}$$, quindi c'è un'interferenza, e serve una protezione (ad esempio un **mutex** o sezioni critiche).
 
