@@ -94,8 +94,8 @@ Ecco una tabella che riassume chiaramente le interferenze tra i due task basata 
 
 ### **Violazioni delle Condizioni di Bernstein**
 Le violazioni si manifestano nei seguenti punti:
-1. **buffer**: \( W_{\text{ISR}} \cap R_{\text{WebSocket}} \neq \emptyset \).
-2. **bufferCount**: \( W_{\text{ISR}} \cap (R_{\text{WebSocket}} \cup W_{\text{WebSocket}}) \neq \emptyset \).
+1. **buffer**: $$W_{\text{ISR}} \cap R_{\text{WebSocket}} \neq \emptyset$$.
+2. **bufferCount**: $$W_{\text{ISR}} \cap (R_{\text{WebSocket}} \cup W_{\text{WebSocket}}) \neq \emptyset$$.
 
 Queste interferenze richiedono l'uso di:
 - **Mutex**: per proteggere l'accesso al `buffer` e a `bufferCount`.
@@ -113,10 +113,6 @@ Queste interferenze richiedono l'uso di:
    - L'ISR scrive nella coda, e il WebSocket legge dalla coda.
 
 ---
-
-
-
-
 
 
 Ecco una versione del sistema che utilizza una **coda** per gestire la comunicazione tra l'ISR (che acquisisce i dati) e il task WebSocket, con i due task distribuiti su **core diversi**. La coda elimina le interferenze dirette sui dati condivisi, rendendo il sistema thread-safe.
