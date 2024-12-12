@@ -33,7 +33,7 @@ Verifica delle condizioni:
 2. $$W_1 \cap R_2 = \emptyset \): \( \{ B \} \cap \{ B \} \neq \emptyset$$ ❌
 3. $$R_1 \cap W_2 = \emptyset \): \( \{ A \} \cap \{ C \} = \emptyset$$ ✅
 
-In questo caso, i due processi **non possono essere eseguiti in parallelo** perché $$W_1\cap R_2\neq\emptyse0$$: il primo processo scrive $$B$$, che il secondo processo legge.
+In questo caso, i due processi **non possono essere eseguiti in parallelo** perché $W_1 \cap R_2 \neq \emptyset$: il primo processo scrive $$B$$, che il secondo processo legge.
 
 ---
 
