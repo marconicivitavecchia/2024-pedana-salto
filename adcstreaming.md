@@ -1248,7 +1248,7 @@ Si potrebbe evitare il mutex:
 2. Copiando localmente i parametri necessari all'avvio di ogni task
 3. Usando strutture dati lock-free 
 
-## ** Copia locale i parametri all'avvio di ogni task**
+## **Copia locale i parametri all'avvio di ogni task**
 
 Ecco una versione riscritta che evita il mutex copiando localmente i parametri nei task. Questo approccio è più pulito e riduce la contesa tra i task.
 
