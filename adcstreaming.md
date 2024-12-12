@@ -1608,5 +1608,34 @@ Vantaggi di questo approccio:
 
 L'unico "costo" è che dobbiamo distribuire gli aggiornamenti di configurazione a tutti i task interessati, ma questo è gestito in modo efficiente attraverso la coda di configurazione.
 
+## **Copia dei dati vs coda di messaggi**
+
+L'opzione 2 (copia locale della configurazione in ogni task) rispetto alle code ha questi aspetti:
+
+Vantaggi:
+1. Accesso immediato ai parametri di configurazione senza ritardi da code
+2. Minor overhead perché non serve continuamente leggere/scrivere dalla coda
+3. Ogni task ha una visione coerente della sua configurazione
+4. Meno complessità del codice (no gestione memoria dinamica o sincronizzazione)
+
+Svantaggi:
+1. Ridondanza dei dati (ogni task ha una copia)
+2. Possibile inconsistenza temporanea tra le copie nei vari task
+3. Spreco di RAM per le copie multiple
+4. Aggiornamenti più complessi (devi propagare a tutti)
+
+Le code FreeRTOS sono migliori quando:
+- Hai dati che devono fluire costantemente tra task (come i campioni ADC)
+- Serve garanzia di consegna
+- I dati sono consumati una sola volta
+
+La copia locale è migliore quando:
+- I dati sono letti spesso e modificati raramente (come parametri di configurazione)
+- La consistenza immediata non è critica
+- Vuoi minimizzare la latenza di accesso
+
+Nel caso dello streaming ADC, un approccio ibrido è ottimale:
+- Code per i campioni ADC e gli eventi
+- Copie locali per la configurazione
 
 >[Torna all'indice](readme.md#fasi-progetto)
