@@ -11,8 +11,8 @@ Le condizioni si basano sui concetti di insiemi di dati **letti** (read set) e *
 Per due processi \( P_1 \) e \( P_2 \), non ci sono interferenze (quindi possono essere eseguiti in parallelo) se sono soddisfatte le seguenti condizioni:
 
 1. $$W_1 \cap W_2 = \emptyset$$: i processi non scrivono sugli stessi dati.
-2. \( W_1 \cap R_2 = \emptyset \): il primo processo non scrive dati che il secondo legge.
-3. \( R_1 \cap W_2 = \emptyset \): il secondo processo non scrive dati che il primo legge.
+2. $$W_1 \cap R_2 = \emptyset$$: il primo processo non scrive dati che il secondo legge.
+3. $$R_1 \cap W_2 = \emptyset$$: il secondo processo non scrive dati che il primo legge.
 
 In altre parole:
 - I dati scritti da un processo non devono essere letti o scritti dall'altro.
@@ -22,18 +22,18 @@ In altre parole:
 
 ### **Esempio Pratico**
 Immagina di avere due processi \( P_1 \) e \( P_2 \):
-- $$ P_1 $$: legge $$ A $$ e scrive $$ B $$.
-- \( P_2 \): legge \( B \) e scrive \( C \).
+- $$P_1 $$: legge $$A$$ e scrive $$B$$.
+- $$P_$$: legge $$B$$ e scrive $$C$$.
 
-- \( R_1 = \{ A \}, W_1 = \{ B \} \)
-- \( R_2 = \{ B \}, W_2 = \{ C \} \)
+- $$R_1 = \{ A \}, W_1 = \{ B \}$$
+- $$R_2 = \{ B \}, W_2 = \{ C \}$$
 
 Verifica delle condizioni:
-1. \( W_1 \cap W_2 = \emptyset \): \( \{ B \} \cap \{ C \} = \emptyset \) ✅
-2. \( W_1 \cap R_2 = \emptyset \): \( \{ B \} \cap \{ B \} \neq \emptyset \) ❌
-3. \( R_1 \cap W_2 = \emptyset \): \( \{ A \} \cap \{ C \} = \emptyset \) ✅
+1. $$W_1 \cap W_2 = \emptyset \): \( \{ B \} \cap \{ C \} = \emptyset$$ ✅
+2. $$W_1 \cap R_2 = \emptyset \): \( \{ B \} \cap \{ B \} \neq \emptyset$$ ❌
+3. $$R_1 \cap W_2 = \emptyset \): \( \{ A \} \cap \{ C \} = \emptyset$$ ✅
 
-In questo caso, i due processi **non possono essere eseguiti in parallelo** perché \( W_1 \cap R_2 \neq \emptyset \): il primo processo scrive \( B \), che il secondo processo legge.
+In questo caso, i due processi **non possono essere eseguiti in parallelo** perché $$W_1 \cap R_2 \neq \emptyse$$: il primo processo scrive $$B$$, che il secondo processo legge.
 
 ---
 
@@ -47,10 +47,10 @@ Nel tuo caso con il buffer circolare:
 - Il task WebSocket legge i dati dal buffer.
   
 Verifichiamo:
-- L'ISR scrive \( W_{\text{ISR}} = \{\text{buffer}, \text{writeIndex}, \text{bufferCount}\} \).
-- Il task WebSocket legge \( R_{\text{WebSocket}} = \{\text{buffer}, \text{readIndex}, \text{bufferCount}\} \) e scrive \( W_{\text{WebSocket}} = \{\text{readIndex}, \text{bufferCount}\} \).
+- L'ISR scrive $$W_{\text{ISR}} = \{\text{buffer}, \text{writeIndex}, \text{bufferCount}\}$$.
+- Il task WebSocket legge \( R_{\text{WebSocket}} = \{\text{buffer}, \text{readIndex}, \text{bufferCount}\}$$ e scrive $$W_{\text{WebSocket}} = \{\text{readIndex}, \text{bufferCount}\}$$.
 
-In questo caso, \( W_{\text{ISR}} \cap R_{\text{WebSocket}} = \{\text{bufferCount}\} \), quindi c'è un'interferenza, e serve una protezione (ad esempio un **mutex** o sezioni critiche).
+In questo caso, $$W_{\text{ISR}} \cap R_{\text{WebSocket}} = \{\text{bufferCount}\}$$, quindi c'è un'interferenza, e serve una protezione (ad esempio un **mutex** o sezioni critiche).
 
 ---
 
@@ -62,10 +62,10 @@ Ecco una tabella che riassume chiaramente le interferenze tra i due task basata 
 
 | **Dati condivisi** | **Accesso ISR**      | **Accesso WebSocket** | **Interferenza** | **Violazione Bernstein**              |
 |---------------------|----------------------|------------------------|-------------------|---------------------------------------|
-| `buffer`           | **Scrittura**       | **Lettura**            | **Sì**           | \( W_{\text{ISR}} \cap R_{\text{WebSocket}} \neq \emptyset \) |
+| `buffer`           | **Scrittura**       | **Lettura**            | **Sì**           | $$W_{\text{ISR}} \cap R_{\text{WebSocket}} \neq \emptyset$$ |
 | `writeIndex`       | **Scrittura**       | **Nessun accesso**     | **No**           | Nessuna interferenza                  |
 | `readIndex`        | **Nessun accesso**  | **Scrittura**          | **No**           | Nessuna interferenza                  |
-| `bufferCount`      | **Scrittura**       | **Lettura e Scrittura**| **Sì**           | \( W_{\text{ISR}} \cap (R_{\text{WebSocket}} \cup W_{\text{WebSocket}}) \neq \emptyset \) |
+| `bufferCount`      | **Scrittura**       | **Lettura e Scrittura**| **Sì**           | $$W_{\text{ISR}} \cap (R_{\text{WebSocket}} \cup W_{\text{WebSocket}}) \neq \emptyset$$ |
 
 ---
 
