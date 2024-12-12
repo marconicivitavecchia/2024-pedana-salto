@@ -10,7 +10,7 @@ Le condizioni si basano sui concetti di insiemi di dati **letti** (read set) e *
 
 Per due processi \( P_1 \) e \( P_2 \), non ci sono interferenze (quindi possono essere eseguiti in parallelo) se sono soddisfatte le seguenti condizioni:
 
-1. $$ W_1 \cap W_2 = \emptyset $$: i processi non scrivono sugli stessi dati.
+1. $$W_1 \cap W_2 = \emptyset$$: i processi non scrivono sugli stessi dati.
 2. \( W_1 \cap R_2 = \emptyset \): il primo processo non scrive dati che il secondo legge.
 3. \( R_1 \cap W_2 = \emptyset \): il secondo processo non scrive dati che il primo legge.
 
