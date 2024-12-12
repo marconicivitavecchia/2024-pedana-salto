@@ -21,7 +21,7 @@ In altre parole:
 ---
 
 ### **Esempio Pratico**
-Immagina di avere due processi \( P_1 \) e \( P_2 \):
+Immagina di avere due processi $$P_$$ e $$P_2$$:
 - $$P_1 $$: legge $$A$$ e scrive $$B$$.
 - $$P_$$: legge $$B$$ e scrive $$C$$.
 
