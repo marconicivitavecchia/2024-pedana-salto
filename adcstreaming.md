@@ -8,7 +8,7 @@ Le condizioni si basano sui concetti di insiemi di dati **letti** (read set) e *
 - **Read set (R)**: insieme dei dati che il processo legge.
 - **Write set (W)**: insieme dei dati che il processo scrive.
 
-Per due processi \( P_1 \) e \( P_2 \), non ci sono interferenze (quindi possono essere eseguiti in parallelo) se sono soddisfatte le seguenti condizioni:
+Per due processi $$P_1$$ e $$P_$$, non ci sono interferenze (quindi possono essere eseguiti in parallelo) se sono soddisfatte le seguenti condizioni:
 
 1. $$W_1 \cap W_2 = \emptyset$$: i processi non scrivono sugli stessi dati.
 2. $$W_1 \cap R_2 = \emptyset$$: il primo processo non scrive dati che il secondo legge.
@@ -29,9 +29,9 @@ Immagina di avere due processi $$P_1$$ e $$P_2$$:
 - $$R_2 = \{ B \}, W_2 = \{ C \}$$
 
 Verifica delle condizioni:
-1. $$W_1 \cap W_2 = \emptyset \): \( \{ B \} \cap \{ C \} = \emptyset$$ ✅
-2. $$W_1 \cap R_2 = \emptyset \): \( \{ B \} \cap \{ B \} \neq \emptyset$$ ❌
-3. $$R_1 \cap W_2 = \emptyset \): \( \{ A \} \cap \{ C \} = \emptyset$$ ✅
+1. $$W_1 \cap W_2 = \emptyset$$: $$\{ B \} \cap \{ C \} = \emptyset$$ ✅
+2. $$W_1 \cap R_2 = \emptyset$$: $$\{ B \} \cap \{ B \} \neq \emptyset$$ ❌
+3. $$R_1 \cap W_2 = \emptyset$$: $$\{ A \} \cap \{ C \} = \emptyset$$ ✅
 
 In questo caso, i due processi **non possono essere eseguiti in parallelo** perché $W_1 \cap R_2 \neq \emptyset$: il primo processo scrive $$B$$, che il secondo processo legge.
 
