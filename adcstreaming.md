@@ -2113,4 +2113,42 @@ Risultati attesi
 - Ogni campione ha un intervallo di circa 1_000_000 / SAMPLE_RATE microsecondi.
 - Il numero totale di campioni ricevuti corrisponde a EXPECTED_SAMPLES.
 
+Ecco un esempio di output dello script client Python durante l'esecuzione del test:
+
+#### Output Normale (senza errori)
+
+```plaintext
+Connessione aperta, inizio test
+Campione 1: sample=453.25, timestamp=0
+Campione 2: sample=672.89, timestamp=33 us, intervallo=33 us (OK)
+Campione 3: sample=198.54, timestamp=66 us, intervallo=33 us (OK)
+Campione 4: sample=765.00, timestamp=99 us, intervallo=33 us (OK)
+Campione 5: sample=390.12, timestamp=132 us, intervallo=33 us (OK)
+...
+Campione 100: sample=521.35, timestamp=3300 us, intervallo=33 us (OK)
+Test completato: ricevuti 100 campioni
+```
+
+#### Output con errori (latenza o pacchetti mancanti)
+
+```plaintext
+Connessione aperta, inizio test
+Campione 1: sample=453.25, timestamp=0
+Campione 2: sample=672.89, timestamp=33 us, intervallo=33 us (OK)
+Campione 3: sample=198.54, timestamp=80 us, intervallo=47 us (Errore: intervallo fuori tolleranza)
+Campione 4: sample=765.00, timestamp=113 us, intervallo=33 us (OK)
+Campione 5: sample=390.12, timestamp=160 us, intervallo=47 us (Errore: intervallo fuori tolleranza)
+...
+Errore: campione mancante! Atteso intervallo ~33 us, ricevuto 66 us
+Campione 99: sample=672.45, timestamp=3234 us, intervallo=66 us (Errore: campione mancante!)
+Campione 100: sample=521.35, timestamp=3267 us, intervallo=33 us (OK)
+Test completato: ricevuti 100 campioni
+```
+
+Cosa significano i dati:
+- **sample:** Il valore del campione ricevuto.
+- **timestamp:** Il timestamp del campione in microsecondi.
+- **intervallo:** La differenza di tempo tra due campioni consecutivi.
+- **Errore:** Ogni volta che l'intervallo supera la tolleranza impostata (MAX_DEVIATION), lo script segnala un errore o un campione mancante.
+
 >[Torna all'indice](readme.md#fasi-progetto)
