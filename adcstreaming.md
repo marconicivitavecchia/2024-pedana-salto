@@ -2020,7 +2020,7 @@ void loop() {
 ```
 - Impostare entrambi:
 ```json
-{"samplerate": "20000", "alfaema
+{"samplerate": "20000", "alfaema": "0.8"}
 ```
 
 >[Torna all'indice](readme.md#fasi-progetto)
