@@ -2216,6 +2216,43 @@ void onEventsWebSocket(AsyncWebSocket *server, AsyncWebSocketClient *client,
     }
 }
 
+/*
+// Task acquisizione dati ADC
+void adcTask(void* pvParameters) {
+    SPIClass spi(VSPI);
+    spi.begin(18, 19, 23, CS_PIN);
+    pinMode(CS_PIN, OUTPUT);
+    pinMode(DRDY_PIN, INPUT);
+
+    uint32_t lastSample = 0;
+    uint32_t sampleInterval = 1000000 / globalConfig.sampleRate;
+    float emaFilteredValue = 0.0;
+
+    while (true) {
+        if (!globalConfig.streaming) {
+            vTaskDelay(100 / portTICK_PERIOD_MS);
+            continue;
+        }
+
+        if (digitalRead(DRDY_PIN) == LOW &&
+            (micros() - lastSample) >= sampleInterval) {
+
+            digitalWrite(CS_PIN, LOW);
+            uint8_t data[3] = {0x01, 0x02, 0x03};
+            digitalWrite(CS_PIN, HIGH);
+
+            int32_t value = (data[0] << 16) | (data[1] << 8) | data[2];
+            if (value & 0x800000) value -= 0x1000000;
+
+            emaFilteredValue = emaAlpha * value + (1 - emaAlpha) * emaFilteredValue;
+
+            xQueueSend(dataQueue, &emaFilteredValue, 0);
+            lastSample = micros();
+        }
+    }
+}
+*/
+
 // Task acquisizione dati ADC (Core 0)
 void IRAM_ATTR adcTask(void* pvParameters) {
     SPIClass spi(VSPI);
