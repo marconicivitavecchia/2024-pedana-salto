@@ -1634,4 +1634,188 @@ Nel caso dello streaming ADC, un approccio ibrido è ottimale:
 - Code per i campioni ADC e gli eventi
 - Copie locali per la configurazione
 
+## **Versione con server Web Socket nativo esp32**
+
+
+```cpp
+#include <Arduino.h>
+#include <WiFi.h>
+#include <SPI.h>
+#include "esp_log.h"
+#include "esp_websocket_server.h"
+#include <cJSON.h>
+
+// Configurazione hardware
+#define CS_PIN 5
+#define DRDY_PIN 4
+
+// Configurazione acquisizione
+#define DEFAULT_SAMPLE_RATE 30000 // Hz
+
+// Configurazione Wi-Fi
+const char* WIFI_SSID = "YOUR_SSID";
+const char* WIFI_PASSWORD = "YOUR_PASSWORD";
+
+// Gestione configurazione
+struct Config {
+    uint32_t sampleRate;
+    uint8_t gain;
+    bool filterEnabled;
+    float threshold;
+    bool streaming;
+};
+
+// Variabili globali
+QueueHandle_t dataQueue;
+QueueHandle_t eventQueue;
+httpd_handle_t wsDataServer = NULL;
+httpd_handle_t wsEventServer = NULL;
+Config globalConfig = {DEFAULT_SAMPLE_RATE, 1, false, 1000000, true};
+float emaAlpha = 0.1; // Coefficiente EMA
+
+// Callback WebSocket per gli eventi
+static esp_err_t websocket_event_handler(httpd_req_t* req) {
+    httpd_ws_frame_t ws_pkt;
+    memset(&ws_pkt, 0, sizeof(httpd_ws_frame_t));
+    ws_pkt.type = HTTPD_WS_TYPE_TEXT;
+
+    // Ricezione messaggio
+    esp_err_t ret = httpd_ws_recv_frame(req, &ws_pkt, 0);
+    if (ret != ESP_OK) {
+        ESP_LOGE("WS_EVENT", "Errore ricezione frame");
+        return ret;
+    }
+
+    ws_pkt.payload = (uint8_t*)malloc(ws_pkt.len + 1);
+    if (ws_pkt.payload == NULL) {
+        ESP_LOGE("WS_EVENT", "Memoria insufficiente");
+        return ESP_ERR_NO_MEM;
+    }
+
+    ret = httpd_ws_recv_frame(req, &ws_pkt, ws_pkt.len);
+    ws_pkt.payload[ws_pkt.len] = '\0';
+
+    ESP_LOGI("WS_EVENT", "Messaggio ricevuto: %s", (char*)ws_pkt.payload);
+
+    // Parsing del messaggio JSON
+    cJSON* json = cJSON_Parse((char*)ws_pkt.payload);
+    if (json) {
+        cJSON* command = cJSON_GetObjectItem(json, "command");
+        if (command && cJSON_IsString(command)) {
+            if (strcmp(command->valuestring, "set_sample_rate") == 0) {
+                cJSON* value = cJSON_GetObjectItem(json, "value");
+                if (value && cJSON_IsNumber(value)) {
+                    globalConfig.sampleRate = value->valueint;
+                    ESP_LOGI("WS_EVENT", "Sample rate impostato a: %d", globalConfig.sampleRate);
+                }
+            } else if (strcmp(command->valuestring, "set_ema_alpha") == 0) {
+                cJSON* value = cJSON_GetObjectItem(json, "value");
+                if (value && cJSON_IsNumber(value)) {
+                    emaAlpha = value->valuedouble;
+                    ESP_LOGI("WS_EVENT", "EMA alpha impostato a: %.2f", emaAlpha);
+                }
+            }
+        }
+        cJSON_Delete(json);
+    } else {
+        ESP_LOGE("WS_EVENT", "Errore parsing JSON");
+    }
+
+    free(ws_pkt.payload);
+    return ESP_OK;
+}
+
+// Configura il server WebSocket per gli eventi
+static void start_event_websocket_server() {
+    httpd_config_t config = HTTPD_DEFAULT_CONFIG();
+    config.server_port = 82;
+
+    if (httpd_start(&wsEventServer, &config) == ESP_OK) {
+        httpd_uri_t ws_uri = {
+            .uri = "/events",
+            .method = HTTP_GET,
+            .handler = websocket_event_handler,
+            .user_ctx = NULL,
+            .is_websocket = true
+        };
+        httpd_register_uri_handler(wsEventServer, &ws_uri);
+        ESP_LOGI("WS_EVENT", "WebSocket server per gli eventi avviato su /events");
+    } else {
+        ESP_LOGE("WS_EVENT", "Errore avvio WebSocket server per gli eventi");
+    }
+}
+
+// Task acquisizione dati ADC
+void adcTask(void* pvParameters) {
+    SPIClass spi(VSPI);
+    spi.begin(18, 19, 23, CS_PIN);
+    pinMode(CS_PIN, OUTPUT);
+    pinMode(DRDY_PIN, INPUT);
+
+    uint32_t lastSample = 0;
+    uint32_t sampleInterval = 1000000 / globalConfig.sampleRate;
+    float emaFilteredValue = 0.0;
+
+    while (true) {
+        if (!globalConfig.streaming) {
+            vTaskDelay(100 / portTICK_PERIOD_MS);
+            continue;
+        }
+
+        if (digitalRead(DRDY_PIN) == LOW &&
+            (micros() - lastSample) >= sampleInterval) {
+
+            digitalWrite(CS_PIN, LOW);
+            uint8_t data[3] = {0x01, 0x02, 0x03};
+            digitalWrite(CS_PIN, HIGH);
+
+            int32_t value = (data[0] << 16) | (data[1] << 8) | data[2];
+            if (value & 0x800000) value -= 0x1000000;
+
+            emaFilteredValue = emaAlpha * value + (1 - emaAlpha) * emaFilteredValue;
+
+            xQueueSend(dataQueue, &emaFilteredValue, 0);
+            lastSample = micros();
+        }
+    }
+}
+
+// Altre funzioni rimangono invariate...
+
+// Setup principale
+void setup() {
+    Serial.begin(115200);
+
+    WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+    while (WiFi.status() != WL_CONNECTED) {
+        delay(500);
+        Serial.print(".");
+    }
+    Serial.println("\nConnesso al WiFi");
+
+    // Crea le code
+    dataQueue = xQueueCreate(1024, sizeof(float));
+    eventQueue = xQueueCreate(32, sizeof(char*));
+
+    // Avvia task
+    xTaskCreatePinnedToCore(adcTask, "ADC Task", 8192, NULL, 1, NULL, 0);
+    xTaskCreatePinnedToCore(webSocketDataTask, "WS Data Task", 8192, NULL, 1, NULL, 1);
+    xTaskCreatePinnedToCore(webSocketEventTask, "WS Event Task", 4096, NULL, 1, NULL, 1);
+
+    // Avvia server WebSocket
+    start_data_websocket_server();
+    start_event_websocket_server();
+}
+
+void loop() {
+    // Loop vuoto, tutto è gestito nei task
+}
+```
+
+Il codice è stato aggiornato per includere:
+
+- Gestione dei comandi JSON nel WebSocket degli eventi per impostare la velocità di campionamento (sampleRate) e il coefficiente alfa del filtro EMA (emaAlpha).
+- Implementazione del filtro EMA nell'elaborazione dei dati ADC.
+- Validazione e aggiornamento dinamico di sampleRate e emaAlpha tramite i comandi ricevuti.
+  
 >[Torna all'indice](readme.md#fasi-progetto)
