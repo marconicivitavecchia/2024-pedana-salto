@@ -2295,7 +2295,7 @@ void setup() {
 }
 
 void loop() {
-    vTaskDelay(1);  // Previene watchdog reset
+    delay(1);  // Previene watchdog reset
 }
 ```
 
