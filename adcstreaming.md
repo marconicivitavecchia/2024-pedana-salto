@@ -2017,7 +2017,7 @@ void loop() {
 - Impostare solo il coefficiente EMA alpha:
 ```json
 {"alfaema": "0.5"}
-
+```
 - Impostare entrambi:
 ```json
 {"samplerate": "20000", "alfaema
