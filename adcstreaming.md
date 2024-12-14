@@ -1893,28 +1893,26 @@ static esp_err_t websocket_event_handler(httpd_req_t* req) {
     ESP_LOGI("WS_EVENT", "Messaggio ricevuto: %s", (char*)ws_pkt.payload);
 
     // Parsing del messaggio JSON
+    // Parsing del messaggio JSON
     cJSON* json = cJSON_Parse((char*)ws_pkt.payload);
     if (json) {
-        cJSON* command = cJSON_GetObjectItem(json, "command");
-        if (command && cJSON_IsString(command)) {
-            if (strcmp(command->valuestring, "set_sample_rate") == 0) {
-                cJSON* value = cJSON_GetObjectItem(json, "value");
-                if (value && cJSON_IsNumber(value)) {
-                    globalConfig.sampleRate = value->valueint;
-                    ESP_LOGI("WS_EVENT", "Sample rate impostato a: %d", globalConfig.sampleRate);
-                }
-            } else if (strcmp(command->valuestring, "set_ema_alpha") == 0) {
-                cJSON* value = cJSON_GetObjectItem(json, "value");
-                if (value && cJSON_IsNumber(value)) {
-                    emaAlpha = value->valuedouble;
-                    ESP_LOGI("WS_EVENT", "EMA alpha impostato a: %.2f", emaAlpha);
-                }
-            }
+        cJSON* samplerate = cJSON_GetObjectItem(json, "samplerate");
+        if (samplerate && cJSON_IsString(samplerate)) {
+            globalConfig.sampleRate = atoi(samplerate->valuestring);
+            ESP_LOGI("WS_EVENT", "Sample rate impostato a: %d", globalConfig.sampleRate);
         }
+    
+        cJSON* alfaema = cJSON_GetObjectItem(json, "alfaema");
+        if (alfaema && cJSON_IsString(alfaema)) {
+            emaAlpha = atof(alfaema->valuestring);
+            ESP_LOGI("WS_EVENT", "EMA alpha impostato a: %.2f", emaAlpha);
+        }
+    
         cJSON_Delete(json);
     } else {
         ESP_LOGE("WS_EVENT", "Errore parsing JSON");
     }
+
 
     free(ws_pkt.payload);
     return ESP_OK;
