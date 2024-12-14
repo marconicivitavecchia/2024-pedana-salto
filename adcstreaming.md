@@ -2021,4 +2021,96 @@ void loop() {
 {"samplerate": "20000", "alfaema": "0.8"}
 ```
 
+### **Modifica al adcTask per test**
+
+Aggiungere questa configurazione al task ADC:
+
+```C++
+void adcTask(void* pvParameters) {
+    uint32_t lastSample = 0;
+    uint32_t sampleInterval = 1000000 / globalConfig.sampleRate;
+
+    while (true) {
+        if (!globalConfig.streaming) {
+            vTaskDelay(100 / portTICK_PERIOD_MS);
+            continue;
+        }
+
+        if ((micros() - lastSample) >= sampleInterval) {
+            uint32_t timestamp = micros();
+            float sample = random(0, 1000);  // Campioni casuali (da 0 a 1000)
+
+            // Pacchetto JSON con campione e timestamp
+            char message[128];
+            snprintf(message, sizeof(message), "{\"timestamp\": %u, \"sample\": %.2f}", timestamp, sample);
+
+            // Invia al server WebSocket
+            xQueueSend(dataQueue, &message, 0);
+            lastSample = timestamp;
+        }
+    }
+}
+```
+
+### **Script lato client per verifica**
+
+Scrivi uno script Python per connetterti al WebSocket e verificare i dati ricevuti:
+
+```python
+import websocket
+import json
+import time
+
+# Parametri
+SAMPLE_RATE = 30000  # Frequenza di campionamento in Hz
+EXPECTED_SAMPLES = 100  # Numero di campioni da ricevere
+MAX_DEVIATION = 50  # Deviation massima in microsecondi
+
+def on_message(ws, message):
+    global received_samples, last_timestamp
+    data = json.loads(message)
+    timestamp = data["timestamp"]
+    sample = data["sample"]
+
+    if last_timestamp is not None:
+        interval = timestamp - last_timestamp
+        expected_interval = 1_000_000 // SAMPLE_RATE
+        if abs(interval - expected_interval) > MAX_DEVIATION:
+            print(f"Errore: intervallo errato {interval} us, atteso ~{expected_interval} us")
+    last_timestamp = timestamp
+
+    received_samples += 1
+    if received_samples >= EXPECTED_SAMPLES:
+        ws.close()
+        print(f"Test completato: ricevuti {received_samples} campioni")
+
+def on_error(ws, error):
+    print(f"Errore: {error}")
+
+def on_close(ws, close_status_code, close_msg):
+    print("Connessione chiusa")
+
+def on_open(ws):
+    global received_samples, last_timestamp
+    received_samples = 0
+    last_timestamp = None
+    print("Connessione aperta, inizio test")
+
+# Connettiti al WebSocket
+url = "ws://<ESP_IP>:81/data"
+ws = websocket.WebSocketApp(url, on_message=on_message, on_error=on_error, on_close=on_close)
+ws.on_open = on_open
+ws.run_forever()
+```
+
+### Spiegazione del test
+
+1. Generazione campioni: Il task ADC invia campioni con timestamp tramite WebSocket.
+2. Script client: Lo script Python riceve i campioni, verifica il numero e controlla la frequenza.
+3. Output: Lo script stampa errori nel caso di campioni mancanti o intervalli non corretti.
+
+Risultati attesi
+- Ogni campione ha un intervallo di circa 1_000_000 / SAMPLE_RATE microsecondi.
+- Il numero totale di campioni ricevuti corrisponde a EXPECTED_SAMPLES.
+
 >[Torna all'indice](readme.md#fasi-progetto)
