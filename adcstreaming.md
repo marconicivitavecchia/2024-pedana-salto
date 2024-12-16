@@ -2157,7 +2157,7 @@ Cosa significano i dati:
 #include <Arduino.h>
 #include <WiFi.h>
 #include <SPI.h>
-#include <ESPAsyncWebServer.h>
+#include <ESPAsyncWebSrv.h>
 #include <AsyncTCP.h>
 #include <ArduinoJson.h>
 
@@ -2166,13 +2166,14 @@ Cosa significano i dati:
 #define DRDY_PIN 4
 
 // Configurazione acquisizione
-#define DEFAULT_SAMPLE_RATE 30000 // Hz
+#define DEFAULT_SAMPLE_RATE 30000  // Hz
+#define QUEUE_SIZE 1024  // Dimensione coda RTOS
 
 // Configurazione Wi-Fi
-const char* WIFI_SSID = "YOUR_SSID";
-const char* WIFI_PASSWORD = "YOUR_PASSWORD";
+const char* WIFI_SSID = "WebPocket-E280";
+const char* WIFI_PASSWORD = "dorabino.7468!";
 
-// Gestione configurazione
+// Struttura configurazione
 struct Config {
     uint32_t sampleRate;
     uint8_t gain;
@@ -2181,111 +2182,157 @@ struct Config {
     bool streaming;
 };
 
+// Struttura dati campione
+struct SampleData {
+    uint32_t timestamp;
+    float value;
+};
+
 // Variabili globali
-QueueHandle_t dataQueue;
-QueueHandle_t eventQueue;
 AsyncWebServer server(80);
-AsyncWebSocket wsData("/data");
-AsyncWebSocket wsEvents("/events");
+AsyncWebSocket wsData("/data");    // Stream dati
+AsyncWebSocket wsControl("/ctl");   // Controllo e stato
 Config globalConfig = {DEFAULT_SAMPLE_RATE, 1, false, 1000000, true};
-float emaAlpha = 0.1; // Coefficiente EMA
+float emaAlpha = 0.1;
+QueueHandle_t dataQueue;
 
-// Gestione eventi WebSocket
-void onEventsWebSocket(AsyncWebSocket *server, AsyncWebSocketClient *client, 
-                      AwsEventType type, void *arg, uint8_t *data, size_t len) {
-    if (type == WS_EVT_CONNECT) {
-        Serial.printf("Client eventi %u connesso\n", client->id());
-    } else if (type == WS_EVT_DISCONNECT) {
-        Serial.printf("Client eventi %u disconnesso\n", client->id());
-    } else if (type == WS_EVT_DATA) {
-        String message = String((char*)data).substring(0, len);
-        StaticJsonDocument<200> doc;
-        DeserializationError error = deserializeJson(doc, message);
+// Funzione per creare e inviare lo stato del sistema
+void sendSystemStatus(AsyncWebSocketClient *client = nullptr) {
+    char statusBuffer[128];
+    snprintf(statusBuffer, sizeof(statusBuffer), 
+        "{\"type\":\"status\",\"samplerate\":%u,\"alfaema\":%.3f,\"streaming\":%s}", 
+        globalConfig.sampleRate,
+        emaAlpha,
+        globalConfig.streaming ? "true" : "false"
+    );
+    
+    if(client) {
+        // Invia solo al client specificato
+        client->text(statusBuffer);
+    } else {
+        // Broadcast a tutti i client connessi
+        wsControl.textAll(statusBuffer);
+    }
+}
+
+// Handler eventi per il canale dati
+void onDataEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, 
+               AwsEventType type, void *arg, uint8_t *data, size_t len) {
+    if(type == WS_EVT_CONNECT) {
+        Serial.printf("Data client #%u connected from %s\n", 
+            client->id(), client->remoteIP().toString().c_str());
+    } else if(type == WS_EVT_DISCONNECT) {
+        Serial.printf("Data client #%u disconnected\n", client->id());
+    }
+}
+
+// Handler eventi per il canale di controllo
+void onControlEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, 
+               AwsEventType type, void *arg, uint8_t *data, size_t len) {
+    if(type == WS_EVT_CONNECT) {
+        Serial.printf("Control client #%u connected from %s\n", 
+            client->id(), client->remoteIP().toString().c_str());
         
-        if (!error) {
-            if (doc.containsKey("samplerate")) {
-                globalConfig.sampleRate = doc["samplerate"].as<int>();
-                Serial.printf("Sample rate impostato a: %d\n", globalConfig.sampleRate);
-            }
+        // Invia stato corrente al nuovo client
+        sendSystemStatus(client);
+    } 
+    else if(type == WS_EVT_DISCONNECT) {
+        Serial.printf("Control client #%u disconnected\n", client->id());
+    } 
+    else if(type == WS_EVT_DATA) {
+        AwsFrameInfo *info = (AwsFrameInfo*)arg;
+        if(info->final && info->index == 0 && info->len == len && info->opcode == WS_TEXT) {
+            data[len] = 0;
+            String message = String((char*)data);
+            StaticJsonDocument<200> doc;
+            DeserializationError error = deserializeJson(doc, message);
             
-            if (doc.containsKey("alfaema")) {
-                emaAlpha = doc["alfaema"].as<float>();
-                Serial.printf("EMA alpha impostato a: %.2f\n", emaAlpha);
+            bool configChanged = false;
+            
+            if(!error) {
+                if(doc.containsKey("samplerate")) {
+                    uint32_t newRate = doc["samplerate"].as<int>();
+                    if(newRate > 0) {
+                        globalConfig.sampleRate = newRate;
+                        Serial.printf("Sample rate impostato a: %d\n", newRate);
+                        configChanged = true;
+                    }
+                }
+                if(doc.containsKey("alfaema")) {
+                    emaAlpha = doc["alfaema"].as<float>();
+                    Serial.printf("EMA alpha impostato a: %.2f\n", emaAlpha);
+                    configChanged = true;
+                }
+                if(doc.containsKey("streaming")) {
+                    globalConfig.streaming = doc["streaming"].as<bool>();
+                    Serial.printf("Streaming: %s\n", globalConfig.streaming ? "avviato" : "fermato");
+                    configChanged = true;
+                }
+                
+                // Invia aggiornamento stato a tutti se è cambiato qualcosa
+                if(configChanged) {
+                    sendSystemStatus();
+                }
             }
         }
     }
 }
 
-/*
-void IRAM_ATTR adcTask(void* pvParameters) {
-    SPIClass spi(VSPI);
-    spi.begin(18, 19, 23, CS_PIN);
-    pinMode(CS_PIN, OUTPUT);
-    pinMode(DRDY_PIN, INPUT);
-
-    uint32_t lastSample = 0;
-    uint32_t sampleInterval = 1000000 / globalConfig.sampleRate;
-    float emaFilteredValue = 0.0;
-
-    while (true) {
-        if (!globalConfig.streaming) {
-            vTaskDelay(100 / portTICK_PERIOD_MS);
-            continue;
-        }
-
-        if (digitalRead(DRDY_PIN) == LOW &&
-            (micros() - lastSample) >= sampleInterval) {
-
-            digitalWrite(CS_PIN, LOW);
-            uint8_t data[3] = {0x01, 0x02, 0x03};
-            digitalWrite(CS_PIN, HIGH);
-
-            int32_t value = (data[0] << 16) | (data[1] << 8) | data[2];
-            if (value & 0x800000) value -= 0x1000000;
-
-            emaFilteredValue = emaAlpha * value + (1 - emaAlpha) * emaFilteredValue;
-
-            xQueueSend(dataQueue, &emaFilteredValue, 0);
-            lastSample = micros();
-        }
-    }
-}
-*/
-
+// Task ADC
 void adcTask(void* pvParameters) {
     uint32_t lastSample = 0;
-    uint32_t sampleInterval = 1000000 / globalConfig.sampleRate;
+    uint32_t targetInterval = 1000000 / globalConfig.sampleRate;
+    float emaFilteredValue = 0.0;
+
+    // Attendi che il WiFi sia connesso prima di iniziare il sampling
+    while (WiFi.status() != WL_CONNECTED) {
+        vTaskDelay(pdMS_TO_TICKS(100));
+    }
 
     while (true) {
         if (!globalConfig.streaming) {
-            vTaskDelay(100 / portTICK_PERIOD_MS);
+            vTaskDelay(pdMS_TO_TICKS(100));
             continue;
         }
 
-        if ((micros() - lastSample) >= sampleInterval) {
-            uint32_t timestamp = micros();
-            float sample = random(0, 1000);  // Campioni casuali (da 0 a 1000)
+        uint32_t now = micros();
+        if ((now - lastSample) >= targetInterval) {
+            // Genera valore random e applica EMA
+            int32_t value = esp_random() & 0xFFFFFF;  // 24-bit random
+            if (value & 0x800000) value -= 0x1000000;
+            
+            emaFilteredValue = emaAlpha * value + (1 - emaAlpha) * emaFilteredValue;
 
-            // Pacchetto JSON con campione e timestamp
-            char message[128];
-            snprintf(message, sizeof(message), "{\"timestamp\": %u, \"sample\": %.2f}", timestamp, sample);
+            // Prepara il dato
+            SampleData sample = {
+                .timestamp = now,
+                .value = emaFilteredValue
+            };
 
-            // Invia al server WebSocket
-            xQueueSend(dataQueue, &message, 0);
-            lastSample = timestamp;
+            // Invia alla coda, non bloccante
+            if (xQueueSend(dataQueue, &sample, 0) != pdTRUE) {
+                // Gestione overflow
+                Serial.println("Queue overflow");
+            }
+
+            lastSample = now;
         }
     }
 }
 
-// Task gestione dati WebSocket (Core 1)
-void webSocketDataTask(void* pvParameters) {
-    float value;
-    char buffer[32];
-    
-    while(true) {
-        if(xQueueReceive(dataQueue, &value, portMAX_DELAY) == pdTRUE) {
-            if(wsData.count() > 0) {  // Se ci sono client connessi
-                snprintf(buffer, sizeof(buffer), "%.2f", value);
+// Task WebSocket
+void wsTask(void* pvParameters) {
+    char buffer[64];
+    SampleData sample;
+
+    while (true) {
+        // Attendi dato dalla coda
+        if (xQueueReceive(dataQueue, &sample, portMAX_DELAY) == pdTRUE) {
+            if (wsData.count() > 0) {
+                snprintf(buffer, sizeof(buffer), 
+                    "{\"t\":%u,\"v\":%.2f}", 
+                    sample.timestamp, 
+                    sample.value);
                 wsData.textAll(buffer);
             }
         }
@@ -2295,32 +2342,57 @@ void webSocketDataTask(void* pvParameters) {
 void setup() {
     Serial.begin(115200);
 
+    // Crea la coda
+    dataQueue = xQueueCreate(QUEUE_SIZE, sizeof(SampleData));
+    if (dataQueue == NULL) {
+        Serial.println("Errore creazione coda");
+        while(1);
+    }
+
+    // Inizializzazione WiFi
     WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
     while (WiFi.status() != WL_CONNECTED) {
         delay(500);
         Serial.print(".");
     }
     Serial.println("\nConnesso al WiFi");
-
-    // Crea le code
-    dataQueue = xQueueCreate(1024, sizeof(float));
-    eventQueue = xQueueCreate(32, sizeof(char*));
+    Serial.print("IP: ");
+    Serial.println(WiFi.localIP());
 
     // Configurazione WebSocket
-    wsEvents.onEvent(onEventsWebSocket);
-    server.addHandler(&wsEvents);
+    wsData.onEvent(onDataEvent);
+    wsControl.onEvent(onControlEvent);
     server.addHandler(&wsData);
+    server.addHandler(&wsControl);
     server.begin();
 
-    // Avvia i task sui core specifici
-    xTaskCreatePinnedToCore(adcTask, "ADC Task", 8192, NULL, 1, NULL, 0);        // Core 0
-    xTaskCreatePinnedToCore(webSocketDataTask, "WS Data Task", 8192, NULL, 1, NULL, 1);  // Core 1
+    // Task ADC su core 1
+    xTaskCreatePinnedToCore(
+        adcTask, 
+        "ADC Task", 
+        16384,
+        NULL, 
+        configMAX_PRIORITIES - 1,  // Massima priorità
+        NULL, 
+        1  // Core 1
+    );
 
-    Serial.println("Sistema inizializzato");
+    // Task WebSocket su core 0
+    xTaskCreatePinnedToCore(
+        wsTask,
+        "WS Task",
+        16384,
+        NULL,
+        1,  // Priorità minore dell'ADC
+        NULL,
+        0  // Core 0
+    );
+
+    Serial.println("Setup completato");
 }
 
 void loop() {
-    delay(1);  // Previene watchdog reset
+    vTaskDelay(1);  // Previene watchdog reset
 }
 ```
 
