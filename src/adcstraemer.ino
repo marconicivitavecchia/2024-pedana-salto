@@ -33,14 +33,13 @@ struct Config {
     float threshold;
     bool streaming;
 };
-
-// Struttura per il batch di campioni
-struct BatchData {
+/*
+// Struttura per iBatchData {
     uint32_t timestamp;
     uint16_t count;
     uint8_t values[MAX_SAMPLES_PER_BATCH][3];  // 3 bytes per valore
 };
-
+*/
 // Variabili globali
 DualWebSocket ws;
 Config globalConfig = {DEFAULT_SAMPLE_RATE, 1, false, 1000000, true};
@@ -294,7 +293,7 @@ void adcTask(void* pvParameters) {
         if (!globalConfig.streaming) {
             samplesPerBatch = (uint16_t)((globalConfig.sampleRate * BATCH_PERIOD_US) / 1000000);
             samplesPerBatch = min(samplesPerBatch, (uint16_t)MAX_SAMPLES_PER_BATCH);
-            adc.setEMAalfa(emaAlpha);
+            ads.setEMAalfa(emaAlpha);
             
             Serial.printf("Blocco task: %d Hz\n", globalConfig.sampleRate);
             Serial.printf("targetInterval: %d\n", targetInterval);

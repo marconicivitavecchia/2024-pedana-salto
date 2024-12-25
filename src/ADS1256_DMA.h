@@ -41,6 +41,8 @@
 #define ADS1256_CMD_STANDBY 0xFD
 #define ADS1256_CMD_RESET   0xFE
 
+#define MAX_SAMPLES_PER_BATCH 310u  // Aggiunto 'u' per unsigned
+
 // Chip settings
 enum ads1256_channels_t {
     ADS1256_AIN0 = 0,
@@ -62,6 +64,13 @@ enum ads1256_gain_t {
     ADS1256_GAIN_16 = 4,  
     ADS1256_GAIN_32 = 5,  
     ADS1256_GAIN_64 = 6   
+};
+
+// Struttura per il batch di campioni
+struct BatchData {
+    uint32_t timestamp;
+    uint16_t count;
+    uint8_t values[MAX_SAMPLES_PER_BATCH][3];  // 3 bytes per valore
 };
 
 class ADS1256_DMA {
