@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WebSocket Test</title>
+    <style>
+        .control-panel {
+            margin: 20px;
+            padding: 10px;
+            border: 1px solid #ccc;
+        }
+        .config-item {
+            margin: 10px 0;
+        }
+        #log {
+            margin-top: 20px;
+            padding: 10px;
+            background-color: #f0f0f0;
+            height: 400px;
+            overflow-y: auto;
+        }
+        .stats {
+            margin: 10px 0;
+            padding: 10px;
+            background-color: #e0e0e0;
+        }
+    </style>
+</head>
+<body>
+    <h1>WebSocket Test</h1>
+
+    <div class="control-panel">
+        <div class="config-item">
+            <label for="sampleRate">Sample Rate:</label>
+            <select id="sampleRate" onchange="updateConfig('samplerate', this.value)">
+                <option value="200">200 Hz</option>
+                <option value="500">500 Hz</option>
+                <option value="1000">1000 Hz</option>
+                <option value="10000">10 kHz</option>
+                <option value="15000">15 kHz</option>
+                <option value="30000" selected>30 kHz</option>
+            </select>
+        </div>
+
+        <div class="config-item">
+            <label for="emaAlpha">EMA Alpha:</label>
+            <select id="emaAlpha" onchange="updateConfig('alfaema', this.value)">
+                <option value="0.05">0.05</option>
+                <option value="0.1" selected>0.10</option>
+                <option value="0.2">0.20</option>
+                <option value="0.3">0.30</option>
+                <option value="0.5">0.50</option>
+            </select>
+        </div>
+        
+        <div class="config-item">
+            <label>Streaming Control:</label>
+            <button id="streamToggle" onclick="toggleStreaming()">Start Streaming</button>
+        </div>
+
+        <div class="config-item">
+            <label>Current Configuration:</label>
+            <div id="currentConfig">Waiting for connection...</div>
+        </div>
+
+        <div class="stats">
+            <div>Batch Stats:</div>
+            <div id="batchStats">No data yet</div>
+        </div>
+    </div>
+
+    <div id="log"></div>
+
+    <script>
+        let SAMPLE_RATE = 30000;
+        const EXPECTED_BATCH_RATE = 200;  // 200 batch al secondo
+        let wsData, wsControl;
+        let isStreaming = false;
+        let batchCount = 0;
+        let lastBatchTime = null;
+        let batchIntervals = [];
+        const MAX_INTERVALS = 200;  // Per calcolare la media mobile
+
+        function toggleStreaming() {
+            isStreaming = !isStreaming;
+            if(wsControl && wsControl.readyState === WebSocket.OPEN) {
+                wsControl.send(JSON.stringify({
+                    streaming: isStreaming
+                }));
+                console.log("Streaming: "+isStreaming);
+                document.getElementById('streamToggle').innerHTML = 
+                    isStreaming ? 'Stop Streaming' : 'Start Streaming';
+                
+                if(isStreaming) {
+                    batchCount = 0;
+                    lastBatchTime = null;
+                    batchIntervals = [];
+                }
+            }
+        }
+
+        function updateBatchStats() {
+            // Verifica che ci siano intervalli registrati
+            if(batchIntervals.length > 0) {
+                // Calcola la media (in msec) degli intervalli usando reduce 
+                const avgInterval = batchIntervals.reduce((a, b) => a + b, 0) / batchIntervals.length;
+                
+                // Calcola la frequenza (Hz = 1000/millisecondi)
+                const actualRate = 1000 / avgInterval;
+
+                // Aggiorna l'HTML dell'elemento con id 'batchStats'
+                document.getElementById('batchStats').innerHTML = 
+                    `Received Batches: ${batchCount}<br>` +        // Numero totale di batch ricevuti
+                    `Avg Interval: ${avgInterval.toFixed(2)} ms<br>` +  // Intervallo medio con 2 decimali
+                    `Actual Rate: ${actualRate.toFixed(1)} Hz<br>` +    // Frequenza con 1 decimale
+                    `Last Batch Size: ${lastBatchSize} samples`;        // Dimensione dell'ultimo batch
+            }
+        }
+
+        let lastBatchSize = 0;
+
+        
+        function connectWebSocket(ip, port, path, name, onMessageCallback) {
+            let wsh = null;
+
+            function init() {
+                wsh = new WebSocket(`ws://${ip}:${port}/${path}`);
+                
+                // Gli handler vanno definiti DOPO la creazione del WebSocket
+                wsh.onopen = () => {
+                    console.log(`WebSocket ${name} connesso`);  // Template string corretta
+                    isConnected = true;
+                };
+
+                wsh.onclose = () => {
+                    console.log(`WebSocket ${name} disconnesso, riconnessione...`);  // Template string corretta
+                    isConnected = false;
+                    //setTimeout(init, 2000);
+                };
+
+                wsh.onerror = (error) => {
+                    console.log(`Errore WebSocket ${name}:`, error);  // Template string corretta
+                };
+
+                // Assegna il gestore onmessage
+                if (typeof onMessageCallback === "function") {
+                    wsh.onmessage = onMessageCallback;
+                }
+            }
+            init();
+            return wsh;
+        }
+        
+        function onControlEvent(event){
+            const status = JSON.parse(event.data);
+            if(status.type === 'status') {
+                document.getElementById('currentConfig').innerHTML = 
+                    `Sample Rate: ${status.samplerate} Hz<br>` +
+                    `EMA Alpha: ${status.alfaema}<br>` +
+                    `Streaming: ${status.streaming}`;
+
+                document.getElementById('sampleRate').value = status.samplerate;
+                document.getElementById('emaAlpha').value = status.alfaema;
+                SAMPLE_RATE = status.samplerate;
+            }
+        };
+
+        function onmessageEvent(event){
+            //console.log(`msg: ${event.data}`);
+            const batch = JSON.parse(event.data);
+            const timestamp = batch.t;
+            const values = batch.v;
+            lastBatchSize = values.length;
+            //console.log("val len:"+values.length)
+            // Calcolo intervallo tra batch
+            if(lastBatchTime !== null) {
+                const interval = (timestamp - lastBatchTime) / 1000;  // Converti in ms
+                batchIntervals.push(interval);
+                if(batchIntervals.length > MAX_INTERVALS) {
+                    batchIntervals.shift();
+                }
+            }
+
+            lastBatchTime = timestamp;
+            batchCount++;
+            //console.log(batchCount);
+            // Aggiorna statistiche ogni 10 batch
+            if(batchCount % 10 === 0) {
+                updateBatchStats();
+            }
+
+            // Verifica dimensione batch
+            /*const expectedBatchSize = Math.floor(SAMPLE_RATE / EXPECTED_BATCH_RATE);
+            if(Math.abs(values.length - expectedBatchSize) > 2) {
+                console.log(`Warning: Unexpected batch size ${values.length}, expected ~${expectedBatchSize}`);
+            }*/
+        };
+
+        wsData = connectWebSocket("192.168.1.167", "81", "ws", "", onmessageEvent);
+        wsControl = connectWebSocket("192.168.1.167", "82", "ws", "", onControlEvent);
+        //wsData = connectWebSocket("10.12.2.72", "80", "data", "dati", onmessageEvent);
+        //wsControl = connectWebSocket("10.12.2.72", "80", "ctl", "controllo", onControlEvent);
+
+        
+        /*
+            // Esempio di decodifica nel client
+            const value = parseInt(hexString, 16);
+            if (value & 0x800000) {  // Se è negativo
+                value |= 0xFF000000;  // sign extension
+            }
+        */
+
+        function updateConfig(param, value) {
+            if(wsControl && wsControl.readyState === WebSocket.OPEN) {
+                const config = {};
+                config[param] = parseFloat(value);
+                wsControl.send(JSON.stringify(config));
+            } else {
+                console.log('WebSocket not connected');
+            }
+        }
+
+        const log = document.getElementById('log');
+        const originalConsoleLog = console.log;
+        console.log = function(...args) {
+            originalConsoleLog.apply(console, args);
+            const message = args.join(' ');
+            log.innerHTML = message + '<br>' + log.innerHTML;
+        };
+    </script>
+</body>
+</html>
