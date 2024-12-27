@@ -32,9 +32,10 @@ struct Config {
     bool filterEnabled;
     float threshold;
     bool streaming;
+    bool last;
 };
 /*
-// Struttura per iBatchData {
+BatchData {
     uint32_t timestamp;
     uint16_t count;
     uint8_t values[MAX_SAMPLES_PER_BATCH][3];  // 3 bytes per valore
@@ -42,7 +43,7 @@ struct Config {
 */
 // Variabili globali
 DualWebSocket ws;
-Config globalConfig = {DEFAULT_SAMPLE_RATE, 1, false, 1000000, true};
+Config globalConfig = {DEFAULT_SAMPLE_RATE, 1, false, 1000000, true, false};
 float emaAlpha = 0.1;
 QueueHandle_t batchQueue;
 
@@ -268,7 +269,7 @@ uint16_t getDecimationFactor(uint32_t desiredRate) {
 }
 
 void adcTask(void* pvParameters) {
-    ADS1256_DMA ads;
+    ADS1256_DMA adc;
     BatchData batch;
     uint32_t lastSample = 0;
     uint32_t overcount = 0;
@@ -290,29 +291,48 @@ void adcTask(void* pvParameters) {
     delay(1000);
 
     while (true) {
-        if (!globalConfig.streaming) {
+        if(globalConfig.last != globalConfig.streaming){
             samplesPerBatch = (uint16_t)((globalConfig.sampleRate * BATCH_PERIOD_US) / 1000000);
             samplesPerBatch = min(samplesPerBatch, (uint16_t)MAX_SAMPLES_PER_BATCH);
-            ads.setEMAalfa(emaAlpha);
+            adc.setEMAalfa(emaAlpha);
+            //decimationFactor = getDecimationFactor(globalConfig.sampleRate);
             
             Serial.printf("Blocco task: %d Hz\n", globalConfig.sampleRate);
             Serial.printf("targetInterval: %d\n", targetInterval);
             Serial.printf("samplesPerBatch: %d\n", samplesPerBatch);
-            
+            Serial.printf("decimationFactor: %d\n", decimationFactor);
             lastSample = 0;
-            xQueueReset(batchQueue);
-            
+            xQueueReset(batchQueue);   
             Serial.println("Queue reset");
-            vTaskDelay(pdMS_TO_TICKS(100));
-            continue;
+            //vTaskDelay(pdMS_TO_TICKS(100));
+            if (!globalConfig.streaming) {
+                // Alla fine dello streaming
+                adc.stopStreaming();
+                Serial.println("stopStreaming");
+                globalConfig.last = globalConfig.streaming;
+                Serial.println(globalConfig.streaming);
+            }else{
+                // All'inizio dello streaming
+                adc.startStreaming();
+                Serial.println("startStreaming");
+                globalConfig.last = globalConfig.streaming;
+            }
+            Serial.println(globalConfig.streaming);
         }
+        
 
         uint32_t now = micros();
-        if ((now - lastSample) >= targetInterval) {
-            lastSample += targetInterval;
-
+        if (globalConfig.streaming && (now - lastSample) >= targetInterval) {
+            lastSample = now;
+            /*
+            batch.values[0][0] = 0;
+            batch.values[0][1] = 0;
+            batch.values[0][2] = 0;
+            batch.timestamp = now;
+            batch.count = 150;
+            */
             //uint16_t decimationFactor = getDecimationFactor(globalConfig.sampleRate);
-            ads.read_data_batch(batch, samplesPerBatch, decimationFactor);             
+            adc.read_data_batch(batch, samplesPerBatch, decimationFactor);             
             if(batch.count > 0) {
                 if (xQueueSend(batchQueue, &batch, 0) != pdTRUE) {
                     Serial.println("Queue overflow: " + String(overcount++));
@@ -321,7 +341,7 @@ void adcTask(void* pvParameters) {
         }
         
         // Piccola pausa per evitare di saturare la CPU
-        portYIELD();
+        //portYIELD();
     }
 }
 
@@ -375,6 +395,7 @@ void wsTask(void* pvParameters) {
                 //} 
                 //ws.sendDataAsync(buffer, len);
                 ws.sendDataSync(buffer, len);
+                //Serial.println(buffer);
                 //}
                 //Serial.println("Buffer");
             }
@@ -428,7 +449,7 @@ void setup() {
     );
     delay(100);
 
-    // Task ADC su core 1
+    // Task ads su core 1
     xTaskCreatePinnedToCore(
         adcTask, 
         "ADC Task", 

@@ -155,16 +155,15 @@ public:
     float apply_ema(int32_t value) {
         emaFilteredValue = emaAlpha * value + (1.0f - emaAlpha) * emaFilteredValue;
         return emaFilteredValue;
-    }
+    }  
 
-    void read_data_batch(BatchData& batch, uint16_t samplesPerBatch, uint16_t decimationFactor = 1) {
-        batch.count = 0;
-        batch.timestamp = esp_timer_get_time();
-        
+    void startStreaming() {
+        if(isStreaming) return;  // Previene avvii multipli
+
         spi_device_acquire_bus(spi, portMAX_DELAY);
         gpio_set_level((gpio_num_t)ADS1256_PIN_CS, 0);
         
-        // Entra in modalità RDATAC
+        // Entra in modalità continua RDATAC
         uint8_t read_cmd = ADS1256_CMD_RDATAC;
         spi_transaction_t trans_cmd;
         memset(&trans_cmd, 0, sizeof(spi_transaction_t));
@@ -173,6 +172,30 @@ public:
         spi_device_transmit(spi, &trans_cmd);
         
         delayMicroseconds(10);
+        isStreaming = true;
+    }
+
+    void stopStreaming() {
+        if(!isStreaming) return;  // Previene stop multipli
+
+        // Esci da modalità continua RDATAC
+        uint8_t read_cmd = ADS1256_CMD_SDATAC;
+        spi_transaction_t trans_cmd;
+        memset(&trans_cmd, 0, sizeof(spi_transaction_t));
+        trans_cmd.length = 8;
+        trans_cmd.tx_buffer = &read_cmd;
+        spi_device_transmit(spi, &trans_cmd);
+        
+        gpio_set_level((gpio_num_t)ADS1256_PIN_CS, 1);
+        spi_device_release_bus(spi);
+        isStreaming = false;
+    }
+
+    void read_data_batch(BatchData& batch, uint16_t samplesPerBatch, uint16_t decimationFactor = 1) {
+        if(!isStreaming) return;  // Verifica che lo streaming sia attivo
+
+        batch.count = 0;
+        batch.timestamp = esp_timer_get_time();
         
         int32_t accumulator = 0;
         uint16_t decimationCount = 0;
@@ -184,18 +207,18 @@ public:
             
             // Accumula decimationFactor campioni
             while(decimationCount < decimationFactor) {
-                while(gpio_get_level((gpio_num_t)ADS1256_PIN_DRDY));
+                // Aspetta che DRDY sia pronto
+                //while(gpio_get_level((gpio_num_t)ADS1256_PIN_DRDY));
                 
                 spi_transaction_t trans_data;
                 memset(&trans_data, 0, sizeof(spi_transaction_t));
                 trans_data.length = 24;
-                uint8_t temp_buffer[3];
-                trans_data.rx_buffer = temp_buffer;
+                trans_data.rx_buffer = batch.values[batch.count];
                 spi_device_transmit(spi, &trans_data);
 
-                int32_t value = (temp_buffer[0] << 16) | 
-                            (temp_buffer[1] << 8) | 
-                            temp_buffer[2];
+                int32_t value = (batch.values[batch.count][0] << 16) | 
+                            (batch.values[batch.count][1] << 8) | 
+                            batch.values[batch.count][2];
                 if(value & 0x800000) {
                     value -= 0x1000000;
                 }
@@ -218,15 +241,7 @@ public:
             batch.values[batch.count][2] = intValue & 0xFF;
             
             batch.count++;
-        }
-        
-        // Esci da RDATAC
-        read_cmd = ADS1256_CMD_SDATAC;
-        trans_cmd.tx_buffer = &read_cmd;
-        spi_device_transmit(spi, &trans_cmd);
-        
-        gpio_set_level((gpio_num_t)ADS1256_PIN_CS, 1);
-        spi_device_release_bus(spi);
+       }
     }
 
     bool set_channel(ads1256_channels_t positive_ch, ads1256_channels_t negative_ch = ADS1256_AINCOM) {
@@ -263,6 +278,7 @@ private:
     uint8_t dma_buffer[32];
     float emaFilteredValue;
     float emaAlpha = 0.1f;
+    bool isStreaming = false;  // Flag per tracciare lo stato dello streaming
 
     void init_ads1256() {
         gpio_set_level((gpio_num_t)ADS1256_PIN_CS, 0);
@@ -348,3 +364,5 @@ private:
 };
 
 #endif
+
+

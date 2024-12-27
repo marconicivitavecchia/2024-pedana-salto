@@ -169,6 +169,8 @@
             const batch = JSON.parse(event.data);
             const timestamp = batch.t;
             const values = batch.v;
+            //console.log(`t: ${timestamp}`);
+            //console.log(`t: ${values}`);
             lastBatchSize = values.length;
             //console.log("val len:"+values.length)
             // Calcolo intervallo tra batch
