@@ -120,7 +120,63 @@ public:
             spi_bus_free(HSPI_HOST);
         }
     }
+    /* 
+    ---------------------------------------
+        TEST SIGNAL GNERATION SECTION
+    ---------------------------------------
+    */
+    void enableTestSignal(bool enable) {
+        testSignalEnabled = enable;
+        if (testSignalEnabled) {
+            testSignalTime = 0;
+        }
+    }
 
+    void setTestSignalParams(float freq, float ampl, float amFreq) {
+        testFrequency = freq;
+        baseAmplitude = ampl;
+        amFrequency = amFreq;
+    }
+
+    void generateTestSamples(BatchData& batch, uint16_t samplesPerBatch, uint16_t decimationFactor) {
+        if (!testSignalEnabled) return;
+
+        float signalPeriod = (float) decimationFactor / 30000;
+        batch.count = 0;
+        batch.timestamp = esp_timer_get_time();
+
+        // Costante di conversione da volt a conteggi ADC (24 bit signed)
+        const float voltsToAdc = 8388608.0f / vRef;  // 2^23 / vRef
+
+        // Genera i campioni
+        for (uint16_t i = 0; i < samplesPerBatch; i++) {
+            // Calcola modulazione d'ampiezza
+            float amplitude = baseAmplitude * (1.0f + sinf(2.0f * PI * amFrequency * testSignalTime));
+            
+            // Genera il campione della sinusoide
+            float volts = amplitude * (1.0f + sinf(2.0f * PI * testFrequency * testSignalTime)) / 2.0f;
+            
+            // Limita tra 0V e 2.5V
+            if (volts < 0.0f) volts = 0.0f;
+            if (volts > vRef) volts = vRef;
+            
+            // Converti in conteggi ADC
+            int32_t value = (int32_t)(volts * voltsToAdc);
+            
+            // Converti in formato 24-bit
+            batch.values[i][0] = (value >> 16) & 0xFF;
+            batch.values[i][1] = (value >> 8) & 0xFF;
+            batch.values[i][2] = value & 0xFF;
+            
+            testSignalTime += signalPeriod;
+            batch.count++;
+        }
+    }
+    /* 
+    ---------------------------------------
+        REAL SIGNAL SAMPLING SECTION
+    ---------------------------------------
+    */
     int32_t read_data() {
         while(gpio_get_level((gpio_num_t)ADS1256_PIN_DRDY));
         
@@ -192,6 +248,13 @@ public:
     }
 
     void read_data_batch(BatchData& batch, uint16_t samplesPerBatch, uint16_t decimationFactor = 1) {
+        // Se in modo emulazione
+        if (testSignalEnabled) {
+            generateTestSamples(batch, samplesPerBatch, decimationFactor);
+            return;
+        }
+        
+        // Se in modo reale
         if(!isStreaming) return;  // Verifica che lo streaming sia attivo
 
         batch.count = 0;
@@ -279,6 +342,13 @@ private:
     float emaFilteredValue;
     float emaAlpha = 0.1f;
     bool isStreaming = false;  // Flag per tracciare lo stato dello streaming
+    // Test signal configuration
+    bool testSignalEnabled = false;
+    float testSignalTime = 0;
+    float testFrequency = 1.0f;     // Hz
+    float baseAmplitude = 1.25f;    // V (metà di 2.5V)
+    float amFrequency = 0.1f;       // Hz
+    const float vRef = 2.5f;        // Tensione di riferimento ADS1256
 
     void init_ads1256() {
         gpio_set_level((gpio_num_t)ADS1256_PIN_CS, 0);

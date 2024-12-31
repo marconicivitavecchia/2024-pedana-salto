@@ -33,6 +33,7 @@ struct Config {
     float threshold;
     bool streaming;
     bool last;
+    bool testSignal;
 };
 /*
 BatchData {
@@ -175,6 +176,14 @@ void onControlEvent(WSEventType type, WebSocketServer::WSClient* client, uint8_t
             Serial.printf("Streaming: %s\n", globalConfig.streaming ? "avviato" : "fermato");
             configChanged = true;
         }
+
+        if(doc.containsKey("test")) {
+            bool newTest = doc["test"].as<bool>();
+            Serial.printf("Found test: %d\n", newTest);
+            globalConfig.testSignal = newTest;
+            Serial.printf("Modo: %s\n", globalConfig.testSignal ? "attivato" : "disattivato");
+            configChanged = true;
+        }
         
         if(configChanged) {
             Serial.println("Config changed, sending status");
@@ -253,8 +262,8 @@ uint16_t getDecimationFactor(uint32_t desiredRate) {
     switch(desiredRate) {
         case 200:   
             return 150;    // 30000/150 = 200Hz
-        case 500:   
-            return 60;     // 30000/60 = 500Hz
+        case 600:   
+            return 50;     // 30000/50 = 600Hz
         case 1000:  
             return 30;     // 30000/30 = 1000Hz
         case 10000: 
@@ -283,7 +292,9 @@ void adcTask(void* pvParameters) {
     Serial.printf("Sample rate: %d Hz\n", globalConfig.sampleRate);
     Serial.printf("Target interval: %d us\n", targetInterval);
     Serial.printf("Expected samples per batch: %d\n", samplesPerBatch);
-
+    // Imposta parametri del segnale: frequenza, ampiezza, frequenza AM
+    adc.setTestSignalParams(1.0f, 1.25f, 0.1f);
+    
     // Attendi connessione WiFi
     while (WiFi.status() != WL_CONNECTED) {
         vTaskDelay(pdMS_TO_TICKS(100));
@@ -295,8 +306,14 @@ void adcTask(void* pvParameters) {
             samplesPerBatch = (uint16_t)((globalConfig.sampleRate * BATCH_PERIOD_US) / 1000000);
             samplesPerBatch = min(samplesPerBatch, (uint16_t)MAX_SAMPLES_PER_BATCH);
             adc.setEMAalfa(emaAlpha);
-            //decimationFactor = getDecimationFactor(globalConfig.sampleRate);
-            
+            decimationFactor = getDecimationFactor(globalConfig.sampleRate);
+            if(globalConfig.testSignal){
+                // Abilita il segnale di test
+                adc.enableTestSignal(true);
+            }else{
+                // Disabilita il segnale di test
+                adc.enableTestSignal(false);
+            }            
             Serial.printf("Blocco task: %d Hz\n", globalConfig.sampleRate);
             Serial.printf("targetInterval: %d\n", targetInterval);
             Serial.printf("samplesPerBatch: %d\n", samplesPerBatch);

@@ -3,6 +3,29 @@
 <head>
     <title>WebSocket Test</title>
     <style>
+        .limit-indicator {
+            color: red;
+            font-weight: bold;
+            visibility: hidden;
+        }
+        .limit-indicator.active {
+            visibility: visible;
+        }
+        #scrollLeft:disabled, #scrollRight:disabled {
+            cursor: not-allowed;
+        }
+            .scope-controls {
+            margin: 5px 0;
+            padding: 5px;
+            background: #f5f5f5;
+            border: 1px solid #ddd;
+        }
+        .timebase-controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin: 5px 0;
+        }
         .control-panel {
             margin: 20px;
             padding: 10px;
@@ -15,13 +38,67 @@
             margin-top: 20px;
             padding: 10px;
             background-color: #f0f0f0;
-            height: 400px;
+            height: 200px;
             overflow-y: auto;
         }
         .stats {
             margin: 10px 0;
             padding: 10px;
             background-color: #e0e0e0;
+        }
+        .plot-container {
+            position: relative;
+            margin: 10px 0;
+        }
+        #plotCanvas {
+            width: 100%;
+            height: 400px;  /* ridotto da 600px a 400px per comprimere verticalmente */
+            border: 1px solid #ccc;
+        }
+        .plot-controls {
+            margin: 5px 0;
+            padding: 5px;
+            background: #f5f5f5;
+            border: 1px solid #ddd;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        .buffer-controls {
+            margin: 5px 0;
+            padding: 5px;
+            background: #f5f5f5;
+            border: 1px solid #ddd;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        .zoom-box {
+            position: absolute;
+            border: 1px dashed blue;
+            background: rgba(0, 0, 255, 0.1);
+            pointer-events: none;
+            display: none;
+        }
+        .value-info {
+            position: absolute;
+            background: rgba(255, 255, 255, 0.9);
+            border: 1px solid #ccc;
+            padding: 5px;
+            display: none;
+            pointer-events: none;
+        }
+        #fileInput {
+            display: none;
+        }
+        .test-signal-controls {
+            margin: 5px 0;
+            padding: 5px;
+            background: #f5f5f5;
+            border: 1px solid #ddd;
+            display: flex;
+            gap: 10px;
+            align-items: center;
         }
     </style>
 </head>
@@ -51,7 +128,14 @@
                 <option value="0.5">0.50</option>
             </select>
         </div>
-        
+
+        <div class="buffer-controls">
+            <label>Buffer Duration (s):
+                <input type="number" id="bufferDuration" value="10" min="1" max="3600" 
+                       onchange="updateBufferSize()">
+            </label>
+            <span>Buffer Size: <span id="bufferInfo">0/0</span></span>
+        </div>       
         <div class="config-item">
             <label>Streaming Control:</label>
             <button id="streamToggle" onclick="toggleStreaming()">Start Streaming</button>
@@ -66,22 +150,542 @@
             <div>Batch Stats:</div>
             <div id="batchStats">No data yet</div>
         </div>
+        <div class="test-signal-controls">
+            <label>Test Signal:
+                <input type="checkbox" id="enableTestSignal" onchange="toggleTestSignal()">
+            </label>
+            <label>Remote Test Signal:
+                <input type="checkbox" id="remoteTest" onchange="toggleRemoteTestSignal()">
+            </label>
+            <label>Frequency (Hz):
+                <input type="number" id="testFrequency" value="1" min="0.1" max="100" step="0.1" 
+                       onchange="updateTestSignal()">
+            </label>
+            <label>Base Amplitude:
+                <input type="number" id="testAmplitude" value="100000" min="1000" max="1000000" 
+                       onchange="updateTestSignal()">
+            </label>
+            <label>AM Frequency (Hz):
+                <input type="number" id="amFrequency" value="0.1" min="0.01" max="10" step="0.01" 
+                       onchange="updateTestSignal()">
+            </label>
+            <span id="testSignalInfo">Samples per batch: 0</span>
+        </div>
+        <div class="scope-controls">
+            <div class="timebase-controls">
+                <label>Timebase (ms/div):
+                    <select id="timebaseDiv" onchange="updateTimebase()">
+                        <option value="0.1">0.01</option>
+                        <option value="0.2">0.02</option>
+                        <option value="0.5">0.05</option>
+                        <option value="0.1">0.1</option>
+                        <option value="0.2">0.2</option>
+                        <option value="0.5">0.5</option>
+                        <option value="1">1</option>
+                        <option value="2">2</option>
+                        <option value="5" selected>5</option>
+                        <option value="10">10</option>
+                        <option value="20">20</option>
+                        <option value="50">50</option>
+                        <option value="100">100</option>
+                        <option value="150">150</option>
+                        <option value="200">200</option>
+                        <option value="250">250</option>
+                    </select>
+                </label>
+                <button id="recordBtn" onclick="toggleRecording()">Start Recording</button>
+                <button id="loadRecordBtn" onclick="document.getElementById('recordFileInput').click()">Load Record</button>
+                <button id="play" onclick="playRecord()">►</button>
+                <button id="scrollLeft">◄◄</button>
+                <button id="scrollRight">►►</button>
+                <input type="file" id="recordFileInput" accept=".txt,.json" style="display: none" onchange="loadRecord(this.files[0])"> 
+            </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="plot-container">
+        <div class="plot-controls">
+            <button onclick="resetView()">Reset View</button>
+            <select id="zoomMode">
+                <option value="none">Pan</option>
+                <option value="x">Zoom X</option>
+                <option value="y">Zoom Y</option>
+                <option value="xy">Zoom XY</option>
+            </select>
+            <select id="plotResolution" onchange="updatePlotResolution(this.value)">
+                <option value="1" selected>1</option>
+                <option value="2">1/2</option>
+                <option value="4">1/4</option>
+                <option value="8">1/8</option>
+                <option value="16">1/16</option>
+            </select>
+            <label>
+                <input type="checkbox" id="autoScale" checked>
+                Auto Scale
+            </label>
+            <span>X Range: <span id="xRange">0ms</span></span>
+            <span>Y Range: <span id="yRange">0</span></span>
+        </div>
+        <canvas id="plotCanvas"></canvas>
+        <div class="zoom-box" id="zoomBox"></div>
+        <div class="value-info" id="valueInfo"></div>
     </div>
 
     <div id="log"></div>
 
     <script>
+        // Base configuration variables
         let SAMPLE_RATE = 30000;
-        const EXPECTED_BATCH_RATE = 200;  // 200 batch al secondo
+        const EXPECTED_BATCH_RATE = 200;
         let wsData, wsControl;
         let isStreaming = false;
+        let isPaused = false;
         let batchCount = 0;
         let lastBatchTime = null;
         let batchIntervals = [];
-        const MAX_INTERVALS = 200;  // Per calcolare la media mobile
+        const MAX_INTERVALS = 200;
+        let batchBuffer = [];
+        let bufferDurationSec = 10;
+        let bufferTimespan = bufferDurationSec * 1000000; // converti in microsecondi
+        let maxBufferSize = Math.ceil((bufferDurationSec * 1000) / 5);
+        let currBatchIndex = 0;
+        let lastFrameTime = 0;
+
+        // Variabili per registrazione
+        let isRecording = false;
+        let recordBuffer = [];
+        let recordBufferSize = 50000; // Circa 250 secondi di dati con intervallo 5ms
+        let currPlayIndex = 0;
+
+        // Display configuration
+        let plotResolution = 1;
+        const MIN_PLOT_INTERVAL = 5;
+        const MIN_PIXEL_DELTA = 2;
+        const padding = 40;
+
+        // Oscilloscope specific variables
+        // Variabili di stato per la vista
+        let xScale = { min: 0, max: 100 };
+        let yScale = { min: 0, max: 1000000 };
+        let timebaseDiv = 5;      // ms per divisione
+        const DIVISIONS_X = 10;   // divisioni orizzontali
+        let viewOffset = 0;       // offset temporale per lo scroll
+        let pausedAt = null;      // timestamp quando messo in pausa
+        let animationFrameId = null;  // ID per cancelAnimationFrame
+        let isAtLeftLimit = false;  // flag per limite sinistro
+        let inputMode = true;
+
+        // Test signal variables
+        let testSignalEnabled = false;
+        let testSignalTime = 0;
+        let lastTestSignalUpdate = 0;
+
+        // Variabili di stato per zoom e pan
+        //let isMouseDown = false;
+        let startX = 0;
+        let startY = 0;
+        //let autoScale = true;
+        //let dragStartPos = null;
+        //let lastMousePos = null;
+
+        // scroll management
+        const delay = (msec) => new Promise(resolve => setTimeout(resolve, msec)) ;
+        let isScrolling = false;
+        let right = true;
+        const leftButton = document.getElementById('scrollLeft');
+        const rightButton = document.getElementById('scrollRight');
+
+        leftButton.onmousedown = async () => {
+            isScrolling = true;
+            while (isScrolling) {
+                scrollView(-timebaseDiv * 5000);
+                await delay(200);
+            }
+        }
+        rightButton.onmousedown = async () => {
+            isScrolling = true;
+            while (isScrolling) {
+                scrollView(timebaseDiv * 5000);
+                await delay(200);
+            }
+        }
+        leftButton.onmouseup = () => {
+            isScrolling = false;
+        }
+        rightButton.onmouseup = () => {
+            isScrolling = false;
+        }
+
+        // Setup canvas
+        const canvas = document.getElementById('plotCanvas');
+        const ctx = canvas.getContext('2d');
+
+        function resizeCanvas() {
+            canvas.width = canvas.offsetWidth;
+            canvas.height = canvas.offsetHeight;
+            if (!isPaused) drawPlot();
+        }
+//-----------------------------------------------------------------------------------------------------------------------
+        // JavaScript
+        function saveRecordedBatches() {
+            const content = recordBuffer.map(batch => {
+                const hexBatch = {
+                    t: batch.t.toString(16),
+                    v: batch.v.map(val => {
+                        const value = (val[0] << 16) | (val[1] << 8) | val[2];
+                        return value.toString(16).padStart(6, '0');
+                    })
+                };
+                return JSON.stringify(hexBatch);
+            }).join('\n');
+            
+            const blob = new Blob([content], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = getDefaultFileName();
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            }
+
+        async function loadRecord(file) {
+            console.log("loadRecord");
+            if (!file) return;
+            try {
+                const text = await file.text();
+                const lines = text.split('\n').filter(line => line.trim());
+                recordBuffer = lines.map(line => {
+                    const hexBatch = JSON.parse(line);
+                    return {
+                        t: parseInt(hexBatch.t, 16),
+                        v: hexBatch.v.map(hexVal => {
+                            const value = parseInt(hexVal, 16);
+                            return [
+                                (value >> 16) & 0xFF,
+                                (value >> 8) & 0xFF,
+                                value & 0xFF
+                            ];
+                        })
+                    };
+                });
+            } catch (error) {
+                console.error('Error loading record:', error);
+            }
+        }
+
+        function playRecord() {
+            console.log("playRecord");
+            // disabilita il modo test se attivo
+            testSignalEnabled = false;
+            if(isStreaming) {
+                toggleStreaming();
+            }
+            inputMode = false;
+            recordBuffer = recordBuffer.slice(0, maxBufferSize);
+            currPlayIndex = 0;
+            const firstBatch = recordBuffer[0];
+            xScale.min = firstBatch.t;
+            xScale.max = firstBatch.t + bufferTimespan;
+            drawPlot();
+        }
+
+        function toggleRecording() {
+            if (!isRecording) {
+                // Start recording
+                recordBuffer = []; // Reset buffer
+                isRecording = true;
+                document.getElementById('recordBtn').innerHTML = 'Stop Recording';
+            } else {
+                // Stop and save
+                isRecording = false;
+                saveRecordedBatches();
+                document.getElementById('recordBtn').innerHTML = 'Start Recording';
+            }
+        }
+
+        function scrollView(deltaMs) {
+            // Verifica che ci siano dati
+            if (recordBuffer.length === 0) return;
+
+            // Calcola la nuova finestra temporale
+            //const timeWindow = timebaseDiv * DIVISIONS_X * 1000;
+            const timeWindow = bufferDurationSec * 1000000; // converti in microsecondi
+            
+            // Sposta la finestra di visualizzazione
+            xScale.min += deltaMs;
+            xScale.max = xScale.min + timeWindow;
+            
+            // Verifica limiti
+            if (xScale.min < recordBuffer[0].t) {
+                // Non andare prima del primo campione
+                xScale.min = recordBuffer[0].t;
+                xScale.max = xScale.min + timeWindow;
+            } else if (xScale.max > recordBuffer[recordBuffer.length - 1].t) {
+                // Non andare oltre l'ultimo campione
+                xScale.max = recordBuffer[recordBuffer.length - 1].t;
+                xScale.min = xScale.max - timeWindow;
+            }
+            
+            // Ridisegna con la nuova finestra temporale
+            drawPlot();
+        }
+
+        function drawScrollLimits() {
+            // Disegna indicatori solo se in pausa
+            if (isPaused && recordBuffer.length > 0) {
+                const firstTime = recordBuffer[0].t;
+                const lastTime = recordBuffer[recordBuffer.length - 1].t;
+                
+                ctx.save();
+                ctx.strokeStyle = 'red';
+                ctx.lineWidth = 2;
+                ctx.setLineDash([5, 5]);  // Linea tratteggiata
+                
+                // Indicatore limite sinistro se siamo vicini al primo batch
+                if (xScale.min <= firstTime + timebaseDiv * 1000) {
+                    const x = timeToScreen(firstTime);
+                    ctx.beginPath();
+                    ctx.moveTo(x, padding);
+                    ctx.lineTo(x, canvas.height - padding);
+                    ctx.stroke();
+                }
+                
+                // Indicatore limite destro se siamo vicini all'ultimo batch
+                if (xScale.max >= lastTime - timebaseDiv * 1000) {
+                    const x = timeToScreen(lastTime);
+                    ctx.beginPath();
+                    ctx.moveTo(x, padding);
+                    ctx.lineTo(x, canvas.height - padding);
+                    ctx.stroke();
+                }
+                
+                ctx.restore();  // Ripristina lo stile originale
+            }
+        }
+//-------------------------------------------------------------------------------------------------------------
+        function drawPlotInc() {
+            // Cancella l'animazione precedente se esiste
+            if (animationFrameId && currBatchIndex > 2) {
+                cancelAnimationFrame(animationFrameId);
+                animationFrameId = null;
+                //console.log("Animazione precedente cancellata.");
+            }
+
+            // Verifica buffer vuoto
+            if (batchBuffer.length === 0) {
+                //console.log("Buffer vuoto, nessun dato da disegnare.");
+                return;
+            }
+
+            function draw(timestamp, index) {
+                // Salva lo stato iniziale del contesto grafico
+                //ctx.save();
+
+                //ctx.beginPath();
+                ctx.strokeStyle = 'blue';
+                ctx.lineWidth = 2;
+
+                const batch = batchBuffer[index];
+              
+                // Test dei range
+                const timeInRange = batch.t >= xScale.min && batch.t <= xScale.max;
+                //console.log(`Batch ${index} - Time range: ${timeInRange} (${batch.t})`);
+
+                if (timeInRange) {
+                    // Decodifica valore
+                    const bytes = batch.v[0];
+                    let value = (bytes[0] << 16) | (bytes[1] << 8) | bytes[2];
+                    if (value & 0x800000) value -= 0x1000000;
+
+                    // Calcola coordinate
+                    //const x = timeToScreen(batch.t);
+
+                    const x = timeToScreen(batch.t);
+                    //const y = valueToScreen(value);
+
+                    //const x = timeToScreen(xScale.min + index*5000);
+                    const y = valueToScreen(value);
+                    //console.log(`Coordinate: x=${x}, y=${y}, minx=${xScale.min}, maxx==${xScale.max}`);
+
+                    // Test coordinate nel plot
+                    const inPlotArea = x >= padding && x <= canvas.width - padding &&
+                                    y >= padding && y <= canvas.height - padding;
+                    //console.log(`Coordinate in area plot: ${inPlotArea}`);
+
+                    if (true) {
+                        if (index === 0) {
+                            // Reset e primo punto
+                            ctx.clearRect(0, 0, canvas.width, canvas.height);
+                            drawGrid();
+                            drawAxes();
+                            ctx.beginPath();
+                            ctx.moveTo(x, y);                            
+                            console.log(`Reset e MoveTo: ${x},${y}`);
+                        } else {
+                            // Punti successivi
+                            //ctx.moveTo(lastX, lastY);
+                            ctx.lineTo(x, y);
+                            //console.log(`LineTo: ${x},${y}`);
+                        }
+                        ctx.stroke();
+                    }
+                }
+
+                // Ripristina lo stato iniziale del contesto grafico
+                //ctx.restore();
+
+                // Aggiorna l'ultimo punto
+            }
+            
+            // Pianifica il prossimo frame se non in pausa
+            if (!isPaused) {
+                animationFrameId = requestAnimationFrame(((value) => (timestamp) => {
+                                        draw(timestamp, value); // Cattura il valore corrente di `dynamicValue`
+                                    })(currBatchIndex)); // Passa una copia al wrapper
+                //console.log("Frame pianificato");
+            }
+        }
+//--------------------------------------------------------------------------------------------------------------------------
+        // Stampa di un batch
+        function drawPlot() {
+            if (animationFrameId) {
+                cancelAnimationFrame(animationFrameId);
+            }
+
+            animationFrameId = requestAnimationFrame(() => {
+                // Usa recordBuffer invece di batchBuffer
+                if (recordBuffer.length === 0) return;
+
+                const timeWindow = timebaseDiv * DIVISIONS_X * 1000;
+
+                // Clear e disegna griglia
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                drawGrid();
+                drawAxes();
+
+                // Plot dei dati
+                ctx.beginPath();
+                ctx.strokeStyle = 'blue';
+                ctx.lineWidth = 2;
+
+                let isFirstPoint = true;
+                let lastX = -1;
+                let lastY = -1;
+
+                // Disegna tutti i punti nella finestra temporale corrente
+                for (let i = 0; i < recordBuffer.length; i++) {
+                    const batch = recordBuffer[i];
+                    
+                    // Salta i punti fuori dalla finestra temporale
+                    if (batch.t < xScale.min || batch.t > xScale.max) continue;
+
+                    const bytes = batch.v[0];
+                    let value = (bytes[0] << 16) | (bytes[1] << 8) | bytes[2];
+                    if (value & 0x800000) value -= 0x1000000;
+
+                    const x = Math.round(timeToScreen(batch.t));
+                    const y = Math.round(valueToScreen(value));
+
+                    if (isFirstPoint) {
+                        ctx.moveTo(x, y);
+                        isFirstPoint = false;
+                    } else {
+                        ctx.lineTo(x, y);
+                    }
+                    
+                    lastX = x;
+                    lastY = y;
+                }
+                
+                ctx.stroke();
+
+                drawScrollLimits();
+
+                // Aggiorna display
+                document.getElementById('xRange').textContent = 
+                    `${((xScale.max - xScale.min)/1000).toFixed(1)}ms`;
+                document.getElementById('yRange').textContent = 
+                    `${yScale.min.toFixed(0)} to ${yScale.max.toFixed(0)}`;
+            });
+        }
+//--------------------------------------------------------------------------------------------------------------------------
+
+        function drawGrid() {
+            ctx.strokeStyle = '#ddd';
+            ctx.lineWidth = 1;           // Grid verticale ogni 5ms
+            const timeStart = Math.floor(xScale.min / 5000) * 5000;
+            for (let t = timeStart; t <= xScale.max; t += 5000) {
+                const x = timeToScreen(t);
+                ctx.beginPath();
+                ctx.moveTo(x, padding);
+                ctx.lineTo(x, canvas.height - padding);
+                ctx.stroke();
+            }
+
+            // Grid orizzontale ogni 10% del range
+            const valueStep = (yScale.max - yScale.min) / 10;
+            for (let v = yScale.min; v <= yScale.max; v += valueStep) {
+                const y = valueToScreen(v);
+                ctx.beginPath();
+                ctx.moveTo(padding, y);
+                ctx.lineTo(canvas.width - padding, y);
+                ctx.stroke();
+            }
+        }
+
+        function drawAxes() {
+            ctx.beginPath();
+            ctx.strokeStyle = '#000';
+            ctx.lineWidth = 1;
+            ctx.moveTo(padding, padding);
+            ctx.lineTo(padding, canvas.height - padding);
+            ctx.lineTo(canvas.width - padding, canvas.height - padding);
+            ctx.stroke();
+        }                
+        /*-------------------------------------------------------------------------
+            CONTROL CALLBACKS SECTION
+          -------------------------------------------------------------------------
+        */
+       
+        function updateTimebase() {
+            timebaseDiv = parseFloat(document.getElementById('timebaseDiv').value);
+            // Reset completo quando cambia la timebase
+            lastDrawnIndex = -1;
+        }
+        
+        function updateSamplesPerBatch() {
+            SAMPLE_RATE = parseInt(document.getElementById('sampleRate').value);
+            samplesPerBatch = Math.floor(SAMPLE_RATE / EXPECTED_BATCH_RATE);
+            document.getElementById('testSignalInfo').textContent = 
+                `Samples per batch: ${samplesPerBatch} (${SAMPLE_RATE}Hz)`;
+        }
+
+        function updatePlotResolution(value) {
+            plotResolution = parseInt(value);
+            if (!isPaused) drawPlotInc();
+        }
+        
+        function resizeCanvas() {
+            canvas.width = canvas.offsetWidth;
+            canvas.height = canvas.offsetHeight;
+            //if (!isPaused) drawPlot();
+        }
+
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
 
         function toggleStreaming() {
             isStreaming = !isStreaming;
+            
+            if(isStreaming){
+                inputMode = true;
+            }else{
+                inputMode = false;
+            }
+
             if(wsControl && wsControl.readyState === WebSocket.OPEN) {
                 wsControl.send(JSON.stringify({
                     streaming: isStreaming
@@ -94,88 +698,205 @@
                     batchCount = 0;
                     lastBatchTime = null;
                     batchIntervals = [];
+                    batchBuffer = [];
+                    inputMode = true;
                 }
+            }
+        }
+
+        function resetView() {
+            autoScale = true;
+            document.getElementById('autoScale').checked = true;
+            if (batchBuffer.length > 0) {
+                const lastBatch = batchBuffer[batchBuffer.length - 1];
+                const firstBatch = batchBuffer[0];
+                //xScale.min = firstBatch.t;
+                //xScale.max = lastBatch.t;
+            }currBatchIndex = 0;
+            drawPlotInc();
+        }
+
+        function updateBufferSize() {
+            bufferDurationSec = parseInt(document.getElementById('bufferDuration').value);
+            bufferTimespan = bufferDurationSec * 1000000; // converti in microsecondi
+            const avgInterval = batchIntervals.length > 0 ? 
+                batchIntervals.reduce((a, b) => a + b, 0) / batchIntervals.length : 5;
+            //maxBufferSize = Math.ceil((bufferDurationSec * 1000) / avgInterval);
+            maxBufferSize = Math.ceil((bufferDurationSec * 1000) / 5);
+            //trimBuffer();
+            updateBufferInfo();
+        }
+
+        function updateBufferInfo() {
+            document.getElementById('bufferInfo').textContent = 
+                `${batchBuffer.length}/${maxBufferSize} batches`;
+        }
+
+        function trimBuffer() {
+            if (batchBuffer.length > maxBufferSize) {
+                batchBuffer = batchBuffer.slice(-maxBufferSize);
             }
         }
 
         function updateBatchStats() {
-            // Verifica che ci siano intervalli registrati
             if(batchIntervals.length > 0) {
-                // Calcola la media (in msec) degli intervalli usando reduce 
                 const avgInterval = batchIntervals.reduce((a, b) => a + b, 0) / batchIntervals.length;
-                
-                // Calcola la frequenza (Hz = 1000/millisecondi)
                 const actualRate = 1000 / avgInterval;
+                const lastBatch = batchBuffer[batchBuffer.length - 1];
+                const lastBatchSize = lastBatch ? lastBatch.v.length : 0;
 
-                // Aggiorna l'HTML dell'elemento con id 'batchStats'
                 document.getElementById('batchStats').innerHTML = 
-                    `Received Batches: ${batchCount}<br>` +        // Numero totale di batch ricevuti
-                    `Avg Interval: ${avgInterval.toFixed(2)} ms<br>` +  // Intervallo medio con 2 decimali
-                    `Actual Rate: ${actualRate.toFixed(1)} Hz<br>` +    // Frequenza con 1 decimale
-                    `Last Batch Size: ${lastBatchSize} samples`;        // Dimensione dell'ultimo batch
+                    `Received Batches: ${batchCount}<br>` +
+                    `Avg Interval: ${avgInterval.toFixed(2)} ms<br>` +
+                    `Actual Rate: ${actualRate.toFixed(1)} Hz<br>` +
+                    `Last Batch Size: ${lastBatchSize} samples`;
             }
         }
 
-        let lastBatchSize = 0;
+        function getDefaultFileName() {
+            const now = new Date();
+            const prefix = document.getElementById('filePrefix').value;
+            return `${prefix}_${now.getFullYear()}${(now.getMonth()+1).toString().padStart(2,'0')}${
+                now.getDate().toString().padStart(2,'0')}_${
+                now.getHours().toString().padStart(2,'0')}${
+                now.getMinutes().toString().padStart(2,'0')}${
+                now.getSeconds().toString().padStart(2,'0')}.txt`;
+        }
 
+        /*-------------------------------------------------------------------------
+            POINT TO SCREEN CONVERSIONS SECTION
+          -------------------------------------------------------------------------
+        */        
+        function timeToScreen(t) {
+            return padding + (t - xScale.min) * (canvas.width - 2 * padding) / (xScale.max - xScale.min);
+        }
+
+        function valueToScreen(v) {
+            return canvas.height - padding - (v - yScale.min) * (canvas.height - 2 * padding) / (yScale.max - yScale.min);
+        }
+
+        function screenToTime(x) {
+            return xScale.min + (x - padding) * (xScale.max - xScale.min) / (canvas.width - 2 * padding);
+        }
+
+        function screenToValue(y) {
+            return yScale.min + (canvas.height - padding - y) * (yScale.max - yScale.min) / (canvas.height - 2 * padding);
+        }
+
+        document.getElementById('sampleRate').addEventListener('change', function() {
+            updateSamplesPerBatch();
+            updateConfig('samplerate', this.value);
+        });
+
+        window.addEventListener('load', updateSamplesPerBatch);
+        /*-------------------------------------------------------------------------
+            TEST SIGNAL GENERATION SECTION
+          -------------------------------------------------------------------------
+        */
+        function toggleTestSignal() {
+            testSignalEnabled = document.getElementById('enableTestSignal').checked;
+            if (testSignalEnabled) {
+                testSignalTime = 0;
+                updateSamplesPerBatch();
+                generateTestSignal();
+            }
+        }
+
+        function toggleRemoteTestSignal() {
+            remoteTestEnabled = document.getElementById('remoteTest').checked;
+            isTest = false;
+            if (remoteTestEnabled) {
+                isTest = true;
+            }
+            if(wsControl && wsControl.readyState === WebSocket.OPEN) {
+                wsControl.send(JSON.stringify({
+                    test: isTest
+                }));
+            }
+            console.log("Remote test: "+isTest);
+            document.getElementById('remoteTest').innerHTML = 
+                isTest ? 'Stop remote test' : 'Start remote test';
+        }
+
+        function updateTestSignal() {
+            if (testSignalEnabled) {
+                generateTestSignal();
+            }
+        }
         
-        function connectWebSocket(ip, port, path, name, onMessageCallback) {
-            let wsh = null;
-
-            function init() {
-                wsh = new WebSocket(`ws://${ip}:${port}/${path}`);
+        function generateTestSignal() {
+            const currentTime = Date.now();
+            if (lastTestSignalUpdate && currentTime - lastTestSignalUpdate < 5) {
+                return; // Limit update rate
+            }
+            lastTestSignalUpdate = currentTime;
+            
+            const frequency = parseFloat(document.getElementById('testFrequency').value);
+            const baseAmplitude = parseFloat(document.getElementById('testAmplitude').value);
+            const amFrequency = parseFloat(document.getElementById('amFrequency').value);
+            
+            // Generate a batch of samples
+            const batchSize = Math.floor(SAMPLE_RATE / EXPECTED_BATCH_RATE);
+            const samples = [];
+            
+            for (let i = 0; i < batchSize; i++) {
+                // Calculate amplitude modulation
+                const amplitude = baseAmplitude * (1 + Math.sin(2 * Math.PI * amFrequency * testSignalTime));
                 
-                // Gli handler vanno definiti DOPO la creazione del WebSocket
-                wsh.onopen = () => {
-                    console.log(`WebSocket ${name} connesso`);  // Template string corretta
-                    isConnected = true;
-                };
-
-                wsh.onclose = () => {
-                    console.log(`WebSocket ${name} disconnesso, riconnessione...`);  // Template string corretta
-                    isConnected = false;
-                    //setTimeout(init, 2000);
-                };
-
-                wsh.onerror = (error) => {
-                    console.log(`Errore WebSocket ${name}:`, error);  // Template string corretta
-                };
-
-                // Assegna il gestore onmessage
-                if (typeof onMessageCallback === "function") {
-                    wsh.onmessage = onMessageCallback;
-                }
+                // Generate sine wave sample
+                const value = Math.round(amplitude * Math.sin(2 * Math.PI * frequency * testSignalTime)+amplitude/2);
+                
+                // Convert to 24-bit format
+                const sample = new Array(3);
+                sample[0] = (value >> 16) & 0xFF;
+                sample[1] = (value >> 8) & 0xFF;
+                sample[2] = value & 0xFF;
+                samples.push(sample);
+                
+                testSignalTime += 1 / SAMPLE_RATE;
             }
-            init();
-            return wsh;
+            
+            // Create batch object
+            const batch = {
+                t: Date.now() * 1000, // microseconds
+                v: samples
+            };
+            
+            // Process batch as if received from WebSocket
+            onmessageEvent({ data: JSON.stringify(batch) });
+            
+            // Schedule next batch if still enabled
+            if (testSignalEnabled) {
+                setTimeout(generateTestSignal, 1000 / EXPECTED_BATCH_RATE);
+            }
         }
-        
-        function onControlEvent(event){
-            const status = JSON.parse(event.data);
-            if(status.type === 'status') {
-                document.getElementById('currentConfig').innerHTML = 
-                    `Sample Rate: ${status.samplerate} Hz<br>` +
-                    `EMA Alpha: ${status.alfaema}<br>` +
-                    `Streaming: ${status.streaming}`;
 
-                document.getElementById('sampleRate').value = status.samplerate;
-                document.getElementById('emaAlpha').value = status.alfaema;
-                SAMPLE_RATE = status.samplerate;
-            }
-        };
+        /*-------------------------------------------------------------------------
+            WEBSOCKET CONTROL SECTION
+          -------------------------------------------------------------------------
+        */
+        function onmessageEvent(event) {
+            if(!inputMode) return;
 
-        function onmessageEvent(event){
-            //console.log(`msg: ${event.data}`);
+            // All'arrivo di un batch
             const batch = JSON.parse(event.data);
             const timestamp = batch.t;
-            const values = batch.v;
-            //console.log(`t: ${timestamp}`);
-            //console.log(`t: ${values}`);
-            lastBatchSize = values.length;
-            //console.log("val len:"+values.length)
-            // Calcolo intervallo tra batch
+            
+            // Aggiungilo al buffer
+            batchBuffer.push(batch);
+
+            // Buffer circolare per registrazione
+            if (isRecording) {
+                recordBuffer.push(batch);
+                if (recordBuffer.length > recordBufferSize) {
+                    recordBuffer.shift(); // Buffer circolare
+                    console.log("Record buffer full, dropping oldest samples");
+                }
+            }
+            
+            // Aggiorna statistiche
             if(lastBatchTime !== null) {
-                const interval = (timestamp - lastBatchTime) / 1000;  // Converti in ms
+                const interval = (timestamp - lastBatchTime) / 1000;
                 batchIntervals.push(interval);
                 if(batchIntervals.length > MAX_INTERVALS) {
                     batchIntervals.shift();
@@ -184,32 +905,109 @@
 
             lastBatchTime = timestamp;
             batchCount++;
-            //console.log(batchCount);
-            // Aggiorna statistiche ogni 10 batch
+
+            // Aggiorna le statistiche a schermo
             if(batchCount % 10 === 0) {
                 updateBatchStats();
+                updateBufferInfo();
             }
 
-            // Verifica dimensione batch
-            /*const expectedBatchSize = Math.floor(SAMPLE_RATE / EXPECTED_BATCH_RATE);
-            if(Math.abs(values.length - expectedBatchSize) > 2) {
-                console.log(`Warning: Unexpected batch size ${values.length}, expected ~${expectedBatchSize}`);
-            }*/
-        };
+            // Aggiorna la scala X per mantenere la finestra temporale costante
+            //const timeWindow = xScale.max - xScale.min;  // manteniamo la stessa finestra temporale
+            //if (timestamp > xScale.max) {
+            //    xScale.max = timestamp;
+            //    xScale.min = timestamp - timeWindow;
+           // }
 
-        wsData = connectWebSocket("192.168.1.167", "81", "ws", "", onmessageEvent);
-        wsControl = connectWebSocket("192.168.1.167", "82", "ws", "", onControlEvent);
-        //wsData = connectWebSocket("10.12.2.72", "80", "data", "dati", onmessageEvent);
-        //wsControl = connectWebSocket("10.12.2.72", "80", "ctl", "controllo", onControlEvent);
+            /*
+            // Realizza l'autoscale dei valori in ordinata
+            if (autoScale && batchBuffer.length > 0) {
+                // Trova min e max dei valori in tutti i batch
+                let yMin = 0;  // forza minimo a zero
+                let yMax = 0;
+                batchBuffer.forEach(batch => {
+                    const values = batch.v.map(sample => {
+                        let value = (sample[0] << 16) | (sample[1] << 8) | sample[2];
+                        if (value & 0x800000) {
+                            value -= 0x1000000;
+                        }
+                        return value;
+                    });
+                    yMax = Math.max(yMax, ...values);
+                });
 
-        
-        /*
-            // Esempio di decodifica nel client
-            const value = parseInt(hexString, 16);
-            if (value & 0x800000) {  // Se è negativo
-                value |= 0xFF000000;  // sign extension
+                // Aggiungi un po' di padding superiore (10%)
+                yScale.min = 0;  // minimo sempre zero
+                yScale.max = yMax * 1.1;
             }
-        */
+            */
+
+            // Stampa a schermo
+            if (currBatchIndex === 0) {
+                // Inizializzazione finestra temporale
+                const firstBatch = batchBuffer[0];
+                xScale.min = firstBatch.t;
+                xScale.max = firstBatch.t + bufferTimespan;
+                console.log(`Finestra temporale: ${xScale.min} - ${xScale.max}`);
+                drawPlotInc();
+                currBatchIndex++;
+            } else if (currBatchIndex < maxBufferSize - 1) {
+                //console.log(`currBatchIndex: ${currBatchIndex}, t: ${batchBuffer[currBatchIndex].t}`);
+                // Batch intermedi
+                drawPlotInc();
+                currBatchIndex++;
+                //console.log(`Batch corrente: ${currBatchIndex}`);
+            } else {
+                // Ultimo batch e reset
+                drawPlotInc();
+                console.log("Reset indice batch");
+                currBatchIndex = 0;
+            }
+        }
+
+        function onControlEvent(event) {
+            const status = JSON.parse(event.data);
+            if(status.type === 'status') {
+                document.getElementById('currentConfig').innerHTML = 
+                    `Sample Rate: ${status.samplerate} Hz<br>` +
+                    `EMA Alpha: ${status.alfaema}<br>` +
+                    `Streaming: ${status.streaming}`;
+                    `Test: ${status.test}`;
+
+                document.getElementById('sampleRate').value = status.samplerate;
+                document.getElementById('emaAlpha').value = status.alfaema;
+                document.getElementById('remoteTest').value = status.test;
+                SAMPLE_RATE = status.samplerate;
+            }
+        }
+
+        function connectWebSocket(ip, port, path, name, onMessageCallback) {
+            let wsh = null;
+
+            function init() {
+                wsh = new WebSocket(`ws://${ip}:${port}/${path}`);
+                
+                wsh.onopen = () => {
+                    console.log(`WebSocket ${name} connesso`);
+                    isConnected = true;
+                };
+
+                wsh.onclose = () => {
+                    console.log(`WebSocket ${name} disconnesso, riconnessione...`);
+                    isConnected = false;
+                };
+
+                wsh.onerror = (error) => {
+                    console.log(`Errore WebSocket ${name}:`, error);
+                };
+
+                if (typeof onMessageCallback === "function") {
+                    wsh.onmessage = onMessageCallback;
+                }
+            }
+            init();
+            return wsh;
+        }
 
         function updateConfig(param, value) {
             if(wsControl && wsControl.readyState === WebSocket.OPEN) {
@@ -221,6 +1019,9 @@
             }
         }
 
+        wsData = connectWebSocket("192.168.1.167", "81", "ws", "", onmessageEvent);
+        wsControl = connectWebSocket("192.168.1.167", "82", "ws", "", onControlEvent);
+
         const log = document.getElementById('log');
         const originalConsoleLog = console.log;
         console.log = function(...args) {
@@ -228,6 +1029,91 @@
             const message = args.join(' ');
             log.innerHTML = message + '<br>' + log.innerHTML;
         };
+        /*
+Capisco, vuoi un comportamento tipo oscilloscopio con:
+
+- Plot incrementale senza cancellazione fino al bordo destro
+- Scroll manuale del margine sinistro della vista
+- Plot fisico solo quando arriva un nuovo batch
+- Decimazione dei punti mantenuta
+Le modifiche principali sono:
+
+Aggiunto tracciamento dell'ultimo batch disegnato
+- Plot incrementale che disegna solo i nuovi batch
+- Reset del disegno solo quando si raggiunge il bordo destro
+- Nuova funzione scrollView per spostare la finestra temporale
+- Mantenuta la decimazione dei punti per l'efficienza
+Controllo della base dei tempi (timebase)
+
+Selettore ms/divisione
+10 divisioni orizzontali
+Scroll manuale left/right
+
+
+Sistema di trigger completo:
+
+- Modalità Auto (free-running)
+- Modalità Normal (aspetta il trigger)
+- Modalità Single shot
+- Livello di trigger regolabile
+- Selezione pendenza (rising/falling)
+- Pulsante force trigger
+- Linea rossa che mostra il livello di trigger
+
+
+Miglioramenti al display:
+
+- Plot incrementale ottimizzato
+- Reset automatico al bordo destro
+- Decimazione punti mantenuta
+- Griglia divisa in divisioni standard
+
+Per usarlo:
+
+1. Seleziona la base dei tempi desiderata
+2. Scegli la modalità di trigger
+3. Imposta il livello e la pendenza del trigger
+4. Usa i pulsanti di scroll per muoverti nella storia
+5. In modalità single shot, usa Force Trigger per forzare l'acquisizione
+let scrollInterval = null; // Variabile globale per l'intervallo
+
+// Modifica i bottoni nell'HTML:
+<button onmousedown="startScrolling(-timebaseDiv * 5000)" 
+        onmouseup="stopScrolling()" 
+        onmouseleave="stopScrolling()">◄◄</button>
+<button onmousedown="startScrolling(timebaseDiv * 5000)" 
+        onmouseup="stopScrolling()" 
+        onmouseleave="stopScrolling()">►►</button>
+        
+// Funzione per iniziare lo scroll continuo
+function startScrolling(deltaMs) {
+    if (scrollInterval) return; // Evita intervalli multipli
+    
+    // Prima chiamata immediata
+    scrollView(deltaMs);
+    
+    // Poi chiamate periodiche ogni 100ms
+    scrollInterval = setInterval(() => {
+        scrollView(deltaMs);
+    }, 100); // Regola questo valore per cambiare la velocità dello scroll
+}
+
+// Funzione per fermare lo scroll
+function stopScrolling() {
+    if (scrollInterval) {
+        clearInterval(scrollInterval);
+        scrollInterval = null;
+    }
+}
+
+// Modifica i bottoni nell'HTML:
+<button onmousedown="startScrolling(-timebaseDiv * 5000)" 
+        onmouseup="stopScrolling()" 
+        onmouseleave="stopScrolling()">◄◄</button>
+<button onmousedown="startScrolling(timebaseDiv * 5000)" 
+        onmouseup="stopScrolling()" 
+        onmouseleave="stopScrolling()">►►</button>
+*/
     </script>
 </body>
 </html>
