@@ -175,22 +175,19 @@
             <div class="timebase-controls">
                 <label>Timebase (ms/div):
                     <select id="timebaseDiv" onchange="updateTimebase()">
-                        <option value="0.1">0.01</option>
-                        <option value="0.2">0.02</option>
+                        <option value="0.005">0.005</option>
+                        <option value="0.01">0.01</option>
+                        <option value="0.02">0.02</option>
                         <option value="0.5">0.05</option>
-                        <option value="0.1">0.1</option>
+                        <option value="0.05">0.1</option>
                         <option value="0.2">0.2</option>
                         <option value="0.5">0.5</option>
-                        <option value="1">1</option>
+                        <option value="1" selected>1</option>
                         <option value="2">2</option>
-                        <option value="5" selected>5</option>
+                        <option value="5">5</option>
                         <option value="10">10</option>
                         <option value="20">20</option>
                         <option value="50">50</option>
-                        <option value="100">100</option>
-                        <option value="150">150</option>
-                        <option value="200">200</option>
-                        <option value="250">250</option>
                     </select>
                 </label>
                 <button id="recordBtn" onclick="toggleRecording()">Start Recording</button>
@@ -198,6 +195,8 @@
                 <button id="play" onclick="playRecord()">►</button>
                 <button id="scrollLeft">◄◄</button>
                 <button id="scrollRight">►►</button>
+                <button id="scrollLeftFast">◄◄◄</button>
+                <button id="scrollRightFast">►►►</button>
                 <input type="file" id="recordFileInput" accept=".txt,.json" style="display: none" onchange="loadRecord(this.files[0])"> 
             </div>
             </div>
@@ -263,6 +262,7 @@
         const MIN_PLOT_INTERVAL = 5;
         const MIN_PIXEL_DELTA = 2;
         const padding = 40;
+        const TARGET_POINTS = 1000;
 
         // Oscilloscope specific variables
         // Variabili di stato per la vista
@@ -295,18 +295,41 @@
         let right = true;
         const leftButton = document.getElementById('scrollLeft');
         const rightButton = document.getElementById('scrollRight');
+        const leftButtonFast = document.getElementById('scrollLeftFast');
+        const rightButtonFast = document.getElementById('scrollRightFast');
+        // Setup canvas
+        const canvas = document.getElementById('plotCanvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = canvas.offsetWidth;
+        canvas.height = canvas.offsetHeight;
+        window.addEventListener('resize', resizeCanvas);
+        
 
         leftButton.onmousedown = async () => {
             isScrolling = true;
             while (isScrolling) {
-                scrollView(-timebaseDiv * 5000);
+                scrollView(-timebaseDiv * 10000);
                 await delay(200);
             }
         }
         rightButton.onmousedown = async () => {
             isScrolling = true;
             while (isScrolling) {
-                scrollView(timebaseDiv * 5000);
+                scrollView(timebaseDiv * 10000);
+                await delay(200);
+            }
+        }
+        leftButtonFast.onmousedown = async () => {
+            isScrolling = true;
+            while (isScrolling) {
+                scrollView(-timebaseDiv * 100000);
+                await delay(200);
+            }
+        }
+        rightButtonFast.onmousedown = async () => {
+            isScrolling = true;
+            while (isScrolling) {
+                scrollView(timebaseDiv * 100000);
                 await delay(200);
             }
         }
@@ -316,15 +339,41 @@
         rightButton.onmouseup = () => {
             isScrolling = false;
         }
+        leftButtonFast.onmouseup = () => {
+            isScrolling = false;
+        }
+        rightButtonFast.onmouseup = () => {
+            isScrolling = false;
+        }
 
-        // Setup canvas
-        const canvas = document.getElementById('plotCanvas');
-        const ctx = canvas.getContext('2d');
 
+        
+/*
         function resizeCanvas() {
+        // Ottieni le dimensioni del contenitore
+        const container = canvas.parentElement;
+        const rect = container.getBoundingClientRect();
+        
+        // Aggiorna le dimensioni del canvas
+        canvas.width = rect.width;
+        canvas.height = rect.height;
+        
+        // Forza un ridisegno
+        if (recordBuffer && recordBuffer.length > 0) {
+            drawPlot();
+        }
+    }
+*/
+        function resizeCanvas() {
+            console.log("resizeCanvas");
             canvas.width = canvas.offsetWidth;
             canvas.height = canvas.offsetHeight;
-            if (!isPaused) drawPlot();
+            if (inputMode){
+                drawPlotInc();
+                //currBatchIndex = 20;
+            }else{
+                playRecord();
+             }
         }
 //-----------------------------------------------------------------------------------------------------------------------
         // JavaScript
@@ -377,7 +426,6 @@
         }
 
         function playRecord() {
-            console.log("playRecord");
             // disabilita il modo test se attivo
             testSignalEnabled = false;
             if(isStreaming) {
@@ -407,62 +455,66 @@
         }
 
         function scrollView(deltaMs) {
+            console.log("scrollView: "+deltaMs);
             // Verifica che ci siano dati
             if (recordBuffer.length === 0) return;
 
             // Calcola la nuova finestra temporale
             //const timeWindow = timebaseDiv * DIVISIONS_X * 1000;
-            const timeWindow = bufferDurationSec * 1000000; // converti in microsecondi
-            
+            //const timeWindow = bufferDurationSec * 1000000; // converti in microsecondi
+            const timeWindow = timebaseDiv * DIVISIONS_X * 1000000;  // in microsecondi
+
+            console.log("scrollView timeWindow: "+timeWindow);
             // Sposta la finestra di visualizzazione
             xScale.min += deltaMs;
             xScale.max = xScale.min + timeWindow;
+            console.log("scrollView xScale.min: "+xScale.min);
+            console.log("scrollView xScale.max: "+xScale.max);
             
+
             // Verifica limiti
+            /*
             if (xScale.min < recordBuffer[0].t) {
+                console.log("xScale.min < recordBuffer[0].t "+recordBuffer[0].t);
                 // Non andare prima del primo campione
                 xScale.min = recordBuffer[0].t;
                 xScale.max = xScale.min + timeWindow;
             } else if (xScale.max > recordBuffer[recordBuffer.length - 1].t) {
+                console.log("xScale.max > recordBuffer[recordBuffer.length - 1].t "+recordBuffer[recordBuffer.length - 1].t);
                 // Non andare oltre l'ultimo campione
                 xScale.max = recordBuffer[recordBuffer.length - 1].t;
                 xScale.min = xScale.max - timeWindow;
             }
-            
+            */
             // Ridisegna con la nuova finestra temporale
             drawPlot();
         }
 
         function drawScrollLimits() {
-            // Disegna indicatori solo se in pausa
-            if (isPaused && recordBuffer.length > 0) {
+            if (recordBuffer.length > 0) {
                 const firstTime = recordBuffer[0].t;
                 const lastTime = recordBuffer[recordBuffer.length - 1].t;
                 
                 ctx.save();
                 ctx.strokeStyle = 'red';
                 ctx.lineWidth = 2;
-                ctx.setLineDash([5, 5]);  // Linea tratteggiata
+                ctx.setLineDash([5, 5]);               
+
+                // Limite sinistro
+                const x1 = timeToScreen(firstTime);
+                ctx.beginPath();
+                ctx.moveTo(x1, padding);
+                ctx.lineTo(x1, canvas.height - padding);
+                ctx.stroke();
                 
-                // Indicatore limite sinistro se siamo vicini al primo batch
-                if (xScale.min <= firstTime + timebaseDiv * 1000) {
-                    const x = timeToScreen(firstTime);
-                    ctx.beginPath();
-                    ctx.moveTo(x, padding);
-                    ctx.lineTo(x, canvas.height - padding);
-                    ctx.stroke();
-                }
+                // Limite destro
+                const x2 = timeToScreen(lastTime);
+                ctx.beginPath();
+                ctx.moveTo(x2, padding);
+                ctx.lineTo(x2, canvas.height - padding);
+                ctx.stroke();
                 
-                // Indicatore limite destro se siamo vicini all'ultimo batch
-                if (xScale.max >= lastTime - timebaseDiv * 1000) {
-                    const x = timeToScreen(lastTime);
-                    ctx.beginPath();
-                    ctx.moveTo(x, padding);
-                    ctx.lineTo(x, canvas.height - padding);
-                    ctx.stroke();
-                }
-                
-                ctx.restore();  // Ripristina lo stile originale
+                ctx.restore();
             }
         }
 //-------------------------------------------------------------------------------------------------------------
@@ -559,8 +611,8 @@
                 // Usa recordBuffer invece di batchBuffer
                 if (recordBuffer.length === 0) return;
 
-                const timeWindow = timebaseDiv * DIVISIONS_X * 1000;
-
+                const timeWindow = timebaseDiv * DIVISIONS_X * 1000000;
+                
                 // Clear e disegna griglia
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
                 drawGrid();
@@ -574,32 +626,45 @@
                 let isFirstPoint = true;
                 let lastX = -1;
                 let lastY = -1;
+                let n = 1;
+                // Prima trova i batch nella finestra temporale
+                const batchesInWindow = recordBuffer.filter(batch => 
+                    batch.t >= xScale.min && batch.t <= xScale.max
+                );
 
-                // Disegna tutti i punti nella finestra temporale corrente
-                for (let i = 0; i < recordBuffer.length; i++) {
-                    const batch = recordBuffer[i];
-                    
-                    // Salta i punti fuori dalla finestra temporale
-                    if (batch.t < xScale.min || batch.t > xScale.max) continue;
-
-                    const bytes = batch.v[0];
-                    let value = (bytes[0] << 16) | (bytes[1] << 8) | bytes[2];
-                    if (value & 0x800000) value -= 0x1000000;
-
-                    const x = Math.round(timeToScreen(batch.t));
-                    const y = Math.round(valueToScreen(value));
-
-                    if (isFirstPoint) {
-                        ctx.moveTo(x, y);
-                        isFirstPoint = false;
-                    } else {
-                        ctx.lineTo(x, y);
-                    }
-                    
-                    lastX = x;
-                    lastY = y;
+                if(batchesInWindow.length < TARGET_POINTS){
+                    n = Math.ceil((TARGET_POINTS - batchesInWindow.length) / batchesInWindow.length)+1;
+                    n = Math.min(n, batchesInWindow[0].v.length);
                 }
+                console.log("batchesInWindow.length: " + batchesInWindow.length);
+                console.log("n: " + n);
+                // Disegna tutti i punti nella finestra temporale corrente
+                let count = 0;
+                for (let batch of batchesInWindow) {
+                    for(let j=0; j < n; j++){                        
+                        const bytes = batch.v[j];
+                        let value = (bytes[0] << 16) | (bytes[1] << 8) | bytes[2];
+                        if (value & 0x800000) value -= 0x1000000;
+                        
+                        // Calcola il timestamp preciso per questo campione nel batch
+                        const sampleTime = batch.t + (j * (1000000 / SAMPLE_RATE)); // in microsecondi
                 
+                        const x = Math.round(timeToScreen(sampleTime));
+                        const y = Math.round(valueToScreen(value));
+
+                        if (isFirstPoint) {
+                            ctx.moveTo(x, y);
+                            isFirstPoint = false;
+                        } else {
+                            ctx.lineTo(x, y);
+                        }
+                        
+                        lastX = x;
+                        lastY = y;
+                        count++;
+                    }
+                }
+                console.log("count: " + count);
                 ctx.stroke();
 
                 drawScrollLimits();
@@ -646,14 +711,25 @@
             ctx.stroke();
         }                
         /*-------------------------------------------------------------------------
-            CONTROL CALLBACKS SECTION
+            CONTROL CALLBACKS SECTION 
           -------------------------------------------------------------------------
         */
        
         function updateTimebase() {
             timebaseDiv = parseFloat(document.getElementById('timebaseDiv').value);
-            // Reset completo quando cambia la timebase
-            lastDrawnIndex = -1;
+            console.log("timebaseDiv update: "+timebaseDiv);
+            // Aggiorna la finestra temporale in base alla nuova base dei tempi
+            const timeWindow = timebaseDiv * DIVISIONS_X * 1000000;  // in microsecondi
+            
+            // Mantieni il centro della vista ma cambia la scala
+            const centerTime = (xScale.max + xScale.min) / 2;
+            console.log("centerTime: "+centerTime);
+            console.log("timeWindow: "+timeWindow);
+            xScale.min = centerTime - timeWindow / 2;
+            xScale.max = centerTime + timeWindow / 2;
+            
+            // Ridisegna con la nuova scala temporale
+            drawPlot();
         }
         
         function updateSamplesPerBatch() {
@@ -673,9 +749,6 @@
             canvas.height = canvas.offsetHeight;
             //if (!isPaused) drawPlot();
         }
-
-        window.addEventListener('resize', resizeCanvas);
-        resizeCanvas();
 
         function toggleStreaming() {
             isStreaming = !isStreaming;
@@ -1038,44 +1111,29 @@ Capisco, vuoi un comportamento tipo oscilloscopio con:
 - Decimazione dei punti mantenuta
 Le modifiche principali sono:
 
-Aggiunto tracciamento dell'ultimo batch disegnato
-- Plot incrementale che disegna solo i nuovi batch
-- Reset del disegno solo quando si raggiunge il bordo destro
-- Nuova funzione scrollView per spostare la finestra temporale
-- Mantenuta la decimazione dei punti per l'efficienza
-Controllo della base dei tempi (timebase)
+Sì, questa soluzione è intelligente! Ha diversi vantaggi:
 
-Selettore ms/divisione
-10 divisioni orizzontali
-Scroll manuale left/right
+Adatta automaticamente il numero di punti da plottare per ogni batch:
 
+javascriptCopyif(batchesInWindow.length < 1000){
+    n =  Math.ceil((1000 - batchesInWindow.length) / batchesInWindow.length)+1;
+    n = Math.min(n, batchesInWindow[0].v.length);
+}
 
-Sistema di trigger completo:
-
-- Modalità Auto (free-running)
-- Modalità Normal (aspetta il trigger)
-- Modalità Single shot
-- Livello di trigger regolabile
-- Selezione pendenza (rising/falling)
-- Pulsante force trigger
-- Linea rossa che mostra il livello di trigger
+Se ci sono pochi batch (<1000), aumenta il numero di punti per batch
+Ma non supera mai il numero di campioni disponibili nel batch
+Se ci sono molti batch, usa solo il primo punto di ogni batch
 
 
-Miglioramenti al display:
+Il calcolo del timestamp è preciso:
 
-- Plot incrementale ottimizzato
-- Reset automatico al bordo destro
-- Decimazione punti mantenuta
-- Griglia divisa in divisioni standard
+javascriptCopyconst sampleTime = batch.t + (j * (1000000 / SAMPLE_RATE));
 
-Per usarlo:
+Mantiene una densità di punti ragionevole:
 
-1. Seleziona la base dei tempi desiderata
-2. Scegli la modalità di trigger
-3. Imposta il livello e la pendenza del trigger
-4. Usa i pulsanti di scroll per muoverti nella storia
-5. In modalità single shot, usa Force Trigger per forzare l'acquisizione
-let scrollInterval = null; // Variabile globale per l'intervallo
+
+Con molti batch: ~1000 punti (un punto per batch)
+Con pochi batch: fino a 1000 punti distribuiti tra i batch disponibili
 
 // Modifica i bottoni nell'HTML:
 <button onmousedown="startScrolling(-timebaseDiv * 5000)" 
