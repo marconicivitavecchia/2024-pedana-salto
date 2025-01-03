@@ -157,6 +157,14 @@
             <label>Remote Test Signal:
                 <input type="checkbox" id="remoteTest" onchange="toggleRemoteTestSignal()">
             </label>
+            <label>
+                <input type="radio" name="filter" value="none" checked>
+                None noise filtering
+            </label>
+            <label>
+                <input type="radio" name="filter" value="kalman" checked>
+                Kalman noise Filter
+            </label>
             <label>Frequency (Hz):
                 <input type="number" id="testFrequency" value="1" min="0.1" max="100" step="0.1" 
                        onchange="updateTestSignal()">
@@ -233,6 +241,9 @@
 
     <div id="log"></div>
 
+    <script src="matrixUtils.js"></script>
+    <script src="filter.js"></script>       
+
     <script>
         // Base configuration variables
         let SAMPLE_RATE = 30000;
@@ -250,6 +261,8 @@
         let maxBufferSize = Math.ceil((bufferDurationSec * 1000) / 5);
         let currBatchIndex = 0;
         let lastFrameTime = 0;
+        let filterh = new Filter();
+        let filtera = new Filter();
 
         // Variabili per registrazione
         let isRecording = false;
@@ -345,10 +358,24 @@
         rightButtonFast.onmouseup = () => {
             isScrolling = false;
         }
-
-
         
-/*
+        const radioButtons = document.querySelectorAll('input[name="filter"]');
+        radioButtons.forEach(radio => {
+            radio.addEventListener('change', (e) => {
+                if (e.target.checked) {
+                    console.log('Selected:', e.target.value);
+                    if(e.target.value =="kalman"){
+                        filterh = new JumpHeightKalmanFilter(1/SAMPLE_RATE);
+                        filtera = new AccelerationKalmanFilter(1/SAMPLE_RATE);
+                    }else{
+                        filterh = new Filter();
+                        filtera = new Filter();
+                    }
+                }
+            });
+        });
+
+        /*
         function resizeCanvas() {
         // Ottieni le dimensioni del contenitore
         const container = canvas.parentElement;
@@ -398,7 +425,7 @@
             a.click();
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
-            }
+        }
 
         async function loadRecord(file) {
             console.log("loadRecord");
@@ -425,6 +452,223 @@
             }
         }
 
+        function detectJumpThresholds(recordBuffer, sampleRate) {
+            const threshold = 10000;
+            let times = {
+                t1: null, t2: null, t3: null, t4: null, t5: null
+            };
+            
+            let lastValue = 0;
+            let velocity = 0;
+            let maxDownVel = 0;
+            let maxUpVel = 0;
+            const dt = 1/sampleRate;
+           
+            
+            for(let batchIdx = 0; batchIdx < recordBuffer.length; batchIdx++) {
+                const batch = recordBuffer[batchIdx];
+                const batchStartTime = parseInt(batch.t, 16) / 1000000;
+                
+                for(let i = 0; i < batch.v.length; i++) {
+                    let value = parseInt(batch.v[i], 16);
+                    if(value & 0x800000) value -= 0x1000000;
+                    
+                    filterh.predict();
+                    value = filterh.update(value);
+                    const currentTime = batchStartTime + (i * dt);
+                    velocity += value * dt;
+                    
+                    if(times.t1 === null && value < -threshold) times.t1 = currentTime;
+                    if(velocity < maxDownVel) {
+                        maxDownVel = velocity;
+                        times.t2 = currentTime;
+                    }
+                    if(velocity > maxUpVel) {
+                        maxUpVel = velocity;
+                        times.t3 = currentTime;
+                    }
+                    if(times.t1 !== null && times.t4 === null && 
+                    Math.abs(value) < threshold && velocity > 0) times.t4 = currentTime;
+                    if(times.t4 !== null && times.t5 === null && 
+                    Math.abs(value) > threshold && velocity < 0) times.t5 = currentTime;
+                    
+                    lastValue = value;
+                }
+            }
+            return times;
+        }
+
+        function analyzeJump(recordBuffer, sampleRate) {
+            const times = detectJumpThresholds(recordBuffer, sampleRate);
+            const g = 9.81;
+            const Fstatico = 700; 
+            
+            // Calcolo velocità iniziale (t1->t4)
+            let vIniziale = 0;
+            let dt = 1/sampleRate;
+            
+            // Calcolo velocità di caduta (t5->stabilizzazione)
+            let vCaduta = 0;
+            let stabilized = false;
+            let tStabilizzazione = times.t5;
+            
+            for(let batchIdx = 0; batchIdx < recordBuffer.length; batchIdx++) {
+                const batch = recordBuffer[batchIdx];
+                const batchTime = parseInt(batch.t, 16) / 1000000;
+                
+                for(let i = 0; i < batch.v.length; i++) {
+                    let value = parseInt(batch.v[i], 16);
+                    if(value & 0x800000) value -= 0x1000000;
+                    
+                    filtera.predict();
+                    value = filtera.update(value);
+                    const force = (value * Fstatico) / 50000;
+                    
+                    // Integrazione pre-salto
+                    if(batchTime >= times.t1 && batchTime <= times.t4) {
+                        vIniziale += g * ((force - Fstatico) / Fstatico) * dt;
+                    }
+                    
+                    // Cerca punto di stabilizzazione post-atterraggio
+                    if(batchTime > times.t5 && !stabilized) {
+                        if(Math.abs(force - Fstatico) < Fstatico * 0.05) { // ±5% del peso statico
+                            stabilized = true;
+                            tStabilizzazione = batchTime;
+                        }
+                        // Integra fino alla stabilizzazione
+                        vCaduta += g * ((force - Fstatico) / Fstatico) * dt;
+                    }
+                }
+            }
+
+            const flightTime = times.t5 - times.t4;
+            const h_flight = (g * flightTime * flightTime) / 8;
+            const h_velocity = (vIniziale * vIniziale) / (2 * g);
+            const h_landing = (vCaduta * vCaduta) / (2 * g);
+
+            return {
+                flightTime,
+                height_from_time: h_flight,
+                height_from_velocity: h_velocity,
+                height_from_landing: h_landing,
+                initial_velocity: vIniziale,
+                landing_velocity: vCaduta,
+                stabilization_time: tStabilizzazione - times.t5,
+                thresholdTimes: times
+            };
+        }
+
+        function printJumpReport(data) {
+            // Console report
+            console.table({
+                "Flight Time": `${(data.flightTime * 1000).toFixed(1)} ms`,
+                "Height (from time)": `${(data.height_from_time * 100).toFixed(1)} cm`,
+                "Height (from velocity)": `${(data.height_from_velocity * 100).toFixed(1)} cm`, 
+                "Height (from landing)": `${(data.height_from_landing * 100).toFixed(1)} cm`,
+                "Initial Velocity": `${data.initial_velocity.toFixed(2)} m/s`,
+                "Landing Velocity": `${data.landing_velocity.toFixed(2)} m/s`,
+                "Stabilization Time": `${(data.stabilization_time * 1000).toFixed(1)} ms`,
+                "Time Events": {
+                    "Start of Movement (t1)": `${(data.thresholdTimes.t1 * 1000).toFixed(1)} ms`,
+                    "Max Descent Speed (t2)": `${(data.thresholdTimes.t2 * 1000).toFixed(1)} ms`, 
+                    "Max Ascent Speed (t3)": `${(data.thresholdTimes.t3 * 1000).toFixed(1)} ms`,
+                    "Takeoff (t4)": `${(data.thresholdTimes.t4 * 1000).toFixed(1)} ms`,
+                    "Landing (t5)": `${(data.thresholdTimes.t5 * 1000).toFixed(1)} ms`
+                }
+            });
+
+            // HTML report
+            const div = document.createElement('div');
+            div.innerHTML = `
+                <div class="jump-report" style="font-family: Arial; padding: 20px; max-width: 600px; margin: auto;">
+                    <h2>Jump Analysis Report</h2>
+                    
+                    <div style="background: #f5f5f5; padding: 15px; border-radius: 5px; margin: 10px 0;">
+                        <h3>Jump Heights</h3>
+                        <p>From Flight Time: <strong>${(data.height_from_time * 100).toFixed(1)} cm</strong></p>
+                        <p>From Initial Velocity: <strong>${(data.height_from_velocity * 100).toFixed(1)} cm</strong></p>
+                        <p>From Landing Force: <strong>${(data.height_from_landing * 100).toFixed(1)} cm</strong></p>
+                    </div>
+
+                    <div style="background: #f5f5f5; padding: 15px; border-radius: 5px; margin: 10px 0;">
+                        <h3>Time Metrics</h3>
+                        <p>Flight Time: <strong>${(data.flightTime * 1000).toFixed(1)} ms</strong></p>
+                        <p>Stabilization Time: <strong>${(data.stabilization_time * 1000).toFixed(1)} ms</strong></p>
+                    </div>
+
+                    <div style="background: #f5f5f5; padding: 15px; border-radius: 5px; margin: 10px 0;">
+                        <h3>Velocity Metrics</h3>
+                        <p>Initial Velocity: <strong>${data.initial_velocity.toFixed(2)} m/s</strong></p>
+                        <p>Landing Velocity: <strong>${data.landing_velocity.toFixed(2)} m/s</strong></p>
+                    </div>
+
+                    <div style="background: #f5f5f5; padding: 15px; border-radius: 5px; margin: 10px 0;">
+                        <h3>Time Events</h3>
+                        <p>Start of Movement (t1): <strong>${(data.thresholdTimes.t1 * 1000).toFixed(1)} ms</strong></p>
+                        <p>Max Descent Speed (t2): <strong>${(data.thresholdTimes.t2 * 1000).toFixed(1)} ms</strong></p>
+                        <p>Max Ascent Speed (t3): <strong>${(data.thresholdTimes.t3 * 1000).toFixed(1)} ms</strong></p>
+                        <p>Takeoff (t4): <strong>${(data.thresholdTimes.t4 * 1000).toFixed(1)} ms</strong></p>
+                        <p>Landing (t5): <strong>${(data.thresholdTimes.t5 * 1000).toFixed(1)} ms</strong></p>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(div);
+            return div;
+        }
+/*
+        function doBufferFiltering(recordBuffer, filterh, filtera){
+            if(filterh){
+                const content = recordBuffer.map(batch => {
+                    const filteredBatch = {
+                        t: batch.t,
+                        v: batch.v,
+                        vh: batch.v.map(val => {
+                            filterh.predict();
+                            const filtered = filterh.update(val);
+                            return filtered;
+                        }),
+                        va: batch.v.map(val => {
+                            filtera.predict();
+                            const filtered = filtera.update(val);
+                            return filtered;
+                        })
+                    };
+                    return filteredBatch;
+                })
+            }else{
+                const content = recordBuffer.map(batch => {
+                    const filteredBatch = {
+                        t: batch.t,
+                        v: batch.v,
+                        vh: batch.v,
+                        va: batch.v,
+                    };
+                    return filteredBatch;
+                })
+            }
+        }
+
+        function doBatchFiltering(batch, filterh, filtera, type){
+            filter = null;
+            if(filterh && type == "h"){
+                filter = filterh;
+            }else if(filterh && type == "a"){
+                filter = filtera;
+            }else{
+                 return batch;
+            }
+            const filteredBatch = {
+                t: batch.t,
+                v: batch.v.map(val => {
+                    filter.predict();
+                    const filtered = filter.update(val);
+                    return filtered;
+                }),
+            };
+            return filteredBatch;
+        }
+*/
         function playRecord() {
             // disabilita il modo test se attivo
             testSignalEnabled = false;
@@ -438,6 +682,8 @@
             xScale.min = firstBatch.t;
             xScale.max = firstBatch.t + bufferTimespan;
             drawPlot();
+            const report = analyzeJump(recordBuffer, SAMPLE_RATE);
+            printJumpReport(report);
         }
 
         function toggleRecording() {
@@ -646,6 +892,8 @@
                         let value = (bytes[0] << 16) | (bytes[1] << 8) | bytes[2];
                         if (value & 0x800000) value -= 0x1000000;
                         
+                        filterh.predict();
+                        value = filterh.update(value);
                         // Calcola il timestamp preciso per questo campione nel batch
                         const sampleTime = batch.t + (j * (1000000 / SAMPLE_RATE)); // in microsecondi
                 
@@ -896,7 +1144,7 @@
                 generateTestSignal();
             }
         }
-        
+
         function generateTestSignal() {
             const currentTime = Date.now();
             if (lastTestSignalUpdate && currentTime - lastTestSignalUpdate < 5) {
@@ -943,14 +1191,13 @@
                 setTimeout(generateTestSignal, 1000 / EXPECTED_BATCH_RATE);
             }
         }
-
         /*-------------------------------------------------------------------------
             WEBSOCKET CONTROL SECTION
           -------------------------------------------------------------------------
         */
         function onmessageEvent(event) {
             if(!inputMode) return;
-
+            //console.log(`event.data: ${event.data}`);
             // All'arrivo di un batch
             const batch = JSON.parse(event.data);
             const timestamp = batch.t;
@@ -1171,6 +1418,12 @@ function stopScrolling() {
 <button onmousedown="startScrolling(timebaseDiv * 5000)" 
         onmouseup="stopScrolling()" 
         onmouseleave="stopScrolling()">►►</button>
+
+t1: contatto con la piattaforma di forza
+t2: velocità discendente massima
+t3: velocità ascendente massima
+t4: stacco
+t5: atterraggio
 */
     </script>
 </body>
