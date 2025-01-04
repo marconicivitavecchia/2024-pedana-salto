@@ -1,6 +1,8 @@
 >[Torna all'indice](readme.md#fasi-progetto)
 
 
+
+
 ## **1. Metodo della derivata del segnale**
 
 Questo metodo si basa sul calcolo della variazione temporale della forza (F_pedana(t)) per rilevare cambiamenti improvvisi (indicativi di stacco o attacco).
