@@ -186,8 +186,8 @@
                         <option value="0.005">0.005</option>
                         <option value="0.01">0.01</option>
                         <option value="0.02">0.02</option>
-                        <option value="0.5">0.05</option>
-                        <option value="0.05">0.1</option>
+                        <option value="0.05">0.05</option>
+                        <option value="0.1">0.1</option>
                         <option value="0.2">0.2</option>
                         <option value="0.5">0.5</option>
                         <option value="1" selected>1</option>
@@ -205,6 +205,9 @@
                 <button id="scrollRight">►►</button>
                 <button id="scrollLeftFast">◄◄◄</button>
                 <button id="scrollRightFast">►►►</button>
+                <label>File Name Prefix:
+                    <input type="text" id="filePrefix" value="data">
+                </label>
                 <input type="file" id="recordFileInput" accept=".txt,.json" style="display: none" onchange="loadRecord(this.files[0])"> 
             </div>
             </div>
@@ -254,6 +257,11 @@
         let batchCount = 0;
         let lastBatchTime = null;
         let batchIntervals = [];
+        // Test signal variables
+        let testSignalEnabled = false;
+        let testSignalTime = 0;
+        let lastTestSignalUpdate = 0;
+        
         const MAX_INTERVALS = 200;
         let batchBuffer = [];
         let bufferDurationSec = 10;
@@ -288,11 +296,6 @@
         let animationFrameId = null;  // ID per cancelAnimationFrame
         let isAtLeftLimit = false;  // flag per limite sinistro
         let inputMode = true;
-
-        // Test signal variables
-        let testSignalEnabled = false;
-        let testSignalTime = 0;
-        let lastTestSignalUpdate = 0;
 
         // Variabili di stato per zoom e pan
         //let isMouseDown = false;
@@ -438,12 +441,9 @@
                     return {
                         t: parseInt(hexBatch.t, 16),
                         v: hexBatch.v.map(hexVal => {
-                            const value = parseInt(hexVal, 16);
-                            return [
-                                (value >> 16) & 0xFF,
-                                (value >> 8) & 0xFF,
-                                value & 0xFF
-                            ];
+                            let value = parseInt(hexVal, 16);
+                            if (value & 0x800000) value -= 0x1000000;
+                            return value;
                         })
                     };
                 });
@@ -453,49 +453,77 @@
         }
 
         function detectJumpThresholds(recordBuffer, sampleRate) {
-            const threshold = 10000;
-            let times = {
-                t1: null, t2: null, t3: null, t4: null, t5: null
-            };
-            
-            let lastValue = 0;
-            let velocity = 0;
-            let maxDownVel = 0;
-            let maxUpVel = 0;
-            const dt = 1/sampleRate;
-           
-            
-            for(let batchIdx = 0; batchIdx < recordBuffer.length; batchIdx++) {
+            let result = {t1: null, t2: null, t3: null, t4: null, t5: null};
+            let lastForce = null;
+            let minDerivative = Infinity;
+            let maxDerivative = -Infinity;
+            let precBatchTime;
+            let currBatchTime;
+            let batchLen;
+
+            // Calcolo peso statico
+            let staticWeight = 0;
+            let staticCount = 0;
+            for(let batchIdx = 0; batchIdx < recordBuffer.length && staticCount < 20; batchIdx++) {
                 const batch = recordBuffer[batchIdx];
-                const batchStartTime = parseInt(batch.t, 16) / 1000000;
-                
-                for(let i = 0; i < batch.v.length; i++) {
-                    let value = parseInt(batch.v[i], 16);
-                    if(value & 0x800000) value -= 0x1000000;
-                    
-                    filterh.predict();
-                    value = filterh.update(value);
-                    const currentTime = batchStartTime + (i * dt);
-                    velocity += value * dt;
-                    
-                    if(times.t1 === null && value < -threshold) times.t1 = currentTime;
-                    if(velocity < maxDownVel) {
-                        maxDownVel = velocity;
-                        times.t2 = currentTime;
-                    }
-                    if(velocity > maxUpVel) {
-                        maxUpVel = velocity;
-                        times.t3 = currentTime;
-                    }
-                    if(times.t1 !== null && times.t4 === null && 
-                    Math.abs(value) < threshold && velocity > 0) times.t4 = currentTime;
-                    if(times.t4 !== null && times.t5 === null && 
-                    Math.abs(value) > threshold && velocity < 0) times.t5 = currentTime;
-                    
-                    lastValue = value;
+                for(let i = 0; i < batch.v.length && staticCount < 20; i++) {
+                    staticWeight += batch.v[i];
+                    staticCount++;
                 }
             }
-            return times;
+            staticWeight /= staticCount;
+
+            const dt0 = 1/sampleRate;
+            precBatchTime = recordBuffer[0].t / 1000000 - dt0;
+            filterh.predict();
+            lastForce = filterh.update(recordBuffer[0].v[0]);
+            batchLen = recordBuffer[0].v.length;
+            // Analisi principale
+            for(let batchIdx = 0; batchIdx < recordBuffer.length; batchIdx++) {
+                const batch = recordBuffer[batchIdx];
+                const batchTime = batch.t / 1000000;
+
+                // Calcola dt medio dai primi due batch
+                currBatchTime = recordBuffer[batchIdx].t / 1000000;
+                const dt = (currBatchTime - precBatchTime) / batchLen;
+                
+                for(let i = 0; i < batch.v.length; i++) {                   
+                    filterh.predict();
+                    let force = filterh.update(batch.v[i]);
+                    
+                    const currentTime = batchTime + (i * dt);
+                    const derivative = (force - lastForce) / dt;
+                    
+                    if(result.t1 === null && derivative > 1000) {
+                        result.t1 = currentTime;
+                    }
+                    
+                    if(result.t1 !== null && derivative < minDerivative) {
+                        minDerivative = derivative;
+                        result.t2 = currentTime;
+                    }
+                    
+                    if(result.t2 !== null && derivative > maxDerivative) {
+                        maxDerivative = derivative;
+                        result.t3 = currentTime;
+                    }
+
+                    if(result.t3 !== null && result.t4 === null && force < 0.05 * staticWeight) {
+                        result.t4 = currentTime;
+                    }
+                    
+                    if(result.t4 !== null && result.t5 === null && force > 0.05 * staticWeight) {
+                        result.t5 = currentTime;
+                    }
+                    
+                    lastForce = force;
+                }
+
+                precBatchTime = currBatchTime;
+            }
+            
+            console.log(`t1: ${result.t1} - t2: ${result.t2} - t3: ${result.t3} - t4: ${result.t4} - t5: ${result.t5}`);
+            return result;
         }
 
         function analyzeJump(recordBuffer, sampleRate) {
@@ -514,11 +542,10 @@
             
             for(let batchIdx = 0; batchIdx < recordBuffer.length; batchIdx++) {
                 const batch = recordBuffer[batchIdx];
-                const batchTime = parseInt(batch.t, 16) / 1000000;
+                const batchTime = batch.t / 1000000;
                 
                 for(let i = 0; i < batch.v.length; i++) {
-                    let value = parseInt(batch.v[i], 16);
-                    if(value & 0x800000) value -= 0x1000000;
+                    let value = batch.v[i];
                     
                     filtera.predict();
                     value = filtera.update(value);
@@ -873,27 +900,27 @@
                 let lastX = -1;
                 let lastY = -1;
                 let n = 1;
+
+                //xScale.min = recordBuffer[0].t;
                 // Prima trova i batch nella finestra temporale
                 const batchesInWindow = recordBuffer.filter(batch => 
                     batch.t >= xScale.min && batch.t <= xScale.max
                 );
-
+                
                 if(batchesInWindow.length < TARGET_POINTS){
                     n = Math.ceil((TARGET_POINTS - batchesInWindow.length) / batchesInWindow.length)+1;
-                    n = Math.min(n, batchesInWindow[0].v.length);
+                    n = Math.min(n, recordBuffer[0].v.length);
                 }
                 console.log("batchesInWindow.length: " + batchesInWindow.length);
                 console.log("n: " + n);
                 // Disegna tutti i punti nella finestra temporale corrente
                 let count = 0;
                 for (let batch of batchesInWindow) {
-                    for(let j=0; j < n; j++){                        
-                        const bytes = batch.v[j];
-                        let value = (bytes[0] << 16) | (bytes[1] << 8) | bytes[2];
-                        if (value & 0x800000) value -= 0x1000000;
-                        
+                    for(let j=0; j < n; j++){  
+                        // filtra i campioni                      
                         filterh.predict();
-                        value = filterh.update(value);
+                        value = filterh.update(batch.v[j]);
+                        
                         // Calcola il timestamp preciso per questo campione nel batch
                         const sampleTime = batch.t + (j * (1000000 / SAMPLE_RATE)); // in microsecondi
                 
@@ -1144,6 +1171,64 @@
                 generateTestSignal();
             }
         }
+/*
+        function generateTestSignal() {
+            const currentTime = Date.now();
+            if (lastTestSignalUpdate && currentTime - lastTestSignalUpdate < 5) return;
+            lastTestSignalUpdate = currentTime;
+
+            const baseAmplitude = parseFloat(document.getElementById('testAmplitude').value);
+            const batchSize = Math.floor(SAMPLE_RATE / EXPECTED_BATCH_RATE);
+            const samples = [];
+            
+            const offset = 8; // 40ms = 8 batch da 5ms
+            const batchProgress = Math.floor(testSignalTime / 0.005);
+            const batchPhase = (testSignalTime % 0.005) / 0.005;
+            
+            for (let i = 0; i < batchSize; i++) {
+                let value;
+                
+                if (batchProgress < offset) {
+                    value = baseAmplitude;
+                } else if (batchProgress < 6 + offset) { 
+                    value = baseAmplitude;
+                } else if (batchProgress < 12 + offset) {
+                    const t = (batchProgress - (6 + offset) + batchPhase) / 6;
+                    value = baseAmplitude * (1 - 0.3 * Math.sin(Math.PI * t));
+                } else if (batchProgress < 16 + offset) {
+                    const t = (batchProgress - (12 + offset) + batchPhase) / 4;
+                    value = baseAmplitude * (1 + Math.sin(Math.PI * t));
+                } else if (batchProgress < 24 + offset) {
+                    value = 0;
+                } else if (batchProgress < 28 + offset) {
+                    const t = (batchProgress - (24 + offset) + batchPhase) / 4;
+                    value = baseAmplitude * 2.5 * Math.exp(-t * 2);
+                } else if (batchProgress < 36 + offset) {
+                    const t = (batchProgress - (28 + offset) + batchPhase) / 8;
+                    value = baseAmplitude * (1 + 0.4 * Math.exp(-t * 3) * Math.cos(2 * Math.PI * t));
+                } else {
+                    testSignalTime = 0;
+                    return;
+                }
+
+                const sample = new Array(3);
+                sample[0] = (value >> 16) & 0xFF;
+                sample[1] = (value >> 8) & 0xFF;
+                sample[2] = value & 0xFF;
+                samples.push(sample);
+                
+                testSignalTime += 1 / SAMPLE_RATE;
+            }
+
+            const batch = {
+                t: Date.now() * 1000,
+                v: samples
+            };
+
+            onmessageEvent({ data: JSON.stringify(batch) });
+            setTimeout(generateTestSignal, 1000 / EXPECTED_BATCH_RATE);
+            }*/
+
 
         function generateTestSignal() {
             const currentTime = Date.now();
@@ -1191,6 +1276,7 @@
                 setTimeout(generateTestSignal, 1000 / EXPECTED_BATCH_RATE);
             }
         }
+    
         /*-------------------------------------------------------------------------
             WEBSOCKET CONTROL SECTION
           -------------------------------------------------------------------------
