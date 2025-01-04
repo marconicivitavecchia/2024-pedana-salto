@@ -1,9 +1,6 @@
 >[Torna all'indice](readme.md#fasi-progetto)
 
 
-
-Ecco il contenuto tradotto in Markdown per GitHub, seguendo le istruzioni che hai fornito:
-
 ## **1. Metodo della derivata del segnale**
 
 Questo metodo si basa sul calcolo della variazione temporale della forza (F_pedana(t)) per rilevare cambiamenti improvvisi (indicativi di stacco o attacco).
