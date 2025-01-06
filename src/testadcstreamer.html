@@ -152,17 +152,21 @@
         </div>
         <div class="test-signal-controls">
             <label>Input selection:</label>
-            <label>ADC real:
-                <input type="radio" id="realADCSignal" name="testSignal" onchange="toggleTestSignal()">
+            <label>
+                <input type="radio" id="enableTestSignal" name="testSignal" onchange="toggleTestSignal()">
+                ADC real
             </label>
-            <label>Local sine wave:
+            <label>
                 <input type="radio" id="enableTestSignal0" name="testSignal" onchange="toggleTestSignal0()">
+                Local sine wave
             </label>
-            <label>Local emulated jump:
+            <label>
                 <input type="radio" id="enableTestSignal1" name="testSignal" onchange="toggleTestSignal1()">
+                Local emulated jump
             </label>
-            <label>Remote sine wave:
+            <label>
                 <input type="radio" id="remoteTest" name="testSignal" onchange="toggleRemoteTestSignal()">
+                Remote sine wave
             </label>
             <label>Sine wave params:</label>
             <label>Frequency (Hz):
@@ -293,6 +297,7 @@
         //let isMouseDown = false;
         let startX = 0;
         let startY = 0;
+        let timers = [];
         //let autoScale = true;
         //let dragStartPos = null;
         //let lastMousePos = null;
@@ -402,7 +407,8 @@
         function saveRecordedBatches() {
             const content = recordBuffer.map(batch => {
                 const hexBatch = {
-                    t: batch.t.toString(16),
+                    //t: batch.t.toString(16),
+                    t: batch.t,
                     v: batch.v.map(val => {
                         const value = (val[0] << 16) | (val[1] << 8) | val[2];
                         return value.toString(16).padStart(6, '0');
@@ -431,7 +437,8 @@
                 recordBuffer = lines.map(line => {
                     const hexBatch = JSON.parse(line);
                     return {
-                        t: parseInt(hexBatch.t, 16),
+                        //t: parseInt(hexBatch.t, 16),
+                        t: parseInt(hexBatch.t),
                         v: hexBatch.v.map(hexVal => {
                             let value = parseInt(hexVal, 16);
                             if (value & 0x800000) value -= 0x1000000;
@@ -1111,13 +1118,14 @@
         }
 
         function resetView() {
-            autoScale = true;
             if (batchBuffer.length > 0) {
-                const lastBatch = batchBuffer[batchBuffer.length - 1];
-                const firstBatch = batchBuffer[0];
+                //const lastBatch = batchBuffer[batchBuffer.length - 1];
+                //const firstBatch = batchBuffer[0];
                 //xScale.min = firstBatch.t;
                 //xScale.max = lastBatch.t;
-            }currBatchIndex = 0;
+            }
+            batchBuffer.length = 0;
+            currBatchIndex = 0;
             drawPlotInc();
         }
 
@@ -1198,33 +1206,57 @@
             TEST SIGNAL GENERATION SECTION
           -------------------------------------------------------------------------
         */
+        function toggleTestSignal() {
+            adcSignalEnabled = document.getElementById('enableTestSignal').checked;
+            if(adcSignalEnabled){
+                testSignalEnabled0 = false;
+                testSignalEnabled1 = false;
+                remoteTestEnabled = false;
+                resetView();
+            }            
+            console.log("testSignalEnabled: "+testSignalEnabled);
+        }
+
         function toggleTestSignal0() {
-            testSignalEnabled = document.getElementById('enableTestSignal0').checked;
-            if (testSignalEnabled) {
+            testSignalEnabled0 = document.getElementById('enableTestSignal0').checked;
+            if(testSignalEnabled0){
+                adcSignalEnabled = false;
+                testSignalEnabled1 = false;
+                remoteTestEnabled = false;
                 testSignalTime = 0;
+                resetView();
                 updateSamplesPerBatch();
                 generateTestSignal0();
-            };
-            updateTestSignal();
+            }         
+            
+            console.log("testSignalEnabled0: "+testSignalEnabled);
         }
 
         function toggleTestSignal1() {
-            testSignalEnabled = document.getElementById('enableTestSignal1').checked;
-            if (testSignalEnabled) {
+            testSignalEnabled1 = document.getElementById('enableTestSignal1').checked;
+            if(testSignalEnabled1){
+                adcSignalEnabled = false;
+                testSignalEnabled0 = false;
+                remoteTestEnabled = false;
+                resetView();
                 testSignalTime = 0;
                 updateSamplesPerBatch();
                 generateTestSignal1();
-            };
-            updateTestSignal();
+            }         
+            console.log("testSignalEnabled1: "+testSignalEnabled1);
         }
 
         function toggleRemoteTestSignal() {
             remoteTestEnabled = document.getElementById('remoteTest').checked;
             isTest = false;
-            if (remoteTestEnabled) {
+            if(remoteTestEnabled){
+                adcSignalEnabled = false;
+                testSignalEnabled0 = false;
+                testSignalEnabled1 = false;
+                resetView();
                 isTest = true;
-                testSignalEnabled = false;
-            }
+            }        
+            
             if(wsControl && wsControl.readyState === WebSocket.OPEN) {
                 wsControl.send(JSON.stringify({
                     test: isTest
@@ -1235,12 +1267,72 @@
                 isTest ? 'Stop remote test' : 'Start remote test';
         }
 
-        function updateTestSignal() {
-            if (testSignalEnabled) {
-                generateTestSignal();
+        /*
+        //const initialTime = 1655484153000000; // Timestamp base
+        const initialTime = Date.now();
+        let count = 1000;
+        async function generateTestSignal1() {
+            const baseAmplitude = parseFloat(document.getElementById('testAmplitude').value);
+            // Timestamp base: 1655484153000000 (62ad7af907880 in hex)
+            const batches = [
+            // 8 batch iniziali statici
+            ...Array(count).fill().map((_, i) => ({
+                t: (initialTime + i * 5000),
+                v: Array(150).fill().map(() => {
+                    const val = Math.floor(baseAmplitude + (Math.random() - 0.5) * 200);
+                    return val.toString(16).padStart(6, '0');
+                })
+            })),
+            // Le 5 fasi del salto come prima
+            {
+                t: (initialTime + count++ * 5000), // Statico pre-stacco
+                v: Array(150).fill().map(() => {
+                    const val = Math.floor(baseAmplitude + (Math.random() - 0.5) * 200);
+                    return val.toString(16).padStart(6, '0');
+                })
+            },
+            {
+                t: (initialTime + count++ * 5000), // Stacco
+                v: Array(150).fill().map((_, i) => {
+                    const progress = i/150;
+                    const val = Math.floor(baseAmplitude * (1 + 0.4 * Math.sin(Math.PI * progress)) + (Math.random() - 0.5) * 200);
+                    return val.toString(16).padStart(6, '0');
+                })
+            },
+            {
+                t: (initialTime + count++ * 5000), // Volo
+                v: Array(150).fill().map(() => {
+                    const val = Math.floor(Math.random() * 400 - 200);
+                    return val.toString(16).padStart(6, '0');
+                })
+            },
+            {
+                t: (initialTime + count++ * 5000), // Atterraggio
+                v: Array(150).fill().map((_, i) => {
+                    const progress = i/150;
+                    const val = Math.floor(baseAmplitude * (1.8 * Math.exp(-progress * 5) + 1) + (Math.random() - 0.5) * 200);
+                    return val.toString(16).padStart(6, '0');
+                })
+            },
+            {
+                t: (initialTime + count++ * 5000), // Ritorno statico
+                v: Array(150).fill().map(() => {
+                    const val = Math.floor(baseAmplitude + (Math.random() - 0.5) * 200);
+                    return val.toString(16).padStart(6, '0');
+                })
             }
-        }
+            ];
 
+            console.log("count: "+count);
+            //console.log(JSON.stringify(batches));
+
+            for (batch of batches) {
+                onmessageEvent({ data: JSON.stringify(batch) });
+                //console.log(JSON.stringify(batch));
+                await delay(5);
+            }
+        }*/        
+        
         function generateTestSignal1() {
             const currentTime = Date.now();
             if (lastTestSignalUpdate && currentTime - lastTestSignalUpdate < 5) return;
@@ -1295,8 +1387,13 @@
             };
 
             onmessageEvent({ data: JSON.stringify(batch) });
-            setTimeout(generateTestSignal1, 1000 / EXPECTED_BATCH_RATE);
+            
+            if (testSignalEnabled1) {
+                timers[1] = setTimeout(generateTestSignal1, 1000 / EXPECTED_BATCH_RATE);
+            }else{
+                clearTimeout(timers[1]);
             }
+        }
 
 
         function generateTestSignal0() {
@@ -1341,8 +1438,10 @@
             onmessageEvent({ data: JSON.stringify(batch) });
             
             // Schedule next batch if still enabled
-            if (testSignalEnabled) {
-                setTimeout(generateTestSignal0, 1000 / EXPECTED_BATCH_RATE);
+            if (testSignalEnabled0) {
+                timers[0] = setTimeout(generateTestSignal0, 1000 / EXPECTED_BATCH_RATE);
+            }else{
+                clearTimeout(timers[0]); 
             }
         }
     
