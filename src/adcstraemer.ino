@@ -15,15 +15,8 @@
 #define QUEUE_SIZE 25              // Dimensione coda batch
 #define MAX_SAMPLES_PER_BATCH 310u  // Aggiunto 'u' per unsigned
 
-const char* WIFI_SSID = "D-Link-6A30CC";
-const char* WIFI_PASSWORD = "FabSeb050770250368120110";
-
-// Configurazione Wi-Fi
-//const char* WIFI_SSID = "WebPocket-E280";
-//const char* WIFI_PASSWORD = "dorabino.7468!";
-
-//const char* WIFI_SSID = "sensori";
-//const char* WIFI_PASSWORD = "sensori2019";
+const char* WIFI_SSID = "xxxx";
+const char* WIFI_PASSWORD = "yyyy";
 
 // Struttura configurazione
 struct Config {
