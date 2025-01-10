@@ -174,11 +174,7 @@
                        onchange="updateTestSignal()">
             </label>
             <label>Base Amplitude:
-                <input type="number" id="testAmplitude" value="100000" min="1000" max="1000000" 
-                       onchange="updateTestSignal()">
-            </label>
-            <label>AM Frequency (Hz):
-                <input type="number" id="amFrequency" value="0.1" min="0.01" max="10" step="0.01" 
+                <input type="number" id="testAmplitude" value="4194304" min="1000" max="8388608" 
                        onchange="updateTestSignal()">
             </label>
             <span id="testSignalInfo">Samples per batch: 0</span>
@@ -489,10 +485,7 @@
                 const hexBatch = {
                     //t: batch.t.toString(16),
                     t: batch.t,
-                    v: batch.v.map(val => {
-                        const value = (val[0] << 16) | (val[1] << 8) | val[2];
-                        return value.toString(16).padStart(6, '0');
-                    })
+                    v: batch.v
                 };
                 return JSON.stringify(hexBatch);
             }).join('\n');
@@ -519,11 +512,7 @@
                     return {
                         //t: parseInt(hexBatch.t, 16),
                         t: parseInt(hexBatch.t),
-                        v: hexBatch.v.map(hexVal => {
-                            let value = parseInt(hexVal, 16);
-                            if (value & 0x800000) value -= 0x1000000;
-                            return value;
-                        })
+                        v: hexBatch.v
                     };
                 });
             } catch (error) {
@@ -551,7 +540,7 @@
             for(let batchIdx = 0; batchIdx < recordBuffer.length && staticCount < 20; batchIdx++) {
                 const batch = recordBuffer[batchIdx];
                 for(let i = 0; i < batch.v.length && staticCount < 20; i++) {
-                    staticWeight += batch.v[i];
+                    staticWeight +=  calculateValue(batch.v[i]);
                     staticCount++;
                 }
             }
@@ -560,7 +549,7 @@
             const dt0 = 1/sampleRate;
             precBatchTime = recordBuffer[0].t / 1000000 - dt0;
             filterh.predict();
-            lastForce = filterh.update(recordBuffer[0].v[0]);
+            lastForce = filterh.update(calculateValue(recordBuffer[0].v[0]));
             batchLen = recordBuffer[0].v.length;
             // Analisi principale
             let lastDerivative = null;            
@@ -574,7 +563,7 @@
                 
                 for(let i = 0; i < batch.v.length; i++) {                   
                     filterh.predict();
-                    let force = filterh.update(batch.v[i]);
+                    let force = filterh.update(calculateValue(batch.v[i]));
                     
                     const currentTime = batchTime + (i * dt);
                     const derivative = (force - lastForce) / dt;
@@ -645,7 +634,7 @@
                 const batchTime = batch.t / 1000000;
                 
                 for(let i = 0; i < batch.v.length; i++) {
-                    let value = batch.v[i];
+                    let value = calculateValue(batch.v[i]);
                     
                     filtera.predict();
                     value = filtera.update(value);
@@ -940,11 +929,9 @@
         }
 
         function calculateValue(hexString) {
-            const byte1 = parseInt(hexString.slice(0, 2), 16);
-            const byte2 = parseInt(hexString.slice(2, 4), 16);
-            const byte3 = parseInt(hexString.slice(4, 6), 16);
-            
-            return (byte1 << 16) | (byte2 << 8) | byte3;
+            let value = parseInt(hexString, 16);
+            if (value & 0x800000) value -= 0x1000000;
+            return value;
         }
 //-------------------------------------------------------------------------------------------------------------
         function drawPlotInc() {
@@ -976,11 +963,9 @@
                 //console.log(`Batch ${index} - Time range: ${timeInRange} (${batch.t})`);
 
                 if (timeInRange) {
-                    // Decodifica valore
-                    let value = calculateValue(batch.v[0]);
-                    //let value = (bytes[0] << 16) || (bytes[1] << 8) || bytes[2];
-                    //console.log("first: "+batch.first);
-                    //if (value & 0x800000) value -= 0x1000000;
+                    let value = parseInt(batch.v[0], 16);
+                    if (value & 0x800000) value -= 0x1000000;
+                   
                     //console.log("value: "+value);
                     // Calcola coordinate
                     //const x = timeToScreen(batch.t);
@@ -1076,7 +1061,7 @@
                     for(let j=0; j < n; j++){  
                         // filtra i campioni                      
                         filterh.predict();
-                        value = filterh.update(batch.v[j]);
+                        value = filterh.update(calculateValue(batch.v[j]));
                         
                         // Calcola il timestamp preciso per questo campione nel batch
                         const sampleTime = batch.t + (j * (1000000 / SAMPLE_RATE)); // in microsecondi
@@ -1366,7 +1351,7 @@
             if (lastTestSignalUpdate && currentTime - lastTestSignalUpdate < 5) return;
             lastTestSignalUpdate = currentTime;
             */
-            const baseAmplitude = parseFloat(document.getElementById('testAmplitude').value);
+            const baseAmplitude = parseFloat(document.getElementById('testAmplitude').value)*100;
             const batchSize = Math.floor(SAMPLE_RATE / EXPECTED_BATCH_RATE);
             const samples = [];
             
@@ -1400,11 +1385,14 @@
                     testSignalTime = 0;
                     return;
                 }
-
-                const sample = new Array(3);
-                sample[0] = (value >> 16) & 0xFF;
-                sample[1] = (value >> 8) & 0xFF;
-                sample[2] = value & 0xFF;
+                
+                if(value > 8388607) value = 8388607;
+                value = value & 0xFFFFFF;  // Tronca a 24 bit
+                if (value < 0) {
+                    value += 0x1000000;
+                }               
+                let sample = value.toString(16).padStart(6, '0');  // Converti in stringa hex di 6 caratteri
+                // on batch sample queing
                 samples.push(sample);
                 
                 testSignalTime += 1 / SAMPLE_RATE;
@@ -1433,9 +1421,10 @@
             }
             lastTestSignalUpdate = currentTime;
             */
+
             const frequency = parseFloat(document.getElementById('testFrequency').value);
             const baseAmplitude = parseFloat(document.getElementById('testAmplitude').value);
-            const amFrequency = parseFloat(document.getElementById('amFrequency').value);
+            //const amFrequency = parseFloat(document.getElementById('amFrequency').value);
             
             // Generate a batch of samples
             const batchSize = Math.floor(SAMPLE_RATE / EXPECTED_BATCH_RATE);
@@ -1444,16 +1433,20 @@
             // genero tutti i campioni del batch immediatamente
             for (let i = 0; i < batchSize; i++) {
                 // Calculate amplitude modulation
-                const amplitude = baseAmplitude * (1 + Math.sin(2 * Math.PI * amFrequency * testSignalTime));
+                //const amplitude = baseAmplitude * (2 + Math.sin(2 * Math.PI * amFrequency * testSignalTime));
                 
                 // Generate sine wave sample
-                const value = Math.round(amplitude * Math.sin(2 * Math.PI * frequency * testSignalTime)+amplitude/2);
-                
-                // Convert to 24-bit format
-                const sample = new Array(3);
-                sample[0] = (value >> 16) & 0xFF;
-                sample[1] = (value >> 8) & 0xFF;
-                sample[2] = value & 0xFF;
+                let value = Math.round(baseAmplitude * Math.sin(2 * Math.PI * frequency * testSignalTime) + baseAmplitude);
+
+                if(value > 8388607) value = 8388607;
+
+                value = value & 0xFFFFFF;  // Tronca a 24 bit
+                if (value < 0) {
+                    value += 0x1000000;
+                }               
+                let sample = value.toString(16).padStart(6, '0');  // Converti in stringa hex di 6 caratteri
+               
+                // on batch sample queing
                 samples.push(sample);
                 
                 testSignalTime += 1 / SAMPLE_RATE;
@@ -1475,6 +1468,7 @@
                 clearTimeout(timers[0]); 
             }
         }
+
     
         /*-------------------------------------------------------------------------
             WEBSOCKET CONTROL SECTION
@@ -1484,8 +1478,9 @@
             if(!(adcSignalEnabled || remoteTestEnabled)) return;
             //console.log(`event.data: ${event.data}`);
             // All'arrivo di un batch
-            const batch = JSON.parse(event.data);
+            let batch = JSON.parse(event.data);
             //console.log("first: "+batch.first);
+
             processBatch(batch);
         }
 
