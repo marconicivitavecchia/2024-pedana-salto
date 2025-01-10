@@ -128,7 +128,6 @@
                 <option value="0.5">0.50</option>
             </select>
         </div>
-
         <div class="buffer-controls">
             <label>Buffer Duration (s):
                 <input type="number" id="bufferDuration" value="10" min="1" max="3600" 
@@ -168,10 +167,14 @@
                 <input type="radio" id="remoteTest" name="testSignal">
                 Remote sine wave
             </label>
+            <label>
+                <input type="radio" id="enableADCTone" name="testSignal">
+                ADC tone
+            </label>
             <label>Sine wave params:</label>
             <label>Frequency (Hz):
                 <input type="number" id="testFrequency" value="1" min="0.1" max="100" step="0.1" 
-                       onchange="updateTestSignal()">
+                       onchange="updateConfig('freq', this.value)">
             </label>
             <label>Base Amplitude:
                 <input type="number" id="testAmplitude" value="4194304" min="1000" max="8388608" 
@@ -257,6 +260,7 @@
         let testSignalEnabled1 = false;
         let remoteTestEnabled = false;
         let adcSignalEnabled = false;
+        let remoteTestTone = false;
         let inputMode = true;
         
         const MAX_INTERVALS = 200;
@@ -382,6 +386,7 @@
             const radio2 = document.getElementById('enableTestSignal0');
             const radio3 = document.getElementById('enableTestSignal1');
             const radio4 = document.getElementById('remoteTest');
+            const radio5 = document.getElementById('enableADCTone');
 
             if (radio1.checked) {
                 console.log('Opzione adc input selezionata');
@@ -431,19 +436,21 @@
                 remoteTestEnabled = true;
                 inputMode = true;
                 resetView();
-                if(wsControl && wsControl.readyState === WebSocket.OPEN) {
-                    wsControl.send(JSON.stringify({
-                        test: true
-                    }));
-                }
+                updateConfig("test", true);
             } else {
                 remoteTestEnabled = false;
                 console.log('Opzione remote sine wave deselezionata');
-                if(wsControl && wsControl.readyState === WebSocket.OPEN) {
-                    wsControl.send(JSON.stringify({
-                        test: false
-                    }));
-                }
+                updateConfig("test", false);
+            }
+
+            if (radio5.checked) {
+                console.log('Opzione tono adc selezionata');
+                remoteTestTone = true;
+                inputMode = true;
+                resetView();
+                updateConfig("tone", true);
+            } else {
+                updateConfig("tone", false);
             }
         }
         // Aggiungi il gestore dell'evento "change" a ogni radio button
@@ -1346,72 +1353,69 @@
         }*/        
         
         function generateTestSignal1() {
-            /*
-            const currentTime = Date.now();
-            if (lastTestSignalUpdate && currentTime - lastTestSignalUpdate < 5) return;
-            lastTestSignalUpdate = currentTime;
-            */
-            const baseAmplitude = parseFloat(document.getElementById('testAmplitude').value);
-            const batchSize = Math.floor(SAMPLE_RATE / EXPECTED_BATCH_RATE);
-            const samples = [];
-            
-            const offset = 8; // 40ms = 8 batch da 5ms
+        const baseAmplitude = parseFloat(document.getElementById('testAmplitude').value);
+        const batchSize = Math.floor(SAMPLE_RATE / EXPECTED_BATCH_RATE);
+        const samples = [];
+        
+        const offset = 8; // 40ms = 8 batch da 5ms
+
+        // genero tutti i campioni del batch immediatamente
+        for (let i = 0; i < batchSize; i++) {
+            // Ricalcola batchProgress e batchPhase per ogni campione
             const batchProgress = Math.floor(testSignalTime / 0.005);
             const batchPhase = (testSignalTime % 0.005) / 0.005;
             
-            // genero tutti i campioni del batch immediatamente
-            for (let i = 0; i < batchSize; i++) {
-                let value;
-                
-                if (batchProgress < offset) {
-                    value = baseAmplitude;
-                } else if (batchProgress < 6 + offset) { 
-                    value = baseAmplitude;
-                } else if (batchProgress < 12 + offset) {
-                    const t = (batchProgress - (6 + offset) + batchPhase) / 6;
-                    value = baseAmplitude * (1 - 0.3 * Math.sin(Math.PI * t));
-                } else if (batchProgress < 16 + offset) {
-                    const t = (batchProgress - (12 + offset) + batchPhase) / 4;
-                    value = baseAmplitude * (1 + Math.sin(Math.PI * t));
-                } else if (batchProgress < 24 + offset) {
-                    value = 0;
-                } else if (batchProgress < 28 + offset) {
-                    const t = (batchProgress - (24 + offset) + batchPhase) / 4;
-                    value = baseAmplitude * 2.5 * Math.exp(-t * 2);
-                } else if (batchProgress < 36 + offset) {
-                    const t = (batchProgress - (28 + offset) + batchPhase) / 8;
-                    value = baseAmplitude * (1 + 0.4 * Math.exp(-t * 3) * Math.cos(2 * Math.PI * t));
-                } else {
-                    testSignalTime = 0;
-                    return;
-                }
-                
-                if(value > 8388607) value = 8388607;
-                value = value & 0xFFFFFF;  // Tronca a 24 bit
-                if (value < 0) {
-                    value += 0x1000000;
-                }               
-                let sample = value.toString(16).padStart(6, '0');  // Converti in stringa hex di 6 caratteri
-                // on batch sample queing
-                samples.push(sample);
-                
-                testSignalTime += 1 / SAMPLE_RATE;
-            }
-
-            const batch = {
-                t: Date.now() * 1000,
-                v: samples
-            };
-
-            processBatch(batch);
+            let value;
             
-            if (testSignalEnabled1) {
-                timers[1] = setTimeout(generateTestSignal1, 1000 / EXPECTED_BATCH_RATE);
-            }else{
-                clearTimeout(timers[1]);
+            if (batchProgress < offset) {
+                value = baseAmplitude;
+            } else if (batchProgress < 6 + offset) {
+                value = baseAmplitude;
+            } else if (batchProgress < 12 + offset) {
+                const t = (batchProgress - (6 + offset) + batchPhase) / 6;
+                value = baseAmplitude * (1 - 0.3 * Math.sin(Math.PI * t));
+            } else if (batchProgress < 16 + offset) {
+                const t = (batchProgress - (12 + offset) + batchPhase) / 4;
+                value = baseAmplitude * (1 + Math.sin(Math.PI * t));
+            } else if (batchProgress < 24 + offset) {
+                value = 0;
+            } else if (batchProgress < 28 + offset) {
+                const t = (batchProgress - (24 + offset) + batchPhase) / 4;
+                value = baseAmplitude * 2.5 * Math.exp(-t * 2);
+            } else if (batchProgress < 36 + offset) {
+                const t = (batchProgress - (28 + offset) + batchPhase) / 8;
+                value = baseAmplitude * (1 + 0.4 * Math.exp(-t * 3) * Math.cos(2 * Math.PI * t));
+            } else {
+                testSignalTime = 0;
+                return;
             }
+            
+            if(value > 8388607) value = 8388607;
+            value = Math.round(value); // Arrotonda il valore
+            value = value & 0xFFFFFF;  // Tronca a 24 bit
+            if (value < 0) {
+                value += 0x1000000;
+            }
+            
+            let sample = value.toString(16).padStart(6, '0');
+            samples.push(sample);
+            
+            testSignalTime += 1 / SAMPLE_RATE;
         }
-
+        
+        const batch = {
+            t: Date.now() * 1000,
+            v: samples
+        };
+        
+        processBatch(batch);
+        
+        if (testSignalEnabled1) {
+            timers[1] = setTimeout(generateTestSignal1, 1000 / EXPECTED_BATCH_RATE);
+        } else {
+            clearTimeout(timers[1]);
+        }
+    }
 
         function generateTestSignal0() {
             /*
@@ -1489,7 +1493,7 @@
             const timestamp = batch.t;
             // Aggiungilo al buffer
             batchBuffer.push(batch);
-
+            //console.log("v: "+batch.v);
             // Buffer circolare per registrazione
             if (isRecording) {
                 recordBuffer.push(batch);
@@ -1498,7 +1502,7 @@
                     console.log("Record buffer full, dropping oldest samples");
                 }
             }
-
+    
             // Aggiorna statistiche
             if(lastBatchTime !== null) {
                 const interval = (timestamp - lastBatchTime) / 1000;
