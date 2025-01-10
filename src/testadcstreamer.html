@@ -1351,7 +1351,7 @@
             if (lastTestSignalUpdate && currentTime - lastTestSignalUpdate < 5) return;
             lastTestSignalUpdate = currentTime;
             */
-            const baseAmplitude = parseFloat(document.getElementById('testAmplitude').value)*100;
+            const baseAmplitude = parseFloat(document.getElementById('testAmplitude').value);
             const batchSize = Math.floor(SAMPLE_RATE / EXPECTED_BATCH_RATE);
             const samples = [];
             
