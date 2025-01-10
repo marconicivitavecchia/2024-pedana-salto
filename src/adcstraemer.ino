@@ -9,6 +9,7 @@
 // Configurazione hardware
 #define CS_PIN 5
 #define DRDY_PIN 4
+#define TONE_PIN 5
 
 // Configurazione acquisizione
 #define DEFAULT_SAMPLE_RATE 30000  // Hz
@@ -32,12 +33,15 @@ const char* WIFI_PASSWORD = "pippo2503";
 // Struttura configurazione
 struct Config {
     uint32_t sampleRate;
-    uint8_t gain;
+    ads1256_gain_t gain;
     bool filterEnabled;
     float threshold;
     bool streaming;
     bool last;
     bool testSignal;
+    bool tone;
+    bool toneFreq;
+    ads1256_channels_t adcPort;
 };
 /*
 BatchData {
@@ -188,7 +192,47 @@ void onControlEvent(WSEventType type, WebSocketServer::WSClient* client, uint8_t
             Serial.printf("Modo test: %s\n", globalConfig.testSignal ? "attivato" : "disattivato");
             configChanged = true;
         }
-        
+
+        if(doc.containsKey("freq")) {
+            uint16_t newFreq = doc["freq"].as<uint16_t>();
+            Serial.printf("Found freq: %d\n", newFreq);
+            globalConfig.toneFreq = newFreq;
+            Serial.printf("Freq: %s\n", globalConfig.toneFreq);
+            configChanged = true;
+        }
+
+        if(doc.containsKey("tone")) {
+            bool newTone = doc["tone"].as<bool>();
+            Serial.printf("Found tone: %d\n", newTone);
+            globalConfig.tone = newTone;
+            if(globalConfig.tone){
+                globalConfig.gain = 1;
+                globalConfig.adcPort = 4;
+            }else{
+                globalConfig.gain = 6;
+                globalConfig.adcPort = 1;
+            }
+            Serial.printf("Modo tone: %s\n", globalConfig.tone ? "attivato" : "disattivato");
+            configChanged = true;
+        }
+
+        /*
+        if(doc.containsKey("port")) {
+            uint8_t newPort = doc["port"].as<uint8_t>();
+            Serial.printf("Found freq: %d\n", newPort);
+            globalConfig.adcPort = newPort;
+            Serial.printf("Adc port: %s\n", globalConfig.adcPort);
+            configChanged = true;
+        }
+
+        if(doc.containsKey("gain")) {
+            uint8_t newGain = doc["gain"].as<uint8_t>();
+            Serial.printf("Found gain: %d\n", newGain);
+            globalConfig.gain = newGain;
+            Serial.printf("Adc gain: %s\n", globalConfig.gain);
+            configChanged = true;
+        }
+        */
         if(configChanged) {
             Serial.println("Config changed, sending status");
             sendSystemStatus();
@@ -338,7 +382,14 @@ void adcTask(void* pvParameters) {
                 // All'inizio dello streaming
                 adc.startStreaming();
                 Serial.println("startStreaming");
+                adc.set_gain(globalConfig.gain);
+                adc.set_channel(globalConfig.adcPort, (ads1256_channels_t) (globalConfig.adcPort + 1));
                 globalConfig.last = globalConfig.streaming;
+            }
+            if(globalConfig.tone){
+                tone(TONE_PIN, globalConfig.toneFreq);
+            }else{
+                noTone(TONE_PIN);
             }
             Serial.println(globalConfig.streaming);
         }
