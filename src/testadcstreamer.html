@@ -153,19 +153,19 @@
         <div class="test-signal-controls">
             <label>Input selection:</label>
             <label>
-                <input type="radio" id="enableADCSignal" name="testSignal" onchange="toggleTestSignal()">
+                <input type="radio" id="enableADCSignal" name="testSignal">
                 ADC real
             </label>
             <label>
-                <input type="radio" id="enableTestSignal0" name="testSignal" onchange="toggleTestSignal0()">
+                <input type="radio" id="enableTestSignal0" name="testSignal">
                 Local sine wave
             </label>
             <label>
-                <input type="radio" id="enableTestSignal1" name="testSignal" onchange="toggleTestSignal1()">
+                <input type="radio" id="enableTestSignal1" name="testSignal">
                 Local emulated jump
             </label>
             <label>
-                <input type="radio" id="remoteTest" name="testSignal" onchange="toggleRemoteTestSignal()">
+                <input type="radio" id="remoteTest" name="testSignal">
                 Remote sine wave
             </label>
             <label>Sine wave params:</label>
@@ -257,6 +257,11 @@
         let testSignalTime = 0;
         let lastTestSignalUpdate = 0;
         let thresholds = null;
+        let testSignalEnabled0 = false;
+        let testSignalEnabled1 = false;
+        let remoteTestEnabled = false;
+        let adcSignalEnabled = false;
+        let inputMode = true;
         
         const MAX_INTERVALS = 200;
         let batchBuffer = [];
@@ -283,14 +288,13 @@
         // Oscilloscope specific variables
         // Variabili di stato per la vista
         let xScale = { min: 0, max: 100 };
-        let yScale = { min: 0, max: 1000000 };
+        let yScale = { min: 0, max: 8388608 };
         let timebaseDiv = 5;      // ms per divisione
         const DIVISIONS_X = 10;   // divisioni orizzontali
         let viewOffset = 0;       // offset temporale per lo scroll
         let pausedAt = null;      // timestamp quando messo in pausa
         let animationFrameId = null;  // ID per cancelAnimationFrame
         let isAtLeftLimit = false;  // flag per limite sinistro
-        let inputMode = true;
 
         // Variabili di stato per zoom e pan
         //let isMouseDown = false;
@@ -372,6 +376,83 @@
                     }
                 }
             });
+        });
+
+        // Seleziona tutti i radio button con lo stesso nome
+        const radioButtons2 = document.querySelectorAll('input[name="testSignal"]');
+        // Funzione per gestire checked/unchecked
+        function handleRadioChange() {
+            const radio1 = document.getElementById('enableADCSignal');
+            const radio2 = document.getElementById('enableTestSignal0');
+            const radio3 = document.getElementById('enableTestSignal1');
+            const radio4 = document.getElementById('remoteTest');
+
+            if (radio1.checked) {
+                console.log('Opzione adc input selezionata');
+                inputMode = true;
+                adcSignalEnabled = true;
+                testSignalTime = 0;
+                resetView();
+                updateSamplesPerBatch();
+                const batch = {
+                    t: 0,
+                    v: [0]
+                };
+                onmessageEvent({ data: JSON.stringify(batch) });
+            } else {
+                adcSignalEnabled = false;
+                console.log('Opzione adc input deselezionata');
+            }
+
+            if (radio2.checked) {
+                console.log('Opzione sine input selezionata');
+                inputMode = true;
+                testSignalEnabled0 = true;
+                testSignalTime = 0;
+                resetView();
+                updateSamplesPerBatch();
+                generateTestSignal0();
+            } else {
+                testSignalEnabled0 = false;
+                console.log('Opzione sine input deselezionata');
+            }
+
+            if (radio3.checked) {
+                console.log('Opzione simulated jump selezionata');                   
+                inputMode = true;
+                testSignalEnabled1 = true;
+                testSignalTime = 0;
+                resetView();
+                updateSamplesPerBatch();
+                generateTestSignal1();   
+            } else {
+                testSignalEnabled1 = false;
+                console.log('Opzione simulated jump deselezionata');
+            }
+
+            if (radio4.checked) {
+                console.log('Opzione remote sine wave selezionata');
+                remoteTestEnabled = true;
+                inputMode = true;
+                resetView();
+                if(wsControl && wsControl.readyState === WebSocket.OPEN) {
+                    wsControl.send(JSON.stringify({
+                        test: true
+                    }));
+                }
+            } else {
+                remoteTestEnabled = false;
+                console.log('Opzione remote sine wave deselezionata');
+                if(wsControl && wsControl.readyState === WebSocket.OPEN) {
+                    wsControl.send(JSON.stringify({
+                        test: false
+                    }));
+                }
+            }
+        }
+        // Aggiungi il gestore dell'evento "change" a ogni radio button
+        radioButtons2.forEach(radio => {
+            radio.addEventListener('change', handleRadioChange);
         });
 
         /*
@@ -857,6 +938,14 @@
                 ctx.restore();
             }
         }
+
+        function calculateValue(hexString) {
+            const byte1 = parseInt(hexString.slice(0, 2), 16);
+            const byte2 = parseInt(hexString.slice(2, 4), 16);
+            const byte3 = parseInt(hexString.slice(4, 6), 16);
+            
+            return (byte1 << 16) | (byte2 << 8) | byte3;
+        }
 //-------------------------------------------------------------------------------------------------------------
         function drawPlotInc() {
             // Cancella l'animazione precedente se esiste
@@ -888,10 +977,11 @@
 
                 if (timeInRange) {
                     // Decodifica valore
-                    const bytes = batch.v[0];
-                    let value = (bytes[0] << 16) | (bytes[1] << 8) | bytes[2];
-                    if (value & 0x800000) value -= 0x1000000;
-
+                    let value = calculateValue(batch.v[0]);
+                    //let value = (bytes[0] << 16) || (bytes[1] << 8) || bytes[2];
+                    //console.log("first: "+batch.first);
+                    //if (value & 0x800000) value -= 0x1000000;
+                    //console.log("value: "+value);
                     // Calcola coordinate
                     //const x = timeToScreen(batch.t);
 
@@ -901,7 +991,7 @@
                     //const x = timeToScreen(xScale.min + index*5000);
                     const y = valueToScreen(value);
                     //console.log(`Coordinate: x=${x}, y=${y}, minx=${xScale.min}, maxx==${xScale.max}`);
-
+                    //console.log(`Coordinate: x=${x}, y=${batch.first}`);
                     // Test coordinate nel plot
                     const inPlotArea = x >= padding && x <= canvas.width - padding &&
                                     y >= padding && y <= canvas.height - padding;
@@ -1075,7 +1165,9 @@
             
             // Ridisegna con la nuova scala temporale
             //drawPlot();
-            playRecord();
+            if (!inputMode){
+                playRecord();
+            }
         }
         
         function updateSamplesPerBatch() {
@@ -1201,78 +1293,7 @@
             TEST SIGNAL GENERATION SECTION
           -------------------------------------------------------------------------
         */
-        function toggleTestSignal() {
-            adcSignalEnabled = document.getElementById('enableADCSignal').checked;
-            if(adcSignalEnabled){
-                inputMode = true;
-                testSignalEnabled0 = false;
-                testSignalEnabled1 = false;
-                remoteTestEnabled = false;
-                testSignalTime = 0;
-                resetView();
-                updateSamplesPerBatch();
-                const batch = {
-                    t: 0,
-                    v: [0]
-                };
-
-                onmessageEvent({ data: JSON.stringify(batch) });
-            }            
-            console.log("adcSignalEnabled: "+adcSignalEnabled);
-        }
-
-        function toggleTestSignal0() {
-            testSignalEnabled0 = document.getElementById('enableTestSignal0').checked;
-            if(testSignalEnabled0){
-                inputMode = true;
-                adcSignalEnabled = false;
-                testSignalEnabled1 = false;
-                remoteTestEnabled = false;
-                testSignalTime = 0;
-                resetView();
-                updateSamplesPerBatch();
-                generateTestSignal0();
-            }         
-            
-            console.log("testSignalEnabled0: "+testSignalEnabled0);
-        }
-
-        function toggleTestSignal1() {
-            testSignalEnabled1 = document.getElementById('enableTestSignal1').checked;
-            if(testSignalEnabled1){
-                inputMode = true;
-                adcSignalEnabled = false;
-                testSignalEnabled0 = false;
-                remoteTestEnabled = false;
-                testSignalTime = 0;
-                resetView();
-                updateSamplesPerBatch();
-                generateTestSignal1();
-            }         
-            console.log("testSignalEnabled1: "+testSignalEnabled1);
-        }
-
-        function toggleRemoteTestSignal() {
-            remoteTestEnabled = document.getElementById('remoteTest').checked;
-            isTest = false;
-            if(remoteTestEnabled){
-                adcSignalEnabled = false;
-                testSignalEnabled0 = false;
-                testSignalEnabled1 = false;
-                resetView();
-                isTest = true;
-            }        
-            
-            if(wsControl && wsControl.readyState === WebSocket.OPEN) {
-                wsControl.send(JSON.stringify({
-                    test: isTest
-                }));
-            }
-            console.log("Remote test: "+isTest);
-            document.getElementById('remoteTest').innerHTML = 
-                isTest ? 'Stop remote test' : 'Start remote test';
-        }
-
+        
         /*
         //const initialTime = 1655484153000000; // Timestamp base
         const initialTime = Date.now();
@@ -1333,7 +1354,7 @@
             //console.log(JSON.stringify(batches));
 
             for (batch of batches) {
-                onmessageEvent({ data: JSON.stringify(batch) });
+                processBatch(batch);
                 //console.log(JSON.stringify(batch));
                 await delay(5);
             }
@@ -1394,7 +1415,7 @@
                 v: samples
             };
 
-            onmessageEvent({ data: JSON.stringify(batch) });
+            processBatch(batch);
             
             if (testSignalEnabled1) {
                 timers[1] = setTimeout(generateTestSignal1, 1000 / EXPECTED_BATCH_RATE);
@@ -1445,7 +1466,7 @@
             };
             
             // Process batch as if received from WebSocket
-            onmessageEvent({ data: JSON.stringify(batch) });
+            processBatch(batch);
             
             // Schedule next batch if still enabled
             if (testSignalEnabled0) {
@@ -1460,12 +1481,17 @@
           -------------------------------------------------------------------------
         */
         function onmessageEvent(event) {
-            if(!inputMode) return;
+            if(!(adcSignalEnabled || remoteTestEnabled)) return;
             //console.log(`event.data: ${event.data}`);
             // All'arrivo di un batch
             const batch = JSON.parse(event.data);
-            const timestamp = batch.t;
+            //console.log("first: "+batch.first);
+            processBatch(batch);
+        }
 
+        function processBatch(batch) {   
+            if(!inputMode) return; 
+            const timestamp = batch.t;
             // Aggiungilo al buffer
             batchBuffer.push(batch);
 
@@ -1602,8 +1628,11 @@
             }
         }
 
-        wsData = connectWebSocket("192.168.1.167", "81", "ws", "", onmessageEvent);
-        wsControl = connectWebSocket("192.168.1.167", "82", "ws", "", onControlEvent);
+        //wsData = connectWebSocket("192.168.1.167", "81", "ws", "", onmessageEvent);
+        //wsControl = connectWebSocket("192.168.1.167", "82", "ws", "", onControlEvent);
+
+        wsData = connectWebSocket("192.168.208.7", "81", "ws", "", onmessageEvent);
+        wsControl = connectWebSocket("192.168.208.7", "82", "ws", "", onControlEvent);
 
         const log = document.getElementById('log');
         const originalConsoleLog = console.log;

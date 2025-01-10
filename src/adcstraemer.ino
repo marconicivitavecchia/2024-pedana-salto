@@ -1,3 +1,4 @@
+
 #include <Arduino.h>
 #include <WiFi.h>
 #include <SPI.h>
@@ -15,8 +16,18 @@
 #define QUEUE_SIZE 25              // Dimensione coda batch
 #define MAX_SAMPLES_PER_BATCH 310u  // Aggiunto 'u' per unsigned
 
-const char* WIFI_SSID = "xxxx";
-const char* WIFI_PASSWORD = "yyyy";
+//const char* WIFI_SSID = "D-Link-6A30CC";
+//const char* WIFI_PASSWORD = "FabSeb050770250368120110";
+
+const char* WIFI_SSID = "RedmiSeb";
+const char* WIFI_PASSWORD = "pippo2503";
+
+// Configurazione Wi-Fi
+//const char* WIFI_SSID = "WebPocket-E280";
+//const char* WIFI_PASSWORD = "dorabino.7468!";
+
+//const char* WIFI_SSID = "sensori";
+//const char* WIFI_PASSWORD = "sensori2019";
 
 // Struttura configurazione
 struct Config {
@@ -32,7 +43,7 @@ struct Config {
 BatchData {
     uint32_t timestamp;
     uint16_t count;
-    uint8_t values[MAX_SAMPLES_PER_BATCH][3];  // 3 bytes per valore
+    uint32_t values[MAX_SAMPLES_PER_BATCH][3];  // 3 bytes per valore
 };
 */
 // Variabili globali
@@ -174,7 +185,7 @@ void onControlEvent(WSEventType type, WebSocketServer::WSClient* client, uint8_t
             bool newTest = doc["test"].as<bool>();
             Serial.printf("Found test: %d\n", newTest);
             globalConfig.testSignal = newTest;
-            Serial.printf("Modo: %s\n", globalConfig.testSignal ? "attivato" : "disattivato");
+            Serial.printf("Modo test: %s\n", globalConfig.testSignal ? "attivato" : "disattivato");
             configChanged = true;
         }
         
@@ -303,9 +314,11 @@ void adcTask(void* pvParameters) {
             if(globalConfig.testSignal){
                 // Abilita il segnale di test
                 adc.enableTestSignal(true);
+                Serial.println("Segnale di test abilitato");
             }else{
                 // Disabilita il segnale di test
                 adc.enableTestSignal(false);
+                Serial.println("Segnale di test disabilitato");
             }            
             Serial.printf("Blocco task: %d Hz\n", globalConfig.sampleRate);
             Serial.printf("targetInterval: %d\n", targetInterval);
@@ -367,6 +380,9 @@ void wsTask(void* pvParameters) {
             // Inizia JSON
             int len = snprintf(buffer, MAX_LEN, 
                 "{\"t\":%u,\"v\":[", batch.timestamp);
+
+            //int len = snprintf(buffer, MAX_LEN, 
+            //    "{\"t\":%u,\"first\":%u,\"v\":[", batch.timestamp, batch.first);
             
             // Controlla overflow
             if (len < 0 || len >= MAX_LEN) {
@@ -427,6 +443,7 @@ void setup() {
         delay(500);
         Serial.print(".");
     }
+    delay(1000);
     Serial.println("\nConnesso al WiFi");
     Serial.print("IP: ");
     Serial.println(WiFi.localIP());
@@ -463,7 +480,7 @@ void setup() {
     xTaskCreatePinnedToCore(
         adcTask, 
         "ADC Task", 
-        4096,  // Stack aumentato
+        4196,  // Stack aumentato
         NULL, 
         configMAX_PRIORITIES - 1,
         NULL, 

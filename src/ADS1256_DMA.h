@@ -69,7 +69,8 @@ enum ads1256_gain_t {
 // Struttura per il batch di campioni
 struct BatchData {
     uint32_t timestamp;
-    uint16_t count;
+    //int32_t first;
+    uint8_t count;
     uint8_t values[MAX_SAMPLES_PER_BATCH][3];  // 3 bytes per valore
 };
 
@@ -120,7 +121,7 @@ public:
             spi_bus_free(HSPI_HOST);
         }
     }
-    /* 
+    /* read_data_batch
     ---------------------------------------
         TEST SIGNAL GNERATION SECTION
     ---------------------------------------
@@ -145,33 +146,38 @@ public:
         batch.count = 0;
         batch.timestamp = esp_timer_get_time();
 
-        // Costante di conversione da volt a conteggi ADC (24 bit signed)
         const float voltsToAdc = 8388608.0f / vRef;  // 2^23 / vRef
+        
+        // Incremento per ogni nuovo batch (esempio: incremento del 10% del range)
+        rampValue += 0.01f;
+        // Usiamo rampValue invece della sinusoide
+        float volts = rampValue * vRef;
 
-        // Genera i campioni
+        // Limitazione tensione
+        if (volts < 0.0f) volts = 0.0f;
+        //if (volts > vRef) rampValue = 0.0f;
+        if (rampValue > 1.0f) rampValue = 0.0f;  // Reset quando raggiunge il massimo
+        //batch.first =  (int32_t) (rampValue * 8388608.0f);
+        //Serial.println(batch.first);
+        //if (rampValue > 1.0f) rampValue = 0.0f;  // Reset quando raggiunge il massimo
+
         for (uint16_t i = 0; i < samplesPerBatch; i++) {
-            // Calcola modulazione d'ampiezza
-            float amplitude = baseAmplitude * (1.0f + sinf(2.0f * PI * amFrequency * testSignalTime));
             
-            // Genera il campione della sinusoide
-            float volts = amplitude * (1.0f + sinf(2.0f * PI * testFrequency * testSignalTime)) / 2.0f;
+            int32_t value = (int32_t)(rampValue * 8388608.0f);
+
+            if (value < 0) {
+                value += 0x1000000;
+            }
             
-            // Limita tra 0V e 2.5V
-            if (volts < 0.0f) volts = 0.0f;
-            if (volts > vRef) volts = vRef;
-            
-            // Converti in conteggi ADC
-            int32_t value = (int32_t)(volts * voltsToAdc);
-            
-            // Converti in formato 24-bit
-            batch.values[i][0] = (value >> 16) & 0xFF;
-            batch.values[i][1] = (value >> 8) & 0xFF;
-            batch.values[i][2] = value & 0xFF;
-            
+            batch.values[i][0] = ((int32_t) value >> 16) & 0xFF;
+            batch.values[i][1] = ((int32_t) value >> 8) & 0xFF;
+            batch.values[i][2] = (int32_t) value & 0xFF;
+
             testSignalTime += signalPeriod;
             batch.count++;
         }
     }
+
     /* 
     ---------------------------------------
         REAL SIGNAL SAMPLING SECTION
@@ -349,6 +355,7 @@ private:
     float baseAmplitude = 1.25f;    // V (metà di 2.5V)
     float amFrequency = 0.1f;       // Hz
     const float vRef = 2.5f;        // Tensione di riferimento ADS1256
+    float rampValue = 0.0f;  // Valore della rampa mantenuto tra i batch
 
     void init_ads1256() {
         gpio_set_level((gpio_num_t)ADS1256_PIN_CS, 0);
