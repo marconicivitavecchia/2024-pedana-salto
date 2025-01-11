@@ -33,15 +33,14 @@ const char* WIFI_PASSWORD = "pippo2503";
 // Struttura configurazione
 struct Config {
     uint32_t sampleRate;
-    ads1256_gain_t gain;
+    uint8_t gain;
     bool filterEnabled;
     float threshold;
     bool streaming;
-    bool last;
     bool testSignal;
     bool tone;
-    bool toneFreq;
-    ads1256_channels_t adcPort;
+    uint16_t toneFreq;
+    uint8_t adcPort;
 };
 /*
 BatchData {
@@ -52,25 +51,27 @@ BatchData {
 */
 // Variabili globali
 DualWebSocket ws;
-Config globalConfig = {DEFAULT_SAMPLE_RATE, 1, false, 1000000, true, false};
+Config globalConfig = {DEFAULT_SAMPLE_RATE, 1, false, 1000000, false, false, false, 10, 1};
+volatile bool last;
+volatile bool curr;
 float emaAlpha = 0.1;
 QueueHandle_t batchQueue;
+SemaphoreHandle_t configMutex;
 
 // Funzione per creare e inviare lo stato del sistema
-void sendSystemStatus(WebSocketServer::WSClient* client = nullptr) {
-    char statusBuffer[128];
+void sendSystemStatus(Config gc, WebSocketServer::WSClient* client = nullptr) {
+    Serial.print("sendSystemStatus");
+    char statusBuffer[140];
     snprintf(statusBuffer, sizeof(statusBuffer), 
-        "{\"type\":\"status\",\"samplerate\":%u,\"alfaema\":%.3f,\"streaming\":%s}", 
-        globalConfig.sampleRate,
-        emaAlpha,
-        globalConfig.streaming ? "true" : "false"
-    );
+        "{\"type\":\"status\",\"samplerate\":%u,\"alfaema\":%.3f,\"streaming\":\"%s\",\"test\":\"%s\",\"tone\":\"%s\",\"freq\":\"%u\"}", 
+        gc.sampleRate, emaAlpha, gc.streaming ? "true" : "false", gc.testSignal ? "true" : "false",
+        gc.tone ? "true" : "false", gc.toneFreq);
     
     if(client) {
         // Rispondi solo al client che ha inviato i dati
-        ws.sendDataToClient(client->id, statusBuffer, strlen(statusBuffer));
+        ws.sendControlToClient(client->id, statusBuffer, strlen(statusBuffer));
     } else {
-        ws.sendDataSync(statusBuffer, strlen(statusBuffer));
+        ws.sendControlSync(statusBuffer, strlen(statusBuffer));
     }
 }
 
@@ -92,6 +93,11 @@ void onDataEvent(WSEventType type, WebSocketServer::WSClient* client,
 
 // Handler eventi per il canale di controllo
 void onControlEvent(WSEventType type, WebSocketServer::WSClient* client, uint8_t* data, size_t len, void* arg) {
+    Config gc1;
+    if (xSemaphoreTake(configMutex, portMAX_DELAY) == pdTRUE) {
+        gc1 = globalConfig;
+        xSemaphoreGive(configMutex);
+    }  
     Serial.printf("\nControl Event Type: ");
     switch(type) {
         case WS_EVT_CONNECT:
@@ -128,7 +134,7 @@ void onControlEvent(WSEventType type, WebSocketServer::WSClient* client, uint8_t
     if(type == WS_EVT_CONNECT) {
         Serial.printf("Control client #%d connected from %s\n", 
             client->id, client->remoteIP);
-        sendSystemStatus(client);
+        sendSystemStatus(gc1, client);
     }
     else if(type == WS_EVT_DISCONNECT) {
         Serial.printf("Control client #%u disconnected\n", client->id);
@@ -157,14 +163,14 @@ void onControlEvent(WSEventType type, WebSocketServer::WSClient* client, uint8_t
             uint32_t newRate = doc["samplerate"].as<int>();
             Serial.printf("Found samplerate: %d\n", newRate);
             if(newRate > 0) {
-                globalConfig.sampleRate = newRate;
+                gc1.sampleRate = newRate;
                 Serial.printf("Sample rate impostato a: %d\n", newRate);
-                lastStreaming = globalConfig.streaming;
-                globalConfig.streaming = false;
+                lastStreaming = gc1.streaming;
+                gc1.streaming = false;
                 xQueueReset(batchQueue);
                 Serial.println("Queue reset");
                 delay(10);
-                globalConfig.streaming = lastStreaming;
+                gc1.streaming = lastStreaming;
                 configChanged = true;
             }
         }
@@ -177,42 +183,42 @@ void onControlEvent(WSEventType type, WebSocketServer::WSClient* client, uint8_t
             configChanged = true;
         }
 
-        if(doc.containsKey("streaming")) {
-            bool newStreaming = doc["streaming"].as<bool>();
-            Serial.printf("Found streaming: %d\n", newStreaming);
-            globalConfig.streaming = newStreaming;
-            Serial.printf("Streaming: %s\n", globalConfig.streaming ? "avviato" : "fermato");
-            configChanged = true;
-        }
-
         if(doc.containsKey("test")) {
             bool newTest = doc["test"].as<bool>();
             Serial.printf("Found test: %d\n", newTest);
-            globalConfig.testSignal = newTest;
-            Serial.printf("Modo test: %s\n", globalConfig.testSignal ? "attivato" : "disattivato");
+            gc1.testSignal = newTest;
+            Serial.printf("Modo test: %s\n", gc1.testSignal ? "attivato" : "disattivato");
             configChanged = true;
         }
 
         if(doc.containsKey("freq")) {
             uint16_t newFreq = doc["freq"].as<uint16_t>();
             Serial.printf("Found freq: %d\n", newFreq);
-            globalConfig.toneFreq = newFreq;
-            Serial.printf("Freq: %s\n", globalConfig.toneFreq);
+            gc1.toneFreq = newFreq;
+            Serial.printf("Freq: %d\n", gc1.toneFreq);
             configChanged = true;
         }
 
         if(doc.containsKey("tone")) {
             bool newTone = doc["tone"].as<bool>();
             Serial.printf("Found tone: %d\n", newTone);
-            globalConfig.tone = newTone;
-            if(globalConfig.tone){
-                globalConfig.gain = 1;
-                globalConfig.adcPort = 4;
+            gc1.tone = newTone;
+            if(gc1.tone){
+                gc1.gain = 1;
+                gc1.adcPort = 5;
             }else{
-                globalConfig.gain = 6;
-                globalConfig.adcPort = 1;
+                gc1.gain = 6;
+                gc1.adcPort = 1;
             }
-            Serial.printf("Modo tone: %s\n", globalConfig.tone ? "attivato" : "disattivato");
+            Serial.printf("Modo tone: %s\n", gc1.tone ? "attivato" : "disattivato");
+            configChanged = true;
+        }
+
+        if(doc.containsKey("streaming")) {
+            bool newStreaming = doc["streaming"].as<bool>();
+            Serial.printf("Found streaming: %d\n", newStreaming);
+            gc1.streaming = newStreaming;
+            Serial.printf("Streaming: %s\n", gc1.streaming ? "avviato" : "fermato");
             configChanged = true;
         }
 
@@ -220,22 +226,27 @@ void onControlEvent(WSEventType type, WebSocketServer::WSClient* client, uint8_t
         if(doc.containsKey("port")) {
             uint8_t newPort = doc["port"].as<uint8_t>();
             Serial.printf("Found freq: %d\n", newPort);
-            globalConfig.adcPort = newPort;
-            Serial.printf("Adc port: %s\n", globalConfig.adcPort);
+            gc1.adcPort = newPort;
+            Serial.printf("Adc port: %s\n", gc1.adcPort);
             configChanged = true;
         }
 
         if(doc.containsKey("gain")) {
             uint8_t newGain = doc["gain"].as<uint8_t>();
             Serial.printf("Found gain: %d\n", newGain);
-            globalConfig.gain = newGain;
-            Serial.printf("Adc gain: %s\n", globalConfig.gain);
+            gc1.gain = newGain;
+            Serial.printf("Adc gain: %s\n", gc1.gain);
             configChanged = true;
         }
         */
         if(configChanged) {
+            if (xSemaphoreTake(configMutex, portMAX_DELAY) == pdTRUE) {
+                globalConfig = gc1;
+                curr = gc1.streaming;
+                xSemaphoreGive(configMutex);
+            }  
             Serial.println("Config changed, sending status");
-            sendSystemStatus();
+            sendSystemStatus(gc1, client);  
         }
     }
     Serial.println("--- Event End ---");  // Fine evento
@@ -328,16 +339,21 @@ uint16_t getDecimationFactor(uint32_t desiredRate) {
 void adcTask(void* pvParameters) {
     ADS1256_DMA adc;
     BatchData batch;
+    Config gc;
     uint32_t lastSample = 0;
     uint32_t overcount = 0;
-
+    // Per leggere
+    if (xSemaphoreTake(configMutex, portMAX_DELAY) == pdTRUE) {
+        gc = globalConfig;
+        xSemaphoreGive(configMutex);
+    }   
     // Calcola parametri di batch
     uint32_t targetInterval = 5000;
-    uint16_t samplesPerBatch = (uint16_t)((globalConfig.sampleRate * BATCH_PERIOD_US) / 1000000);
+    uint16_t samplesPerBatch = (uint16_t)((gc.sampleRate * BATCH_PERIOD_US) / 1000000);
     samplesPerBatch = std::min<uint16_t>(samplesPerBatch, MAX_SAMPLES_PER_BATCH);
-    uint16_t decimationFactor = getDecimationFactor(globalConfig.sampleRate);
+    uint16_t decimationFactor = getDecimationFactor(gc.sampleRate);
     
-    Serial.printf("Sample rate: %d Hz\n", globalConfig.sampleRate);
+    Serial.printf("Sample rate: %d Hz\n", gc.sampleRate);
     Serial.printf("Target interval: %d us\n", targetInterval);
     Serial.printf("Expected samples per batch: %d\n", samplesPerBatch);
     // Imposta parametri del segnale: frequenza, ampiezza, frequenza AM
@@ -350,53 +366,56 @@ void adcTask(void* pvParameters) {
     delay(1000);
 
     while (true) {
-        if(globalConfig.last != globalConfig.streaming){
-            samplesPerBatch = (uint16_t)((globalConfig.sampleRate * BATCH_PERIOD_US) / 1000000);
+        //Serial.println("curr: "+String(gc.streaming)+" last: "+String(gc.last));
+        if(last != curr){
+            if (xSemaphoreTake(configMutex, portMAX_DELAY) == pdTRUE) {
+                gc = globalConfig;
+                xSemaphoreGive(configMutex);
+            }   
+            Serial.println("adcTask: Cambio stato stream");
+            samplesPerBatch = (uint16_t)((gc.sampleRate * BATCH_PERIOD_US) / 1000000);
             samplesPerBatch = min(samplesPerBatch, (uint16_t)MAX_SAMPLES_PER_BATCH);
             adc.setEMAalfa(emaAlpha);
-            decimationFactor = getDecimationFactor(globalConfig.sampleRate);
-            if(globalConfig.testSignal){
+            decimationFactor = getDecimationFactor(gc.sampleRate);
+            if(gc.testSignal){
                 // Abilita il segnale di test
                 adc.enableTestSignal(true);
-                Serial.println("Segnale di test abilitato");
+                Serial.println("adcTask: Segnale di test abilitato");
             }else{
                 // Disabilita il segnale di test
                 adc.enableTestSignal(false);
-                Serial.println("Segnale di test disabilitato");
+                Serial.println("adcTask: Segnale di test disabilitato");
             }            
-            Serial.printf("Blocco task: %d Hz\n", globalConfig.sampleRate);
-            Serial.printf("targetInterval: %d\n", targetInterval);
-            Serial.printf("samplesPerBatch: %d\n", samplesPerBatch);
-            Serial.printf("decimationFactor: %d\n", decimationFactor);
+            Serial.printf("adcTask: Blocco task: %d Hz\n", gc.sampleRate);
+            Serial.printf("adcTask: targetInterval: %d\n", targetInterval);
+            Serial.printf("adcTask: samplesPerBatch: %d\n", samplesPerBatch);
+            Serial.printf("adcTask: decimationFactor: %d\n", decimationFactor);
             lastSample = 0;
             xQueueReset(batchQueue);   
-            Serial.println("Queue reset");
+            Serial.println("adcTask: Queue reset");
             //vTaskDelay(pdMS_TO_TICKS(100));
-            if (!globalConfig.streaming) {
+            if (!gc.streaming) {
                 // Alla fine dello streaming
                 adc.stopStreaming();
-                Serial.println("stopStreaming");
-                globalConfig.last = globalConfig.streaming;
-                Serial.println(globalConfig.streaming);
+                Serial.println("adcTask: stopStreaming");
+                Serial.println(gc.streaming);
             }else{
-                // All'inizio dello streaming
+                //adc.setTestSignalParams(1.0f, 1.25f, 0.1f);
+                adc.set_gain(static_cast<ads1256_gain_t>(gc.gain));
+                adc.set_channel(static_cast<ads1256_channels_t>(gc.adcPort), static_cast<ads1256_channels_t>(gc.adcPort + 1));
+                if(gc.tone){
+                    tone(TONE_PIN, gc.toneFreq);
+                }else{
+                    noTone(TONE_PIN);
+                }
                 adc.startStreaming();
-                Serial.println("startStreaming");
-                adc.set_gain(globalConfig.gain);
-                adc.set_channel(globalConfig.adcPort, (ads1256_channels_t) (globalConfig.adcPort + 1));
-                globalConfig.last = globalConfig.streaming;
+                Serial.println("adcTask: startStreaming");               
             }
-            if(globalConfig.tone){
-                tone(TONE_PIN, globalConfig.toneFreq);
-            }else{
-                noTone(TONE_PIN);
-            }
-            Serial.println(globalConfig.streaming);
-        }
-        
+            last = curr;
+        }        
 
         uint32_t now = micros();
-        if (globalConfig.streaming && (now - lastSample) >= targetInterval) {
+        if (gc.streaming && (now - lastSample) >= targetInterval) {
             lastSample = now;
             /*
             batch.values[0][0] = 0;
@@ -415,7 +434,7 @@ void adcTask(void* pvParameters) {
         }
         
         // Piccola pausa per evitare di saturare la CPU
-        //portYIELD();
+        portYIELD();
     }
 }
 
@@ -488,6 +507,7 @@ void wsTask(void* pvParameters) {
 
 void setup() {
     Serial.begin(115200);
+    configMutex = xSemaphoreCreateMutex();
      // Inizializzazione WiFi
     WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
     while (WiFi.status() != WL_CONNECTED) {
@@ -531,7 +551,7 @@ void setup() {
     xTaskCreatePinnedToCore(
         adcTask, 
         "ADC Task", 
-        4196,  // Stack aumentato
+        8192,  // Stack aumentato
         NULL, 
         configMAX_PRIORITIES - 1,
         NULL, 

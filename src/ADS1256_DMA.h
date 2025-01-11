@@ -158,7 +158,7 @@ public:
         //if (volts > vRef) rampValue = 0.0f;
         if (rampValue > 1.0f) rampValue = 0.0f;  // Reset quando raggiunge il massimo
         //batch.first =  (int32_t) (rampValue * 8388608.0f);
-        //Serial.println(batch.first);
+        //Serial.println(rampValue * 8388608.0f);
         //if (rampValue > 1.0f) rampValue = 0.0f;  // Reset quando raggiunge il massimo
 
         for (uint16_t i = 0; i < samplesPerBatch; i++) {

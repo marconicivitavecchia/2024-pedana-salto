@@ -173,12 +173,11 @@
             </label>
             <label>Sine wave params:</label>
             <label>Frequency (Hz):
-                <input type="number" id="testFrequency" value="1" min="0.1" max="100" step="0.1" 
+                <input type="number" id="testFrequency" value="1" min="1" max="100" step="1" 
                        onchange="updateConfig('freq', this.value)">
             </label>
             <label>Base Amplitude:
-                <input type="number" id="testAmplitude" value="4194304" min="1000" max="8388608" 
-                       onchange="updateTestSignal()">
+                <input type="number" id="testAmplitude" value="4194304" min="1000" max="8388608">
             </label>
             <span id="testSignalInfo">Samples per batch: 0</span>
         </div>
@@ -1184,21 +1183,14 @@
                 inputMode = false;
             }
 
-            if(wsControl && wsControl.readyState === WebSocket.OPEN) {
-                wsControl.send(JSON.stringify({
-                    streaming: isStreaming
-                }));
-                console.log("Streaming: "+isStreaming);
-                document.getElementById('streamToggle').innerHTML = 
-                    isStreaming ? 'Stop Streaming' : 'Start Streaming';
-                
-                if(isStreaming) {
-                    batchCount = 0;
-                    lastBatchTime = null;
-                    batchIntervals = [];
-                    batchBuffer = [];
-                    inputMode = true;
-                }
+            updateConfig("streaming", isStreaming);
+
+            if(isStreaming) {
+                batchCount = 0;
+                lastBatchTime = null;
+                batchIntervals = [];
+                batchBuffer = [];
+                inputMode = true;
             }
         }
 
@@ -1575,16 +1567,23 @@
 
         function onControlEvent(event) {
             const status = JSON.parse(event.data);
+            console.log("Received current status: " + event.data);
             if(status.type === 'status') {
                 document.getElementById('currentConfig').innerHTML = 
                     `Sample Rate: ${status.samplerate} Hz<br>` +
                     `EMA Alpha: ${status.alfaema}<br>` +
-                    `Streaming: ${status.streaming}`;
-                    `Test: ${status.test}`;
-
+                    `Streaming: ${status.streaming == "true" ? 'In corso' : 'Bloccato'}<br>`+
+                    `Remote Test: ${status.test == "true" ? 'Attivato' : 'Disattivato'}<br>` +
+                    `ADC Tone: ${status.tone == "true" ? 'Attivato' : 'Disattivato'}<br>` +
+                    `Test frequency: ${status.freq}`;
+                
+                document.getElementById('streamToggle').innerHTML = status.streaming == "true" ? 'Stop Streaming' : 'Start Streaming';   
                 document.getElementById('sampleRate').value = status.samplerate;
                 document.getElementById('emaAlpha').value = status.alfaema;
-                document.getElementById('remoteTest').value = status.test;
+                document.getElementById('remoteTest').checked = (status.test == "true");
+                document.getElementById('enableADCTone').checked = (status.tone == "true");
+                document.getElementById('testFrequency').value = status.freq;
+
                 SAMPLE_RATE = status.samplerate;
             }
         }
@@ -1620,7 +1619,23 @@
         function updateConfig(param, value) {
             if(wsControl && wsControl.readyState === WebSocket.OPEN) {
                 const config = {};
-                config[param] = parseFloat(value);
+                
+                // Gestione dei diversi tipi di valore
+                if (typeof value === 'string') {
+                    // Converti in booleano se è "true" o "false"
+                    if (value.toLowerCase() === 'true') {
+                        config[param] = true;
+                    } else if (value.toLowerCase() === 'false') {
+                        config[param] = false;
+                    } else {
+                        // Prova a convertire in numero se non è un booleano
+                        config[param] = isNaN(parseFloat(value)) ? value : parseFloat(value);
+                    }
+                } else {
+                    // Mantieni il tipo originale per booleani e numeri
+                    config[param] = value;
+                }
+                
                 wsControl.send(JSON.stringify(config));
             } else {
                 console.log('WebSocket not connected');
