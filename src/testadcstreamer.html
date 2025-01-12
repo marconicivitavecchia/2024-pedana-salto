@@ -153,11 +153,11 @@
             <label>Input selection:</label>
             <label>
                 <input type="radio" id="enableADCSignal" name="testSignal">
-                ADC real
+                ADC real input
             </label>
             <label>
                 <input type="radio" id="enableTestSignal0" name="testSignal">
-                Local sine wave
+                Local emulated sine wave
             </label>
             <label>
                 <input type="radio" id="enableTestSignal1" name="testSignal">
@@ -165,11 +165,11 @@
             </label>
             <label>
                 <input type="radio" id="remoteTest" name="testSignal">
-                Remote sine wave
+                Remote Emulated Ramp signal
             </label>
             <label>
                 <input type="radio" id="enableADCTone" name="testSignal">
-                ADC tone
+                ADC real tone
             </label>
             <label>Sine wave params:</label>
             <label>Frequency (Hz):
@@ -1582,6 +1582,7 @@
                 document.getElementById('emaAlpha').value = status.alfaema;
                 document.getElementById('remoteTest').checked = (status.test == "true");
                 document.getElementById('enableADCTone').checked = (status.tone == "true");
+                document.getElementById('enableADCSignal').checked = (status.tone == "false");
                 document.getElementById('testFrequency').value = status.freq;
 
                 SAMPLE_RATE = status.samplerate;
