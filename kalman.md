@@ -117,5 +117,6 @@ Punti critici:
 Sitografia:
 - https://www.dmi.unict.it/santoro/teaching/psr/slides/KalmanFiltering.pdf
 - https://moodle2.units.it/course/section.php?id=116470
+- https://www.wouterbulten.nl/posts/lightweight-javascript-library-for-noise-filtering/
 
 >[Torna all'indice](readme.md#fasi-progetto)>[Torna a filtri](filtri.md)
