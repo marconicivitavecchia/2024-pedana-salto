@@ -118,5 +118,11 @@ Sitografia:
 - https://www.dmi.unict.it/santoro/teaching/psr/slides/KalmanFiltering.pdf
 - https://moodle2.units.it/course/section.php?id=116470
 - https://www.wouterbulten.nl/posts/lightweight-javascript-library-for-noise-filtering/
+- http://bilgin.esme.org/BitsAndBytes/KalmanFilterforDummies
+- https://wirelesspi.com/the-easiest-tutorial-on-kalman-filter/
+- https://arxiv.org/pdf/1910.03558
+- https://www.kalmanfilter.net/default.aspx
+- https://www.ladispe.polito.it/corsi/SIEF/material/L_M_K.pdf
+- https://web.mit.edu/kirtley/kirtley/binlustuff/literature/control/Kalman%20filter.pdf
 
 >[Torna all'indice](readme.md#fasi-progetto)>[Torna a filtri](filtri.md)
