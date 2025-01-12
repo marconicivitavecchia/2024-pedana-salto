@@ -64,8 +64,7 @@ void sendSystemStatus(Config gc, WebSocketServer::WSClient* client = nullptr) {
     char statusBuffer[140];
     snprintf(statusBuffer, sizeof(statusBuffer), 
         "{\"type\":\"status\",\"samplerate\":%u,\"alfaema\":%.3f,\"streaming\":\"%s\",\"test\":\"%s\",\"tone\":\"%s\",\"freq\":\"%u\"}", 
-        gc.sampleRate, emaAlpha, gc.streaming ? "true" : "false", gc.testSignal ? "true" : "false",
-        gc.tone ? "true" : "false", gc.toneFreq);
+        gc.sampleRate, emaAlpha, gc.streaming ? "true" : "false", gc.testSignal ? "true" : "false", gc.tone ? "true" : "false", gc.toneFreq);
     
     if(client) {
         // Rispondi solo al client che ha inviato i dati
@@ -132,8 +131,7 @@ void onControlEvent(WSEventType type, WebSocketServer::WSClient* client, uint8_t
     Serial.printf("Event type: %d, len: %d\n", type, len);
     */
     if(type == WS_EVT_CONNECT) {
-        Serial.printf("Control client #%d connected from %s\n", 
-            client->id, client->remoteIP);
+        Serial.printf("Control client #%d connected from %s\n", client->id, client->remoteIP);
         sendSystemStatus(gc1, client);
     }
     else if(type == WS_EVT_DISCONNECT) {
@@ -165,12 +163,13 @@ void onControlEvent(WSEventType type, WebSocketServer::WSClient* client, uint8_t
             if(newRate > 0) {
                 gc1.sampleRate = newRate;
                 Serial.printf("Sample rate impostato a: %d\n", newRate);
-                lastStreaming = gc1.streaming;
-                gc1.streaming = false;
+                //curr = false; // arresto immediato del loop adc
+                //last = curr;
                 xQueueReset(batchQueue);
                 Serial.println("Queue reset");
                 delay(10);
-                gc1.streaming = lastStreaming;
+                //curr = gc1.streaming; // riavvio immediato del loop adc
+                //last = curr;
                 configChanged = true;
             }
         }
@@ -366,7 +365,7 @@ void adcTask(void* pvParameters) {
     delay(1000);
 
     while (true) {
-        //Serial.println("curr: "+String(gc.streaming)+" last: "+String(gc.last));
+        //Serial.println("curr: "+String(curr)+" last: "+String(last));
         if(last != curr){
             if (xSemaphoreTake(configMutex, portMAX_DELAY) == pdTRUE) {
                 gc = globalConfig;
@@ -400,12 +399,14 @@ void adcTask(void* pvParameters) {
                 Serial.println("adcTask: stopStreaming");
                 Serial.println(gc.streaming);
             }else{
-                //adc.setTestSignalParams(1.0f, 1.25f, 0.1f);
+                adc.setTestSignalParams(gc.toneFreq, 8388608.0f, 0.1f);
                 adc.set_gain(static_cast<ads1256_gain_t>(gc.gain));
                 adc.set_channel(static_cast<ads1256_channels_t>(gc.adcPort), static_cast<ads1256_channels_t>(gc.adcPort + 1));
                 if(gc.tone){
+                    Serial.println("adcTask: start Tone");
                     tone(TONE_PIN, gc.toneFreq);
                 }else{
+                    Serial.println("adcTask: stop Tone");
                     noTone(TONE_PIN);
                 }
                 adc.startStreaming();
@@ -415,7 +416,7 @@ void adcTask(void* pvParameters) {
         }        
 
         uint32_t now = micros();
-        if (gc.streaming && (now - lastSample) >= targetInterval) {
+        if (curr && (now - lastSample) >= targetInterval) {
             lastSample = now;
             /*
             batch.values[0][0] = 0;
@@ -495,10 +496,6 @@ void wsTask(void* pvParameters) {
                 //}
                 //Serial.println("Buffer");
             }
-            //ws.sendDataAsync("{\"t\":74111471,\"v\":[\"ee2db6\",\"f2dad4\",\"f95db8\",\"02381d\",\"020a4c\",\"fe961b\",\"f29324\",\"fa7321\",\"03ae6a\",\"068c70\",\"0553e8\",\"056839\",\"03b660\",\"0bb73b\",\"0ab73d\",\"04beae\",\"f7f5bd\",\"f66406\",\"eac1e5\",\"ef3e3c\",\"e8fdf6\",\"eaeb4a\",\"e1aa24\",\"eac267\",\"e8b73e\",\"eeb306\",\"e71e5a\",\"e877a7\",\"ee93c4\",\"eb0990\",\"e7a9c8\",\"e63d17\",\"f4f073\",\"fe3d96\",\"f9c700\",\"02b540\",\"0bdc0f\",\"009c78\",\"fe752d\",\"f3d24a\",\"f0c061\",\"ec151c\",\"f04806\",\"f92c23\",\"f4e6b8\",\"021935\",\"006e2b\",\"f818f9\",\"f6bad9\",\"fb81b8\",\"0853a7\",\"125666\",\"14ad7f\",\"090fea\",\"11f91f\",\"0470ef\",\"02ed5c\",\"05d44d\",\"080707\",\"01d6ec\",\"014ca0\",\"0463b9\",\"ff278e\",\"04a9bb\",\"fe50e5\",\"f6ed86\",\"f2be0f\",\"f81aa0\",\"edf702\",\"f3a39a\",\"f45e86\",\"f46f30\",\"f12860\",\"f26d6f\",\"ffd194\",\"0a53d0\",\"09de15\",\"ff3af2\",\"f52b3e\",\"00a8b9\",\"ffb684\",\"04aa4b\",\"fd5626\",\"023073\",\"fc1a4a\",\"f30bed\",\"f3a763\",\"fd1046\",\"fa8ce1\",\"f2cd97\",\"ecd82b\",\"e8c2d0\",\"e7a69a\",\"ec9201\",\"e378bd\",\"e462e5\",\"ec87c1\",\"eada08\",\"ec3969\",\"ea98c4\",\"e10996\",\"d79670\",\"e75895\",\"df5748\",\"dceb73\",\"d8a124\",\"e10d33\",\"e63dea\",\"e0403d\",\"e752b3\",\"f00733\",\"e829a4\",\"f407ad\",\"e8730b\",\"f3caef\",\"f41d8d\",\"f307ce\",\"fede2e\",\"0a3df6\",\"0b3e1a\",\"011665\",\"f4e6d3\",\"fbde0e\",\"fef5e6\",\"027aca\",\"0728a4\",\"faf3a2\",\"f4e808\",\"fc779f\",\"03abbd\",\"fb98fa\",\"f551a8\",\"01f0ae\",\"07d303\",\"07a80d\",\"0b8668\"]}");     
-            //ws.sendDataAsync("{\"t\":\"74111471\",\"v\":[\"ee2db6\",\"ea3cb6\"]}", strlen("{\"t\":\"74111471\",\"v\":[\"ee2db6\",\"ea3cb6\"]}"));
-            //}
-            //vTaskDelay(10);
         }else {
             vTaskDelay(1);  // delay solo se non ci sono dati
         }
