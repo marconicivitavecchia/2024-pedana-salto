@@ -381,7 +381,6 @@ void adcTask(void* pvParameters) {
                 //lastOvercount = 1;
                 overflow = false;
                 enable1 = true;
-                adc.setTestSignalParams(gc.toneFreq, 8388608.0f, 0.1f);
                 adc.set_gain(static_cast<ads1256_gain_t>(gc.gain));
                 adc.set_channel(static_cast<ads1256_channels_t>(gc.adcPort), static_cast<ads1256_channels_t>(gc.adcPort + 1));
                 if(gc.mode == 2){
@@ -389,7 +388,7 @@ void adcTask(void* pvParameters) {
                     tone(TONE_PIN, gc.toneFreq);
                     adc.enableTestSignal(false);
                 }else if(gc.mode == 1){
-                    // Abilita il segnale di test
+                    adc.setTestSignalParams(gc.toneFreq, 8388608.0f, 0.1f);
                     adc.enableTestSignal(true);
                     noTone(TONE_PIN);
                     Serial.println("adcTask: Segnale di test abilitato");
@@ -399,6 +398,7 @@ void adcTask(void* pvParameters) {
                     adc.enableTestSignal(false);
                     Serial.println("adcTask: Segnale di test disabilitato");
                 }
+                delay(10);
                 adc.startStreaming();
                 Serial.print("adcTask: startStreaming");    
                 Serial.println(gc.streaming);               
