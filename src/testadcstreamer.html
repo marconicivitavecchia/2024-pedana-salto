@@ -467,6 +467,8 @@
                 remoteTestTone = true;
                 inputMode = true;
                 resetView();
+                testSignalTime = 0;
+                updateSamplesPerBatch();
                 updateConfig("mode", 2);
             } else {
                 console.log('Opzione tono adc deselezionata');
@@ -476,6 +478,8 @@
         radioButtons2.forEach(radio => {
             radio.addEventListener('change', handleRadioChange);
         });
+
+        updateConfig('freq', 1);
 
         /*
         function resizeCanvas() {
@@ -1607,7 +1611,7 @@
                 document.getElementById('testFrequency').value = status.freq;
 
                 SAMPLE_RATE = status.samplerate;
-            }else if(type == "event"){
+            }else if(status.type == "event"){
                 if (status.overflow > 0) {
                     overflowBox.classList.remove('green');
                     overflowBox.classList.add('red');
