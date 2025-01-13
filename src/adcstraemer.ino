@@ -491,8 +491,6 @@ void wsTask(void* pvParameters) {
                 //}
                 //Serial.println("Buffer");
             }
-                         
-        }else {     
             if(overflow){
                 if(enable1){
                     enable1 = false;
@@ -505,7 +503,8 @@ void wsTask(void* pvParameters) {
                     Serial.println("wsTask: sendOverflow false");
                     sendOverflowStatus(false);
                 }  
-            }     
+            }                 
+        }else {     
             vTaskDelay(1);  // delay solo se non ci sono dati
         }
     }
