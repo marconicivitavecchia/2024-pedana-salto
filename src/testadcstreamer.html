@@ -100,6 +100,23 @@
             gap: 10px;
             align-items: center;
         }
+        .green {
+            background-color: #22c55e;
+        }
+
+        .red {
+            background-color: #ef4444;
+        }
+        .overflow-box {
+            width: 150px;
+            padding: 5px;
+            text-align: center;
+            border-radius: 8px;
+            font-weight: bold;
+            color: white;
+            transition: background-color 0.3s;
+            mask-origin: 5px;
+        }
     </style>
 </head>
 <body>
@@ -134,6 +151,9 @@
                        onchange="updateBufferSize()">
             </label>
             <span>Buffer Size: <span id="bufferInfo">0/0</span></span>
+            <div id="overflowBox" class="overflow-box green">
+                OVERFLOW
+            </div>
         </div>       
         <div class="config-item">
             <label>Streaming Control:</label>
@@ -399,6 +419,7 @@
                     v: [0]
                 };
                 onmessageEvent({ data: JSON.stringify(batch) });
+                updateConfig("mode", 0);
             } else {
                 adcSignalEnabled = false;
                 console.log('Opzione adc input deselezionata');
@@ -435,11 +456,10 @@
                 remoteTestEnabled = true;
                 inputMode = true;
                 resetView();
-                updateConfig("test", true);
+                updateConfig("mode", 1);
             } else {
                 remoteTestEnabled = false;
                 console.log('Opzione remote sine wave deselezionata');
-                updateConfig("test", false);
             }
 
             if (radio5.checked) {
@@ -447,9 +467,9 @@
                 remoteTestTone = true;
                 inputMode = true;
                 resetView();
-                updateConfig("tone", true);
+                updateConfig("mode", 2);
             } else {
-                updateConfig("tone", false);
+                console.log('Opzione tono adc deselezionata');
             }
         }
         // Aggiungi il gestore dell'evento "change" a ogni radio button
@@ -1573,19 +1593,28 @@
                     `Sample Rate: ${status.samplerate} Hz<br>` +
                     `EMA Alpha: ${status.alfaema}<br>` +
                     `Streaming: ${status.streaming == "true" ? 'In corso' : 'Bloccato'}<br>`+
-                    `Remote Test: ${status.test == "true" ? 'Attivato' : 'Disattivato'}<br>` +
-                    `ADC Tone: ${status.tone == "true" ? 'Attivato' : 'Disattivato'}<br>` +
+                    `ADC Input: ${status.mode == 0 ? 'Attivato' : 'Disattivato'}<br>` +
+                    `Remote Test: ${status.mode == 1 ? 'Attivato' : 'Disattivato'}<br>` +
+                    `ADC Tone: ${status.mode == 2 ? 'Attivato' : 'Disattivato'}<br>` +
                     `Test frequency: ${status.freq}`;
                 
                 document.getElementById('streamToggle').innerHTML = status.streaming == "true" ? 'Stop Streaming' : 'Start Streaming';   
                 document.getElementById('sampleRate').value = status.samplerate;
                 document.getElementById('emaAlpha').value = status.alfaema;
-                document.getElementById('remoteTest').checked = (status.test == "true");
-                document.getElementById('enableADCTone').checked = (status.tone == "true");
-                document.getElementById('enableADCSignal').checked = (status.tone == "false");
+                document.getElementById('remoteTest').checked = (status.mode == 1);
+                document.getElementById('enableADCTone').checked = (status.mode == 2);
+                document.getElementById('enableADCSignal').checked = (status.mode == 0);
                 document.getElementById('testFrequency').value = status.freq;
 
                 SAMPLE_RATE = status.samplerate;
+            }else if(type == "event"){
+                if (status.overflow > 0) {
+                    overflowBox.classList.remove('green');
+                    overflowBox.classList.add('red');
+                } else {
+                    overflowBox.classList.remove('red');
+                    overflowBox.classList.add('green');
+                }
             }
         }
 

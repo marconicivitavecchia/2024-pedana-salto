@@ -34,11 +34,8 @@ const char* WIFI_PASSWORD = "pippo2503";
 struct Config {
     uint32_t sampleRate;
     uint8_t gain;
-    bool filterEnabled;
-    float threshold;
     bool streaming;
-    bool testSignal;
-    bool tone;
+    uint8_t mode;
     uint16_t toneFreq;
     uint8_t adcPort;
 };
@@ -51,9 +48,11 @@ BatchData {
 */
 // Variabili globali
 DualWebSocket ws;
-Config globalConfig = {DEFAULT_SAMPLE_RATE, 1, false, 1000000, false, false, false, 10, 1};
+Config globalConfig = {DEFAULT_SAMPLE_RATE, 1, false, 0, 10, 1};
 volatile bool last;
 volatile bool curr;
+volatile bool overflow;
+volatile bool notOverflow;
 float emaAlpha = 0.1;
 QueueHandle_t batchQueue;
 SemaphoreHandle_t configMutex;
@@ -61,10 +60,23 @@ SemaphoreHandle_t configMutex;
 // Funzione per creare e inviare lo stato del sistema
 void sendSystemStatus(Config gc, WebSocketServer::WSClient* client = nullptr) {
     Serial.print("sendSystemStatus");
-    char statusBuffer[140];
+    char statusBuffer[130];
     snprintf(statusBuffer, sizeof(statusBuffer), 
-        "{\"type\":\"status\",\"samplerate\":%u,\"alfaema\":%.3f,\"streaming\":\"%s\",\"test\":\"%s\",\"tone\":\"%s\",\"freq\":\"%u\"}", 
-        gc.sampleRate, emaAlpha, gc.streaming ? "true" : "false", gc.testSignal ? "true" : "false", gc.tone ? "true" : "false", gc.toneFreq);
+        "{\"type\":\"status\",\"samplerate\":%u,\"alfaema\":%.3f,\"streaming\":\"%s\",\"mode\":\"%u\",\"freq\":\"%u\"}", 
+        gc.sampleRate, emaAlpha, gc.streaming ? "true" : "false", gc.mode, gc.toneFreq);
+    
+    if(client) {
+        // Rispondi solo al client che ha inviato i dati
+        ws.sendControlToClient(client->id, statusBuffer, strlen(statusBuffer));
+    } else {
+        ws.sendControlSync(statusBuffer, strlen(statusBuffer));
+    }
+}
+
+void sendOverflowStatus(bool status, WebSocketServer::WSClient* client = nullptr) {
+    char statusBuffer[20];
+    snprintf(statusBuffer, sizeof(statusBuffer), 
+        "{\"type\":\"event\",\"overflow\":%u}", status);
     
     if(client) {
         // Rispondi solo al client che ha inviato i dati
@@ -182,14 +194,6 @@ void onControlEvent(WSEventType type, WebSocketServer::WSClient* client, uint8_t
             configChanged = true;
         }
 
-        if(doc.containsKey("test")) {
-            bool newTest = doc["test"].as<bool>();
-            Serial.printf("Found test: %d\n", newTest);
-            gc1.testSignal = newTest;
-            Serial.printf("Modo test: %s\n", gc1.testSignal ? "attivato" : "disattivato");
-            configChanged = true;
-        }
-
         if(doc.containsKey("freq")) {
             uint16_t newFreq = doc["freq"].as<uint16_t>();
             Serial.printf("Found freq: %d\n", newFreq);
@@ -198,18 +202,18 @@ void onControlEvent(WSEventType type, WebSocketServer::WSClient* client, uint8_t
             configChanged = true;
         }
 
-        if(doc.containsKey("tone")) {
-            bool newTone = doc["tone"].as<bool>();
-            Serial.printf("Found tone: %d\n", newTone);
-            gc1.tone = newTone;
-            if(gc1.tone){
+        if(doc.containsKey("mode")) {
+            uint8_t newMode = doc["mode"].as<uint8_t>();
+            Serial.printf("Found mode: %d\n", newMode);
+            gc1.mode = newMode;
+            if(gc1.mode == 2){
                 gc1.gain = 1;
                 gc1.adcPort = 5;
             }else{
                 gc1.gain = 6;
                 gc1.adcPort = 1;
             }
-            Serial.printf("Modo tone: %s\n", gc1.tone ? "attivato" : "disattivato");
+            Serial.printf("Modo: %u attivato\n", gc1.mode);
             configChanged = true;
         }
 
@@ -341,6 +345,7 @@ void adcTask(void* pvParameters) {
     Config gc;
     uint32_t lastSample = 0;
     uint32_t overcount = 0;
+    uint32_t lastOvercount = 0;
     // Per leggere
     if (xSemaphoreTake(configMutex, portMAX_DELAY) == pdTRUE) {
         gc = globalConfig;
@@ -376,7 +381,7 @@ void adcTask(void* pvParameters) {
             samplesPerBatch = min(samplesPerBatch, (uint16_t)MAX_SAMPLES_PER_BATCH);
             adc.setEMAalfa(emaAlpha);
             decimationFactor = getDecimationFactor(gc.sampleRate);
-            if(gc.testSignal){
+            if(gc.mode == 1){
                 // Abilita il segnale di test
                 adc.enableTestSignal(true);
                 Serial.println("adcTask: Segnale di test abilitato");
@@ -399,10 +404,13 @@ void adcTask(void* pvParameters) {
                 Serial.println("adcTask: stopStreaming");
                 Serial.println(gc.streaming);
             }else{
+                overcount = 0;
+                overflow = false;
+                notOverflow = true;
                 adc.setTestSignalParams(gc.toneFreq, 8388608.0f, 0.1f);
                 adc.set_gain(static_cast<ads1256_gain_t>(gc.gain));
                 adc.set_channel(static_cast<ads1256_channels_t>(gc.adcPort), static_cast<ads1256_channels_t>(gc.adcPort + 1));
-                if(gc.tone){
+                if(gc.mode == 2){
                     Serial.println("adcTask: start Tone");
                     tone(TONE_PIN, gc.toneFreq);
                 }else{
@@ -430,6 +438,11 @@ void adcTask(void* pvParameters) {
             if(batch.count > 0) {
                 if (xQueueSend(batchQueue, &batch, 0) != pdTRUE) {
                     Serial.println("Queue overflow: " + String(overcount++));
+                    if(lastOvercount != overcount){
+                        overflow = true;
+                    }else{
+                        notOverflow = true;
+                    }
                 }
             }
         }
@@ -497,6 +510,14 @@ void wsTask(void* pvParameters) {
                 //Serial.println("Buffer");
             }
         }else {
+            if(overflow && notOverflow == true){
+                notOverflow == false;
+                sendOverflowStatus(true);
+            }
+            if(notOverflow && overflow == true){
+                overflow == false;
+                sendOverflowStatus(false);
+            }
             vTaskDelay(1);  // delay solo se non ci sono dati
         }
     }
@@ -548,7 +569,7 @@ void setup() {
     xTaskCreatePinnedToCore(
         adcTask, 
         "ADC Task", 
-        8192,  // Stack aumentato
+        4096,  // Stack aumentato
         NULL, 
         configMAX_PRIORITIES - 1,
         NULL, 
