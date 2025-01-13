@@ -49,10 +49,10 @@ BatchData {
 // Variabili globali
 DualWebSocket ws;
 Config globalConfig = {DEFAULT_SAMPLE_RATE, 1, false, 0, 1, 1};
-volatile bool last;
-volatile bool curr;
+volatile bool last = false;
+volatile bool curr = false;
 volatile bool overflow;
-volatile bool notOverflow;
+volatile bool enable1 = true;
 float emaAlpha = 0.1;
 QueueHandle_t batchQueue;
 SemaphoreHandle_t configMutex;
@@ -167,7 +167,6 @@ void onControlEvent(WSEventType type, WebSocketServer::WSClient* client, uint8_t
 
         Serial.println("JSON parsed successfully");
         bool configChanged = false;
-        bool lastStreaming;
 
         if(doc.containsKey("samplerate")) {
             uint32_t newRate = doc["samplerate"].as<int>();
@@ -225,23 +224,6 @@ void onControlEvent(WSEventType type, WebSocketServer::WSClient* client, uint8_t
             configChanged = true;
         }
 
-        /*
-        if(doc.containsKey("port")) {
-            uint8_t newPort = doc["port"].as<uint8_t>();
-            Serial.printf("Found freq: %d\n", newPort);
-            gc1.adcPort = newPort;
-            Serial.printf("Adc port: %s\n", gc1.adcPort);
-            configChanged = true;
-        }
-
-        if(doc.containsKey("gain")) {
-            uint8_t newGain = doc["gain"].as<uint8_t>();
-            Serial.printf("Found gain: %d\n", newGain);
-            gc1.gain = newGain;
-            Serial.printf("Adc gain: %s\n", gc1.gain);
-            configChanged = true;
-        }
-        */
         if(configChanged) {
             if (xSemaphoreTake(configMutex, portMAX_DELAY) == pdTRUE) {
                 globalConfig = gc1;
@@ -401,13 +383,13 @@ void adcTask(void* pvParameters) {
             if (!gc.streaming) {
                 // Alla fine dello streaming
                 adc.stopStreaming();
-                Serial.println("adcTask: stopStreaming");
+                Serial.print("adcTask: stopStreaming ");
                 Serial.println(gc.streaming);
             }else{
                 overcount = 0;
                 //lastOvercount = 1;
                 overflow = false;
-                notOverflow = true;
+                enable1 = true;
                 adc.setTestSignalParams(gc.toneFreq, 8388608.0f, 0.1f);
                 adc.set_gain(static_cast<ads1256_gain_t>(gc.gain));
                 adc.set_channel(static_cast<ads1256_channels_t>(gc.adcPort), static_cast<ads1256_channels_t>(gc.adcPort + 1));
@@ -419,7 +401,8 @@ void adcTask(void* pvParameters) {
                     noTone(TONE_PIN);
                 }
                 adc.startStreaming();
-                Serial.println("adcTask: startStreaming");               
+                Serial.print("adcTask: startStreaming");    
+                Serial.println(gc.streaming);               
             }
             last = curr;
         }        
@@ -438,11 +421,11 @@ void adcTask(void* pvParameters) {
             adc.read_data_batch(batch, samplesPerBatch, decimationFactor);             
             if(batch.count > 0) {
                 if (xQueueSend(batchQueue, &batch, 0) != pdTRUE) {
-                    overcount++;
+                    //overcount++;
                     overflow = true;    // lastOvercount != overcount
                     //Serial.print("Queue overflow: " + String(overcount));
                 }else{
-                    notOverflow = true; // lastOvercount == overcount;
+                    overflow = false; // lastOvercount == overcount;
                 }
             }
         }        
@@ -454,7 +437,7 @@ void adcTask(void* pvParameters) {
 void wsTask(void* pvParameters) {
     BatchData batch;
     char buffer[2800]; 
-
+    
     const int MAX_LEN = sizeof(buffer);
 
     while (true) {
@@ -508,22 +491,21 @@ void wsTask(void* pvParameters) {
                 //}
                 //Serial.println("Buffer");
             }
-            if(notOverflow && overflow){// inizialmente diversi
-                if(overflow){
-                    notOverflow = false;
+                         
+        }else {     
+            if(overflow){
+                if(enable1){
+                    enable1 = false;
                     Serial.println("wsTask: sendOverflow true");
                     sendOverflowStatus(true);
-                }
-                if(notOverflow){
-                    overflow = false;
+                }  
+            }else{
+                if(!enable1){
+                    enable1 = true;
                     Serial.println("wsTask: sendOverflow false");
                     sendOverflowStatus(false);
-                }
-                // init
-                // notOverflow = true
-                // overflow = false
-            }
-        }else {       
+                }  
+            }     
             vTaskDelay(1);  // delay solo se non ci sono dati
         }
     }
