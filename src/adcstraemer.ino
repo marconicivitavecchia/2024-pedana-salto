@@ -362,16 +362,7 @@ void adcTask(void* pvParameters) {
             samplesPerBatch = (uint16_t)((gc.sampleRate * BATCH_PERIOD_US) / 1000000);
             samplesPerBatch = min(samplesPerBatch, (uint16_t)MAX_SAMPLES_PER_BATCH);
             adc.setEMAalfa(emaAlpha);
-            decimationFactor = getDecimationFactor(gc.sampleRate);
-            if(gc.mode == 1){
-                // Abilita il segnale di test
-                adc.enableTestSignal(true);
-                Serial.println("adcTask: Segnale di test abilitato");
-            }else{
-                // Disabilita il segnale di test
-                adc.enableTestSignal(false);
-                Serial.println("adcTask: Segnale di test disabilitato");
-            }            
+            decimationFactor = getDecimationFactor(gc.sampleRate);         
             Serial.printf("adcTask: Blocco task: %d Hz\n", gc.sampleRate);
             Serial.printf("adcTask: targetInterval: %d\n", targetInterval);
             Serial.printf("adcTask: samplesPerBatch: %d\n", samplesPerBatch);
@@ -400,6 +391,15 @@ void adcTask(void* pvParameters) {
                     Serial.println("adcTask: stop Tone");
                     noTone(TONE_PIN);
                 }
+                if(gc.mode == 1){
+                    // Abilita il segnale di test
+                    adc.enableTestSignal(true);
+                    Serial.println("adcTask: Segnale di test abilitato");
+                }else{
+                    // Disabilita il segnale di test
+                    adc.enableTestSignal(false);
+                    Serial.println("adcTask: Segnale di test disabilitato");
+                }   
                 adc.startStreaming();
                 Serial.print("adcTask: startStreaming");    
                 Serial.println(gc.streaming);               
