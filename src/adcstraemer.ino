@@ -387,19 +387,18 @@ void adcTask(void* pvParameters) {
                 if(gc.mode == 2){
                     Serial.println("adcTask: start Tone");
                     tone(TONE_PIN, gc.toneFreq);
+                    adc.enableTestSignal(false);
+                }else if(gc.mode == 1){
+                    // Abilita il segnale di test
+                    adc.enableTestSignal(true);
+                    noTone(TONE_PIN);
+                    Serial.println("adcTask: Segnale di test abilitato");
                 }else{
                     Serial.println("adcTask: stop Tone");
                     noTone(TONE_PIN);
-                }
-                if(gc.mode == 1){
-                    // Abilita il segnale di test
-                    adc.enableTestSignal(true);
-                    Serial.println("adcTask: Segnale di test abilitato");
-                }else{
-                    // Disabilita il segnale di test
                     adc.enableTestSignal(false);
                     Serial.println("adcTask: Segnale di test disabilitato");
-                }   
+                }
                 adc.startStreaming();
                 Serial.print("adcTask: startStreaming");    
                 Serial.println(gc.streaming);               
