@@ -52,10 +52,11 @@ Config globalConfig = {DEFAULT_SAMPLE_RATE, 1, false, 0, 1, 1};
 volatile bool last = false;
 volatile bool curr = false;
 volatile bool overflow;
-volatile bool enable1 = true;
+volatile uint8_t enable1 = 128;
 float emaAlpha = 0.1;
 QueueHandle_t batchQueue;
 SemaphoreHandle_t configMutex;
+TaskHandle_t adcTaskHandle = NULL; 
 
 // Funzione per creare e inviare lo stato del sistema
 void sendSystemStatus(Config gc, WebSocketServer::WSClient* client = nullptr) {
@@ -144,7 +145,8 @@ void onControlEvent(WSEventType type, WebSocketServer::WSClient* client, uint8_t
     */
     if(type == WS_EVT_CONNECT) {
         Serial.printf("Control client #%d connected from %s\n", client->id, client->remoteIP);
-        sendSystemStatus(gc1, client);
+        //sendSystemStatus(gc1, client); 
+        sendSystemStatus(gc1);
     }
     else if(type == WS_EVT_DISCONNECT) {
         Serial.printf("Control client #%u disconnected\n", client->id);
@@ -204,13 +206,13 @@ void onControlEvent(WSEventType type, WebSocketServer::WSClient* client, uint8_t
         if(doc.containsKey("mode")) {
             uint8_t newMode = doc["mode"].as<uint8_t>();
             Serial.printf("Found mode: %d\n", newMode);
+            gc1.streaming = false;
             gc1.mode = newMode;
+            gc1.gain = 6;
+            gc1.adcPort = 1;
             if(gc1.mode == 2){
                 gc1.gain = 1;
                 gc1.adcPort = 5;
-            }else{
-                gc1.gain = 6;
-                gc1.adcPort = 1;
             }
             Serial.printf("Modo: %u attivato\n", gc1.mode);
             configChanged = true;
@@ -224,14 +226,18 @@ void onControlEvent(WSEventType type, WebSocketServer::WSClient* client, uint8_t
             configChanged = true;
         }
 
+        Serial.println("Config changed, sending status");
+        //sendSystemStatus(gc1, client);  
+        sendSystemStatus(gc1);  
+
         if(configChanged) {
-            if (xSemaphoreTake(configMutex, portMAX_DELAY) == pdTRUE) {
+            if (xSemaphoreTake(configMutex, pdMS_TO_TICKS(1000)) == pdTRUE) {
                 globalConfig = gc1;
                 curr = gc1.streaming;
                 xSemaphoreGive(configMutex);
-            }  
-            Serial.println("Config changed, sending status");
-            sendSystemStatus(gc1, client);  
+            }else {
+                Serial.println("Timeout nel prendere il semaforo del task websocket");
+            }     
         }
     }
     Serial.println("--- Event End ---");  // Fine evento
@@ -329,10 +335,12 @@ void adcTask(void* pvParameters) {
     uint32_t overcount = 0;
     // uint32_t lastOvercount = 0;
     // Per leggere
-    if (xSemaphoreTake(configMutex, portMAX_DELAY) == pdTRUE) {
+    if (xSemaphoreTake(configMutex, pdMS_TO_TICKS(1000)) == pdTRUE) {
         gc = globalConfig;
         xSemaphoreGive(configMutex);
-    }   
+    }else {
+        Serial.println("Timeout nel prendere il primo semaforo");
+    }    
     // Calcola parametri di batch
     uint32_t targetInterval = 5000;
     uint16_t samplesPerBatch = (uint16_t)((gc.sampleRate * BATCH_PERIOD_US) / 1000000);
@@ -346,17 +354,21 @@ void adcTask(void* pvParameters) {
     adc.setTestSignalParams(1.0f, 1.25f, 0.1f);
     
     // Attendi connessione WiFi
-    while (WiFi.status() != WL_CONNECTED) {
+    uint8_t maxdelay = 100;
+    while (WiFi.status() != WL_CONNECTED && maxdelay > 0) {
         vTaskDelay(pdMS_TO_TICKS(100));
+        maxdelay--;
     }
     delay(1000);
 
     while (true) {
         //Serial.println("curr: "+String(curr)+" last: "+String(last));
         if(last != curr){
-            if (xSemaphoreTake(configMutex, portMAX_DELAY) == pdTRUE) {
+            if (xSemaphoreTake(configMutex, pdMS_TO_TICKS(1000)) == pdTRUE) {
                 gc = globalConfig;
                 xSemaphoreGive(configMutex);
+            }else {
+                Serial.println("Timeout nel prendere il secondo semaforo");
             }   
             Serial.println("adcTask: Cambio stato stream");
             samplesPerBatch = (uint16_t)((gc.sampleRate * BATCH_PERIOD_US) / 1000000);
@@ -380,7 +392,7 @@ void adcTask(void* pvParameters) {
                 overcount = 0;
                 //lastOvercount = 1;
                 overflow = false;
-                enable1 = true;
+                enable1 = 128;
                 adc.set_gain(static_cast<ads1256_gain_t>(gc.gain));
                 adc.set_channel(static_cast<ads1256_channels_t>(gc.adcPort), static_cast<ads1256_channels_t>(gc.adcPort + 1));
                 if(gc.mode == 2){
@@ -490,19 +502,26 @@ void wsTask(void* pvParameters) {
                 //}
                 //Serial.println("Buffer");
             }
+            
+            // overflow signalling management
             if(overflow){
-                if(enable1){
-                    enable1 = false;
+                if(enable1 > 127){
+                    enable1 = 127;// A single batch in overflow condition indicates an overflow status
                     Serial.println("wsTask: sendOverflow true");
                     sendOverflowStatus(true);
                 }  
             }else{
-                if(!enable1){
-                    enable1 = true;
-                    Serial.println("wsTask: sendOverflow false");
-                    sendOverflowStatus(false);
+                if(enable1 < 128){
+                    enable1--;
+                    if(enable1 < 97){// 20 consecutive batches in normal condition are required to confirm normal status
+                        Serial.println("wsTask: sendOverflow false");
+                        sendOverflowStatus(false);
+                        enable1 = 128;
+                    }
+                    
                 }  
-            }                 
+            } 
+                            
         }else {     
             vTaskDelay(1);  // delay solo se non ci sono dati
         }
@@ -555,10 +574,10 @@ void setup() {
     xTaskCreatePinnedToCore(
         adcTask, 
         "ADC Task", 
-        4096,  // Stack aumentato
+        8192,  // Stack aumentato
         NULL, 
         configMAX_PRIORITIES - 1,
-        NULL, 
+        &adcTaskHandle, 
         1
     );
 
@@ -566,5 +585,32 @@ void setup() {
 }
 
 void loop() {
-    vTaskDelay(10);
+    eTaskState taskState = eTaskGetState(adcTaskHandle);
+    Serial.print("Stato task ADC: ");
+    switch(taskState) {
+        case eRunning:
+            Serial.println("RUNNING");
+            break;
+        case eBlocked:
+            Serial.println("BLOCKED");
+            break;
+        case eSuspended:
+            Serial.println("SUSPENDED");
+            break;
+        case eDeleted:
+            Serial.println("DELETED");
+            break;
+        case eReady:
+            Serial.println("READY");
+            break;
+        default:
+            Serial.println("STATO SCONOSCIUTO");
+    }
+
+    // Aggiungi anche info sullo stack
+    UBaseType_t stackHighWaterMark = uxTaskGetStackHighWaterMark(adcTaskHandle);
+    Serial.printf("Stack libero: %d bytes\n", stackHighWaterMark);
+
+    delay(1000);  // Ritardo per non floodare il serial monitor
+    //vTaskDelay(10);
 }

@@ -452,14 +452,19 @@
             }
 
             if (radio4.checked) {
-                console.log('Opzione remote sine wave selezionata');
+                console.log('Opzione remote ramp wave selezionata');
                 remoteTestEnabled = true;
                 inputMode = true;
                 resetView();
                 updateConfig("mode", 1);
+                const batch = {
+                    t: 0,
+                    v: [0]
+                };
+                onmessageEvent({ data: JSON.stringify(batch) });
             } else {
                 remoteTestEnabled = false;
-                console.log('Opzione remote sine wave deselezionata');
+                console.log('Opzione remote ramp wave deselezionata');
             }
 
             if (radio5.checked) {
