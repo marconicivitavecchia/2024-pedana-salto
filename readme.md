@@ -79,6 +79,7 @@
 - [Filtro di Kalman da accelerazione](kalman_accelerazione.md)
 - [Filtro di Kalman da tempo di volo](kalman_tempovolo.md)
 - [Streaming dei campioni ADC](adcstreaming.md)
+- [Progetto con ESP32](ads1256.md)
 
 
 **Materiale**:
