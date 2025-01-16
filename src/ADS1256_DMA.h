@@ -133,6 +133,10 @@ public:
         }
     }
 
+    void forceOffset(uint32_t val) {
+        offset = val;
+    }
+
     void setTestSignalParams(float freq, float ampl, float amFreq) {
         testFrequency = freq;
         baseAmplitude = ampl;
@@ -145,11 +149,13 @@ public:
         float signalPeriod = (float) decimationFactor / 30000;
         batch.count = 0;
         batch.timestamp = esp_timer_get_time();
+        float t = 1 / testFrequency;
+        float amp = baseAmplitude;
 
         const float voltsToAdc = 8388608.0f / vRef;  // 2^23 / vRef
         
         // Incremento per ogni nuovo batch (esempio: incremento del 10% del range)
-        rampValue += 0.01f;
+        rampValue += testFrequency*0.005f;
         // Usiamo rampValue invece della sinusoide
         float volts = rampValue * vRef;
 
@@ -163,7 +169,7 @@ public:
 
         for (uint16_t i = 0; i < samplesPerBatch; i++) {
             
-            int32_t value = (int32_t)(rampValue * 8388608.0f);
+            int32_t value = (int32_t)(rampValue * amp);
 
             if (value < 0) {
                 value += 0x1000000;
@@ -254,6 +260,7 @@ public:
     }
 
     void read_data_batch(BatchData& batch, uint16_t samplesPerBatch, uint16_t decimationFactor = 1) {
+        //Serial.println("read_data_batch: read_data_batch");
         // Se in modo emulazione
         if (testSignalEnabled) {
             generateTestSamples(batch, samplesPerBatch, decimationFactor);
@@ -269,30 +276,37 @@ public:
         int32_t accumulator = 0;
         uint16_t decimationCount = 0;
         
+        //Serial.println("read_data_batch: leggo batch");
         // Leggiamo decimationFactor * samplesPerBatch campioni
         while(batch.count < samplesPerBatch) {
             accumulator = 0;
             decimationCount = 0;
             
+            //Serial.print("read_data_batch: leggo campione: ");
+            //Serial.println(batch.count);
             // Accumula decimationFactor campioni
             while(decimationCount < decimationFactor) {
                 // Aspetta che DRDY sia pronto
-                //while(gpio_get_level((gpio_num_t)ADS1256_PIN_DRDY));
+                while(gpio_get_level((gpio_num_t)ADS1256_PIN_DRDY));
                 
+                //Serial.println("read_data_batch: decimo per "+decimationCount);
+                uint32_t buffer = 0;
                 spi_transaction_t trans_data;
-                memset(&trans_data, 0, sizeof(spi_transaction_t));
-                trans_data.length = 24;
-                trans_data.rx_buffer = batch.values[batch.count];
-                spi_device_transmit(spi, &trans_data);
+                memset(&trans_data, 0, sizeof(spi_transaction_t));// azzera la memoria tampone trans_data (in RAM)
+                trans_data.length = 24; // leggo 24 bit di dati
+                trans_data.rx_buffer = &buffer; // puntatore alla cella corrente da riempire
+                spi_device_transmit(spi, &trans_data); // trasferisci sulla memoria tampone via DMA (senza passare per la CPU)
 
-                int32_t value = (batch.values[batch.count][0] << 16) | 
-                            (batch.values[batch.count][1] << 8) | 
-                            batch.values[batch.count][2];
-                if(value & 0x800000) {
-                    value -= 0x1000000;
+                // Conversione a int32_t con gestione del segno
+                //buffer = buffer & 0xFFFFFF;  // Prendi solo i 24 bit meno significativi
+                if(buffer & 0x800000) {  // Se è negativo
+                    buffer |= 0xFF000000;  // Estendi il segno
                 }
-                
-                accumulator += value;
+
+                buffer += offset;
+
+                // calcolo somma running
+                accumulator += buffer;
                 decimationCount++;
             }
             
@@ -303,8 +317,9 @@ public:
             emaFilteredValue = (float)averaged_value * emaAlpha + 
                             emaFilteredValue * (1.0f - emaAlpha);
             int32_t intValue = (int32_t)emaFilteredValue;
-            
-            // Salva il valore
+           
+            //Serial.println(intValue);
+            // Salva il valore codificato a 24 bit
             batch.values[batch.count][0] = (intValue >> 16) & 0xFF;
             batch.values[batch.count][1] = (intValue >> 8) & 0xFF;
             batch.values[batch.count][2] = intValue & 0xFF;
@@ -356,6 +371,7 @@ private:
     float amFrequency = 0.1f;       // Hz
     const float vRef = 2.5f;        // Tensione di riferimento ADS1256
     float rampValue = 0.0f;  // Valore della rampa mantenuto tra i batch
+    uint32_t offset = 0;
 
     void init_ads1256() {
         gpio_set_level((gpio_num_t)ADS1256_PIN_CS, 0);

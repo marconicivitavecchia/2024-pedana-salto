@@ -5,11 +5,13 @@
 #include <ArduinoJson.h>
 #include "DualWebSocket.h"
 #include "ADS1256_DMA.h"
+//#include "esp32-hal-timer.h"
 
 // Configurazione hardware
 #define CS_PIN 5
 #define DRDY_PIN 4
-#define TONE_PIN 5
+#define DAC1_PIN 25    // DAC1
+#define DAC2_PIN 26    // DAC2
 
 // Configurazione acquisizione
 #define DEFAULT_SAMPLE_RATE 30000  // Hz
@@ -57,6 +59,95 @@ float emaAlpha = 0.1;
 QueueHandle_t batchQueue;
 SemaphoreHandle_t configMutex;
 TaskHandle_t adcTaskHandle = NULL; 
+hw_timer_t * timer = NULL;
+portMUX_TYPE timerMux = portMUX_INITIALIZER_UNLOCKED;
+volatile float freq = 1;
+volatile uint32_t angle = 0;
+volatile uint8_t timerCmd = 0;
+volatile uint8_t lastTimerCmd = 0;
+const uint32_t SAMPLES_PER_CYCLE = 200;  // 1000ms/5ms = 200 campioni per ciclo
+
+void ARDUINO_ISR_ATTR onTimer() {
+    float f = 10;
+    portENTER_CRITICAL_ISR(&timerMux);
+    f = freq;
+    portEXIT_CRITICAL_ISR(&timerMux); 
+    uint32_t value = 100 + 50 * sin(angle);  
+    //dacWrite(DAC_PIN, value);
+    angle += 2 * PI * f / 1000;
+    if(angle >= 2 * PI) angle -= 2 * PI;
+}
+
+void updateDAC() {
+    //Serial.println("updateDAC");
+    // Calcola il valore della sinusoide
+    float sinValue = sin(2 * PI * angle / SAMPLES_PER_CYCLE);
+    
+    // DAC1: normale
+    int value1 = 100 + 50 * sinValue;
+    // DAC2: invertito (controfase)
+    int value2 = 100 - 50 * sinValue;
+    
+    // Aggiorna entrambi i DAC
+    dacWrite(DAC1_PIN, value1);
+    dacWrite(DAC2_PIN, value2);
+    
+    angle++;
+    if(angle >= SAMPLES_PER_CYCLE) {
+        angle = 0;
+    }
+}
+
+void setupDAC(){
+    Serial.println("setupDAC");
+    timer = timerBegin(10000);  // 1kHz
+    if (timer == NULL) {
+        Serial.println("Errore creazione timer!");
+        return;
+    }
+    Serial.println("Timer creato");
+
+    // Stampa frequenza subito dopo la creazione
+    float freq = timerGetFrequency(timer);
+    Serial.print("Frequenza iniziale timer: ");
+    Serial.println(freq);
+
+    timerAttachInterrupt(timer, &onTimer);  
+    Serial.println("Interrupt attaccato");
+
+    timerAlarm(timer, 1000, true, 0);
+    Serial.println("Alarm impostato");
+
+    timerWrite(timer, 0);
+    Serial.println("Timer azzerato");
+
+    // Stampa frequenza dopo la configurazione completa
+    freq = timerGetFrequency(timer);
+    Serial.print("Frequenza finale timer: ");
+    Serial.println(freq);
+
+    timerStop(timer);
+    Serial.println("Timer fermato");
+}
+
+void startDAC() {
+    if (timer != NULL) {
+        //timerAlarm(timer, 1000, true, 0);
+        //Serial.println("Alarm impostato");
+        timerStart(timer);
+        //Serial.print("DAC timer started with freq: ");
+        //Serial.println(timerGetFrequency(timer));
+    }
+}
+
+void stopDAC() {
+    if (timer != NULL) {
+        timerStop(timer);
+        dacWrite(DAC1_PIN, 0);
+        dacWrite(DAC2_PIN, 0);
+        //Serial.println("DAC timer stopped");
+    }
+}
 
 // Funzione per creare e inviare lo stato del sistema
 void sendSystemStatus(Config gc, WebSocketServer::WSClient* client = nullptr) {
@@ -212,7 +303,7 @@ void onControlEvent(WSEventType type, WebSocketServer::WSClient* client, uint8_t
             gc1.adcPort = 1;
             if(gc1.mode == 2){
                 gc1.gain = 1;
-                gc1.adcPort = 5;
+                gc1.adcPort = 6;
             }
             Serial.printf("Modo: %u attivato\n", gc1.mode);
             configChanged = true;
@@ -388,31 +479,43 @@ void adcTask(void* pvParameters) {
                 adc.stopStreaming();
                 Serial.print("adcTask: stopStreaming ");
                 Serial.println(gc.streaming);
+                //stopDAC();
+                timerCmd = 0;
             }else{
                 overcount = 0;
                 //lastOvercount = 1;
                 overflow = false;
                 enable1 = 128;
+                Serial.print("adcTask: gain: ");Serial.println(gc.gain);
                 adc.set_gain(static_cast<ads1256_gain_t>(gc.gain));
                 adc.set_channel(static_cast<ads1256_channels_t>(gc.adcPort), static_cast<ads1256_channels_t>(gc.adcPort + 1));
+                Serial.print("adcTask: ch1: ");Serial.println(gc.adcPort);
+                Serial.print("adcTask: ch2: ");Serial.println(gc.adcPort+1);
+                
                 if(gc.mode == 2){
                     Serial.println("adcTask: start Tone");
-                    tone(TONE_PIN, gc.toneFreq);
+                    freq = gc.toneFreq;
+                    timerCmd = 1;
+                    //startDAC();
+                    Serial.println("adcTask: enableTestSignal");
                     adc.enableTestSignal(false);
+                    //adc.forceOffset(250000);
                 }else if(gc.mode == 1){
+                    timerCmd = 0;
                     adc.setTestSignalParams(gc.toneFreq, 8388608.0f, 0.1f);
                     adc.enableTestSignal(true);
-                    noTone(TONE_PIN);
+                    //stopDAC();
                     Serial.println("adcTask: Segnale di test abilitato");
                 }else{
+                    timerCmd = 0;
                     Serial.println("adcTask: stop Tone");
-                    noTone(TONE_PIN);
+                    //stopDAC();
                     adc.enableTestSignal(false);
+                    //adc.forceOffset(0);
                     Serial.println("adcTask: Segnale di test disabilitato");
                 }
-                delay(10);
                 adc.startStreaming();
-                Serial.print("adcTask: startStreaming");    
+                Serial.print("adcTask: startStreaming: ");    
                 Serial.println(gc.streaming);               
             }
             last = curr;
@@ -421,6 +524,9 @@ void adcTask(void* pvParameters) {
         uint32_t now = micros();
         if (curr && (now - lastSample) >= targetInterval) {
             lastSample = now;
+
+            if(timerCmd) updateDAC();
+            //Serial.print(timerReadMillis(timer));
             /*
             batch.values[0][0] = 0;
             batch.values[0][1] = 0;
@@ -541,7 +647,9 @@ void setup() {
     Serial.println("\nConnesso al WiFi");
     Serial.print("IP: ");
     Serial.println(WiFi.localIP());
+    //setupDAC();
     delay(1000);
+    //startDAC();
     // Crea la coda per i batch
     batchQueue = xQueueCreate(QUEUE_SIZE, sizeof(BatchData));
     if (batchQueue == NULL) {
@@ -574,7 +682,7 @@ void setup() {
     xTaskCreatePinnedToCore(
         adcTask, 
         "ADC Task", 
-        8192,  // Stack aumentato
+        4096,  // Stack aumentato
         NULL, 
         configMAX_PRIORITIES - 1,
         &adcTaskHandle, 
@@ -585,6 +693,7 @@ void setup() {
 }
 
 void loop() {
+    /*
     eTaskState taskState = eTaskGetState(adcTaskHandle);
     Serial.print("Stato task ADC: ");
     switch(taskState) {
@@ -610,7 +719,31 @@ void loop() {
     // Aggiungi anche info sullo stack
     UBaseType_t stackHighWaterMark = uxTaskGetStackHighWaterMark(adcTaskHandle);
     Serial.printf("Stack libero: %d bytes\n", stackHighWaterMark);
+   
+    
+    static uint32_t lastTime = 0;
+    uint32_t now = millis();
 
-    delay(1000);  // Ritardo per non floodare il serial monitor
+    // Stampa stato ogni secondo
+    if (now - lastTime >= 1000) {
+        Serial.println("Loop running...");
+        Serial.print(", "+timerCmd);
+        lastTime = now;
+    }
+
+    if(timerCmd != lastTimerCmd){
+        switch(timerCmd) {
+            case 1:
+                Serial.println("loop: startDAC");
+                startDAC();
+            break;
+            case 0:
+                Serial.println("loop: stopDAC");
+                stopDAC();
+            break;
+        }
+        lastTimerCmd = timerCmd;
+    } */
+    delay(100);  // Ritardo per non floodare il serial monitor
     //vTaskDelay(10);
 }
