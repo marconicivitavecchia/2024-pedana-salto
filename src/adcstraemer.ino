@@ -84,9 +84,9 @@ void updateDAC() {
     float sinValue = sin(2 * PI * angle / SAMPLES_PER_CYCLE);
     
     // DAC1: normale
-    int value1 = 100 + 50 * sinValue;
+    int value1 = 150 + 50 * sinValue;
     // DAC2: invertito (controfase)
-    int value2 = 100 - 50 * sinValue;
+    int value2 = 150 - 50 * sinValue;
     
     // Aggiorna entrambi i DAC
     dacWrite(DAC1_PIN, value1);
@@ -682,7 +682,7 @@ void setup() {
     xTaskCreatePinnedToCore(
         adcTask, 
         "ADC Task", 
-        4096,  // Stack aumentato
+        6000,  // Stack aumentato
         NULL, 
         configMAX_PRIORITIES - 1,
         &adcTaskHandle, 
