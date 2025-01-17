@@ -481,6 +481,7 @@ void adcTask(void* pvParameters) {
                 Serial.println(gc.streaming);
                 //stopDAC();
                 timerCmd = 0;
+                lastSample = 0;
             }else{
                 overcount = 0;
                 lastSample = 0;
@@ -523,7 +524,7 @@ void adcTask(void* pvParameters) {
         }        
 
         uint32_t now = micros();
-        if (curr && (now - lastSample) >= targetInterval) {
+        if (gc.streaming && (now - lastSample) >= targetInterval) {
             lastSample = now;
 
             if(timerCmd) updateDAC();
