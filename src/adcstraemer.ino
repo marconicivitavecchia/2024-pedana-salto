@@ -483,6 +483,7 @@ void adcTask(void* pvParameters) {
                 timerCmd = 0;
             }else{
                 overcount = 0;
+                lastSample = 0;
                 //lastOvercount = 1;
                 overflow = false;
                 enable1 = 128;
