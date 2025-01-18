@@ -82,6 +82,7 @@ public:
         if (taskHandle != nullptr) {
             // Reset dello stato SPI prima di riavviare il task
             ADS1256_DMA::resetSPI();  // Reset stato SPI prima di killare il task
+            vTaskDelay(pdMS_TO_TICKS(100));
             vTaskDelete(taskHandle);
             taskHandle = nullptr;
             ADS1256_DMA::resetSPI();
