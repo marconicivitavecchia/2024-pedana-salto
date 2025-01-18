@@ -135,14 +135,25 @@ public:
     }
 
     static void resetSPI() {
+        Serial.println("resetSPI: inizio");
         if (spi_initialized) {
             if (spi != nullptr) {
+                Serial.println("resetSPI: stopping streaming...");
+                vTaskDelay(pdMS_TO_TICKS(50));
+                stopStreaming();
+                
+                Serial.println("resetSPI: delay...");
+                vTaskDelay(pdMS_TO_TICKS(50));
+                
+                Serial.println("resetSPI: removing device...");
                 spi_bus_remove_device(spi);
                 spi = nullptr;
             }
+            Serial.println("resetSPI: freeing bus...");
             spi_bus_free(HSPI_HOST);
             spi_initialized = false;
         }
+        Serial.println("resetSPI: completato");
     }
     /* read_data_batch
     ---------------------------------------
@@ -266,20 +277,37 @@ public:
         isStreaming = true;
     }
 
-    void stopStreaming() {
-        if(!isStreaming) return;  // Previene stop multipli
+    static void stopStreaming() {
+        Serial.println("stopStreaming: inizio");
+        if (isStreaming) {
+            //Serial.println("stopStreaming: acquiring bus");
+            //spi_device_acquire_bus(spi, portMAX_DELAY); // non funziona
+            //esp_err_t ret = spi_device_acquire_bus(spi, portMAX_DELAY);pdMS_TO_TICKS(100)
+            //esp_err_t ret = spi_device_acquire_bus(spi, portMAX_DELAY);
+            //if (ret == ESP_OK) {
+            if (true) {
+                ESP_LOGI("SPI", "Bus SPI acquisito con successo.");
 
-        // Esci da modalità continua RDATAC
-        uint8_t read_cmd = ADS1256_CMD_SDATAC;
-        spi_transaction_t trans_cmd;
-        memset(&trans_cmd, 0, sizeof(spi_transaction_t));
-        trans_cmd.length = 8;
-        trans_cmd.tx_buffer = &read_cmd;
-        spi_device_transmit(spi, &trans_cmd);
-        
-        gpio_set_level((gpio_num_t)ADS1256_PIN_CS, 1);
-        spi_device_release_bus(spi);
-        isStreaming = false;
+                Serial.println("stopStreaming: sending SDATAC");
+                uint8_t read_cmd = ADS1256_CMD_SDATAC;
+                spi_transaction_t trans_cmd;
+                memset(&trans_cmd, 0, sizeof(spi_transaction_t));
+                trans_cmd.length = 8;
+                trans_cmd.tx_buffer = &read_cmd;
+                spi_device_transmit(spi, &trans_cmd);
+                
+                Serial.println("stopStreaming: setting CS high");
+                gpio_set_level((gpio_num_t)ADS1256_PIN_CS, 1);
+                Serial.println("stopStreaming: releasing bus");
+                spi_device_release_bus(spi);
+                isStreaming = false;
+                Serial.println("stopStreaming: completato");
+            } else {
+                ESP_LOGE("SPI", "Impossibile acquisire il bus SPI.");
+            }      
+        } else {
+            Serial.println("stopStreaming: già fermo");
+        }
     }
 
     void read_data_batch(BatchData& batch, uint16_t samplesPerBatch, uint16_t decimationFactor = 1) {
@@ -385,9 +413,9 @@ private:
     uint8_t dma_buffer[32];
     float emaFilteredValue;
     float emaAlpha = 0.1f;
-    bool isStreaming = false;  // Flag per tracciare lo stato dello streaming
+    static bool isStreaming;  //  // flag statico per tracciare lo stato dello streaming
     // Test signal configuration
-    bool testSignalEnabled = false;
+    bool testSignalEnabled;
     float testSignalTime = 0;
     float testFrequency = 1.0f;     // Hz
     float baseAmplitude = 1.25f;    // V (metà di 2.5V)
@@ -482,6 +510,7 @@ private:
 
 // Definizione del flag statico
 bool ADS1256_DMA::spi_initialized = false;
+bool ADS1256_DMA::isStreaming = false;
 spi_device_handle_t ADS1256_DMA::spi = nullptr;
 
 #endif
