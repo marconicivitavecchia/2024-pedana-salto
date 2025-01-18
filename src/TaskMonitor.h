@@ -79,19 +79,19 @@ public:
 
     bool restartTask() {
         Serial.println("Tentativo di restart del task...");
-            if (taskHandle != nullptr) {
-                // Reset dello stato SPI prima di riavviare il task
-                ADS1256_DMA::resetSPI();  // Reset stato SPI prima di killare il task
-                vTaskDelete(taskHandle);
-                taskHandle = nullptr;
-                ADS1256_DMA::resetSPI();
-                vTaskDelay(pdMS_TO_TICKS(100));
-            }
-            Serial.println("Avvio nuovo task");
-            return startTask();
+        if (taskHandle != nullptr) {
+            // Reset dello stato SPI prima di riavviare il task
+            ADS1256_DMA::resetSPI();  // Reset stato SPI prima di killare il task
+            vTaskDelete(taskHandle);
+            taskHandle = nullptr;
+            ADS1256_DMA::resetSPI();
+            vTaskDelay(pdMS_TO_TICKS(100));
         }
+        Serial.println("Avvio nuovo task");
+        return startTask();
+    }
 
-        TaskHandle_t getTaskHandle() {
+    TaskHandle_t getTaskHandle() {
         return taskHandle;
     }
 };
