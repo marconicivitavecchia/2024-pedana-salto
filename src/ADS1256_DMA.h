@@ -77,6 +77,7 @@ struct BatchData {
 class ADS1256_DMA {
 public:
     ADS1256_DMA() : emaFilteredValue(0.0f) {
+        Serial.println("Costruttore: inizio");
         // Setup SPI configuration
         spi_bus_config_t buscfg;
         memset(&buscfg, 0, sizeof(spi_bus_config_t));
@@ -105,9 +106,20 @@ public:
         devcfg.queue_size = 1;
         devcfg.pre_cb = NULL;
         devcfg.post_cb = NULL;
+
         
-        ESP_ERROR_CHECK(spi_bus_initialize(HSPI_HOST, &buscfg, 1));
-        ESP_ERROR_CHECK(spi_bus_add_device(HSPI_HOST, &devcfg, &spi));
+        Serial.printf("spi_initialized = %d\n", spi_initialized);
+        Serial.printf("spi = %p\n", spi);
+        if (!spi_initialized) {
+            Serial.println("ADS1256_DMA: inizializzo SPI bus...");
+            ESP_ERROR_CHECK(spi_bus_initialize(HSPI_HOST, &buscfg, 1));
+            Serial.println("ADS1256_DMA: SPI bus inizializzato");
+            
+            Serial.println("ADS1256_DMA: aggiungo device SPI...");
+            ESP_ERROR_CHECK(spi_bus_add_device(HSPI_HOST, &devcfg, &spi));
+            Serial.println("ADS1256_DMA: device SPI aggiunto");
+            spi_initialized = true;
+        }        
         
         gpio_set_direction((gpio_num_t)ADS1256_PIN_CS, GPIO_MODE_OUTPUT);
         gpio_set_direction((gpio_num_t)ADS1256_PIN_DRDY, GPIO_MODE_INPUT);
@@ -119,6 +131,17 @@ public:
         if(spi) {
             spi_bus_remove_device(spi);
             spi_bus_free(HSPI_HOST);
+        }
+    }
+
+    static void resetSPI() {
+        if (spi_initialized) {
+            if (spi != nullptr) {
+                spi_bus_remove_device(spi);
+                spi = nullptr;
+            }
+            spi_bus_free(HSPI_HOST);
+            spi_initialized = false;
         }
     }
     /* read_data_batch
@@ -358,7 +381,7 @@ public:
     }
 
 private:
-    spi_device_handle_t spi;
+    static spi_device_handle_t spi;  // handle SPI statico
     uint8_t dma_buffer[32];
     float emaFilteredValue;
     float emaAlpha = 0.1f;
@@ -372,6 +395,7 @@ private:
     const float vRef = 2.5f;        // Tensione di riferimento ADS1256
     float rampValue = 0.0f;  // Valore della rampa mantenuto tra i batch
     uint32_t offset = 0;
+    static bool spi_initialized;  // flag statico
 
     void init_ads1256() {
         gpio_set_level((gpio_num_t)ADS1256_PIN_CS, 0);
@@ -456,6 +480,9 @@ private:
     }
 };
 
-#endif
+// Definizione del flag statico
+bool ADS1256_DMA::spi_initialized = false;
+spi_device_handle_t ADS1256_DMA::spi = nullptr;
 
+#endif
 
