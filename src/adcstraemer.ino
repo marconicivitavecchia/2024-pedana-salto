@@ -763,7 +763,7 @@ void setup() {
     delay(1000);
     adcMonitor = new TaskMonitor(
         "ADC_Task",
-        2000,       // timeout 2 secondi
+        4000,       // timeout 2 secondi
         adcTask,
         nullptr, 
         1,         // core 1

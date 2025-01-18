@@ -90,7 +90,7 @@ public:
             vTaskDelete(taskHandle);
             taskHandle = nullptr;
             
-            //ADS1256_DMA::resetSPI(); 
+            ADS1256_DMA::resetSPI(); 
             Serial.println("Secondo delay...");
             vTaskDelay(pdMS_TO_TICKS(100));
         }
