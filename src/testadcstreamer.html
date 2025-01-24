@@ -1693,6 +1693,9 @@
         wsData = connectWebSocket("192.168.10.136", "81", "ws", "", onmessageEvent);
         wsControl = connectWebSocket("192.168.10.136", "82", "ws", "", onControlEvent);
 
+        //wsData = connectWebSocket("10.12.1.149", "81", "ws", "", onmessageEvent);
+        //wsControl = connectWebSocket("10.12.1.149", "82", "ws", "", onControlEvent);
+
         const log = document.getElementById('log');
         const originalConsoleLog = console.log;
         console.log = function(...args) {

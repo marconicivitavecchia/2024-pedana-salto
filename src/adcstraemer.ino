@@ -7,6 +7,8 @@
 #include "ADS1256_DMA.h"
 #include "TaskMonitor.h"
 #include <driver/spi_master.h>
+
+#define ADS1256_DEBUG
 //#include "esp32-hal-timer.h"
 
 // Configurazione hardware
@@ -45,35 +47,6 @@ struct Config {
 };
 
 /*
-class TaskMonitor() {
-private:
-    volatile uint32_t lastHeartbeatTime = 0;
-    const uint32_t timeoutMs;
-    const uint32_t initialDelayMs = 5000;  // 5 secondi di delay iniziale
-
-public:
-    // Il timeout viene specificato alla creazione
-    TaskMonitor(uint32_t timeoutMillis) : timeoutMs(timeoutMillis) {}
-
-    // Chiamato dal task che vogliamo monitorare
-    void heartbeat() {
-        lastHeartbeatTime = esp_timer_get_time() / 1000;
-    }
-
-    // Chiamato dal task che monitora
-    bool isAlive() {
-        uint32_t currentTime = esp_timer_get_time() / 1000;
-
-        // Se non sono ancora passati 5 secondi dall'avvio, consideriamo il task vivo
-        if ((currentTime - startTime) < initialDelayMs) {
-            return true;
-        }        
-        return ((currentTime - lastHeartbeatTime) <= timeoutMs);
-    }
-};
-*/
-
-/*
 BatchData {
     uint32_t timestamp;
     uint16_t count;
@@ -110,9 +83,13 @@ void updateDAC() {
     float sinValue = sin(2 * PI * angle / SAMPLES_PER_CYCLE);
     
     // DAC1: normale
-    int value1 = 150 + 50 * sinValue;
+    //int value1 = 150 + 50 * sinValue;
     // DAC2: invertito (controfase)
-    int value2 = 150 - 50 * sinValue;
+    //int value2 = 150 - 50 * sinValue;
+
+    // Aumenta l'ampiezza al massimo (0-255)
+    int value1 = 200 * (sinValue + 1) / 2;  // Onda sinusoidale 0-255V
+    int value2 = 200 * (-sinValue + 1) / 2; // Controfase
     
     // Aggiorna entrambi i DAC
     dacWrite(DAC1_PIN, value1);
@@ -338,7 +315,7 @@ void onControlEvent(WSEventType type, WebSocketServer::WSClient* client, uint8_t
             gc1.streaming = false;
             gc1.mode = newMode;
             gc1.gain = 6;
-            gc1.adcPort = 1;
+            gc1.adcPort = 0;
             if(gc1.mode == 2){
                 gc1.gain = 1;
                 gc1.adcPort = 6;
@@ -459,7 +436,7 @@ uint16_t getDecimationFactor(uint32_t desiredRate) {
 void adcTask(void* pvParameters) {
     TaskMonitor* monitor = (TaskMonitor*)pvParameters;
     Serial.println("ADC task: monitor acquisito");
-
+    float Vref = 3.3;
     try {
         Serial.println("ADC task: prima ADS1256_DMA");
         // Verifichiamo lo stato prima della creazione
@@ -500,6 +477,15 @@ void adcTask(void* pvParameters) {
             maxdelay--;
         }
         //delay(1000);
+        //adc.test_cs_pin();
+        //adc.test_spi_registers();
+        //adc.print_spi_config();
+        //adc.test_chip_active();
+        //adc.test_chip_sequence();
+        //adc.test_spi_loopback();
+        //adc.test_full_sequence();
+        //adc.test_single_byte(128);
+        delay(100);
 
         while (true) {
             //Serial.println("curr: "+String(curr)+" last: "+String(last));
@@ -528,19 +514,25 @@ void adcTask(void* pvParameters) {
                     adc.stopStreaming();
                     Serial.print("adcTask: stopStreaming ");
                     Serial.println(gc.streaming);
+                    adc.set_channel(static_cast<ads1256_channels_t>(gc.adcPort), static_cast<ads1256_channels_t>(gc.adcPort + 1));
+                    Serial.print("adcTask: gain: ");Serial.println(gc.gain);
+                    adc.set_gain(static_cast<ads1256_gain_t>(gc.gain));
+                    Serial.print("adcTask: ch1: ");Serial.println(gc.adcPort);
+                    Serial.print("adcTask: ch2: ");Serial.println(gc.adcPort+1);
+                    //uint8_t adcon = adc.read_reg(ADS1256_REG_ADCON);
+                    //Serial.printf("ADCON register: 0x%02X\n", adcon);
+                    //uint8_t mux = adc.read_reg(ADS1256_REG_MUX);
+                    //Serial.printf("MUX register: 0x%02X\n", mux);
                     //stopDAC();
+                    //adc.test_signal_sequence();
                     timerCmd = 0;
+                    //adc.set_channel(ADS1256_AIN6, ADS1256_AIN7); 
+                    delay(100);
                 }else{
                     overcount = 0;
                     //lastOvercount = 1;
                     overflow = false;
                     enable1 = 127;
-                    Serial.print("adcTask: gain: ");Serial.println(gc.gain);
-                    adc.set_gain(static_cast<ads1256_gain_t>(gc.gain));
-                    adc.set_channel(static_cast<ads1256_channels_t>(gc.adcPort), static_cast<ads1256_channels_t>(gc.adcPort + 1));
-                    Serial.print("adcTask: ch1: ");Serial.println(gc.adcPort);
-                    Serial.print("adcTask: ch2: ");Serial.println(gc.adcPort+1);
-                    
                     if(gc.mode == 2){
                         Serial.println("adcTask: start Tone");
                         freq = gc.toneFreq;
@@ -566,8 +558,8 @@ void adcTask(void* pvParameters) {
                     adc.startStreaming();
                     Serial.print("adcTask: startStreaming: ");    
                     Serial.println(gc.streaming);
-                    uint32_t now2 = micros();
-                    Serial.print("adcTask: isRightTime? "); Serial.println((now2 - lastSample) >= targetInterval);                
+                    //uint32_t now2 = micros();
+                    //Serial.print("adcTask: isRightTime? "); Serial.println((now2 - lastSample) >= targetInterval);                
                 }
                 last = curr;
             }        
@@ -581,15 +573,16 @@ void adcTask(void* pvParameters) {
                 if(gc.streaming){
                     if(timerCmd) updateDAC();
                     //Serial.print(timerReadMillis(timer));
-                    /*
-                    batch.values[0][0] = 0;
-                    batch.values[0][1] = 0;
-                    batch.values[0][2] = 0;
-                    batch.timestamp = now;
-                    batch.count = 150;
-                    */
                     //uint16_t decimationFactor = getDecimationFactor(globalConfig.sampleRate);
-                    adc.read_data_batch(batch, samplesPerBatch, decimationFactor);           
+                    adc.read_data_batch(batch, samplesPerBatch, decimationFactor);         
+                    //int32_t value = (batch.values[0][0] << 16) | 
+                    //                (batch.values[0][1] << 8) | 
+                    //                batch.values[0][2];
+                    //if(value & 0x800000) {
+                    //    value |= 0xFF000000;  // Estendi il segno
+                    //}
+                    //float voltage = (float)value * 2.5f / 8388608.0f;  // Assumendo Vref = 2.5V
+                    //Serial.printf("Value: %d, Voltage: %.6f V\n", value, voltage);
                     if(batch.count > 0) {
                         if (xQueueSend(batchQueue, &batch, 0) != pdTRUE) {
                             //overcount++;
@@ -599,7 +592,7 @@ void adcTask(void* pvParameters) {
                             overflow = false; // lastOvercount == overcount;
                         }
                     }
-                }
+                }                
             }        
             // Piccola pausa per evitare di saturare la CPU
             portYIELD();
