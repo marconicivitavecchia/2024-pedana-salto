@@ -340,6 +340,7 @@ void onControlEvent(WSEventType type, WebSocketServer::WSClient* client, uint8_t
             if (xSemaphoreTake(configMutex, pdMS_TO_TICKS(1000)) == pdTRUE) {
                 globalConfig = gc1;
                 curr = gc1.streaming;
+                last = !curr;
                 xSemaphoreGive(configMutex);
             }else {
                 Serial.println("Timeout nel prendere il semaforo del task websocket");
@@ -477,14 +478,10 @@ void adcTask(void* pvParameters) {
             maxdelay--;
         }
         //delay(1000);
-        //adc.test_cs_pin();
         //adc.test_spi_registers();
         //adc.print_spi_config();
         //adc.test_chip_active();
-        //adc.test_chip_sequence();
-        //adc.test_spi_loopback();
-        //adc.test_full_sequence();
-        //adc.test_single_byte(128);
+        adc.printDeviceStatus(adc.getDeviceStatus());
         delay(100);
 
         while (true) {
@@ -519,12 +516,7 @@ void adcTask(void* pvParameters) {
                     adc.set_gain(static_cast<ads1256_gain_t>(gc.gain));
                     Serial.print("adcTask: ch1: ");Serial.println(gc.adcPort);
                     Serial.print("adcTask: ch2: ");Serial.println(gc.adcPort+1);
-                    //uint8_t adcon = adc.read_reg(ADS1256_REG_ADCON);
-                    //Serial.printf("ADCON register: 0x%02X\n", adcon);
-                    //uint8_t mux = adc.read_reg(ADS1256_REG_MUX);
-                    //Serial.printf("MUX register: 0x%02X\n", mux);
-                    //stopDAC();
-                    //adc.test_signal_sequence();
+                    adc.printDeviceStatus(adc.getDeviceStatus());
                     timerCmd = 0;
                     //adc.set_channel(ADS1256_AIN6, ADS1256_AIN7); 
                     delay(100);
@@ -555,6 +547,8 @@ void adcTask(void* pvParameters) {
                         //adc.forceOffset(0);
                         Serial.println("adcTask: Segnale di test disabilitato");
                     }
+                    // azzera batch
+                    memset(batch.values, 0, MAX_SAMPLES_PER_BATCH * 3);
                     adc.startStreaming();
                     Serial.print("adcTask: startStreaming: ");    
                     Serial.println(gc.streaming);
@@ -609,6 +603,8 @@ void adcTask(void* pvParameters) {
 void wsTask(void* pvParameters) {
     BatchData batch;
     char buffer[2800]; 
+    uint32_t startTime = 0;
+    const uint32_t timeout = 1000;
          
     const int MAX_LEN = sizeof(buffer);
 
@@ -685,6 +681,11 @@ void wsTask(void* pvParameters) {
         }else {   
             // se non riceve dati il loop adc potrebbe essere fermo
             //Serial.println("wsTask: non ci sono dati");  
+            vTaskDelay(1);  // delay solo se non ci sono dati
+        }
+
+        if(millis() - startTime > timeout) {
+            startTime += timeout;        
             if (adcMonitor != nullptr) {  // verifica che adcMonitor sia valido
                 if (!adcMonitor->isAlive()) {
                     Serial.println("ADC non risponde!");
@@ -693,7 +694,6 @@ void wsTask(void* pvParameters) {
             } else {
                 Serial.println("ADC monitor non inizializzato!");
             }
-            vTaskDelay(1);  // delay solo se non ci sono dati
         }
     }
 }

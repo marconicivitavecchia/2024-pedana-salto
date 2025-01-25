@@ -7,6 +7,10 @@
 #include "esp_log.h"
 #include "ADS1256_delays.h"
 
+#include "soc/spi_struct.h"
+#include "soc/spi_reg.h"
+#include "soc/soc.h"
+
 // Pin definitions
 #define ADS1256_PIN_CS   5
 #define ADS1256_PIN_DRDY 4
@@ -74,6 +78,15 @@ struct BatchData {
     //int32_t first;
     uint8_t count;
     uint8_t values[MAX_SAMPLES_PER_BATCH][3];  // 3 bytes per valore
+};
+
+struct ADS1256Status {
+   uint8_t status;      // STATUS register
+   uint8_t mux;         // MUX register
+   uint8_t adcon;       // ADCON register 
+   uint8_t drate;       // DRATE register
+   bool rdatac_active;  // True se in RDATAC
+   bool chip_active;    // True se chip risponde
 };
 
 // Primo: definire i possibili codici di errore
@@ -196,14 +209,27 @@ public:
 
         if (!spi_initialized) {
             Serial.println("ADS1256_DMA: inizializzo SPI bus...");
-            ESP_ERROR_CHECK(spi_bus_initialize(HSPI_HOST, &buscfg, 1));
-            Serial.println("ADS1256_DMA: SPI bus inizializzato");
             
+            esp_err_t ret = spi_bus_initialize(VSPI_HOST, &buscfg, 1);
+            if (ret != ESP_OK) {
+                Serial.print("Errore nell'inizializzazione del bus SPI: ");
+                Serial.println(esp_err_to_name(ret));  // Converte l'errore in una stringa leggibile
+                return;  // Esci dalla funzione in caso di errore
+            }
+            Serial.println("ADS1256_DMA: SPI bus inizializzato");
+
             Serial.println("ADS1256_DMA: aggiungo device SPI...");
-            ESP_ERROR_CHECK(spi_bus_add_device(HSPI_HOST, &devcfg, &spi));
+            ret = spi_bus_add_device(VSPI_HOST, &devcfg, &spi);
+            if (ret != ESP_OK) {
+                Serial.print("Errore nell'aggiunta del device SPI: ");
+                Serial.println(esp_err_to_name(ret));
+                return;  // Esci dalla funzione in caso di errore
+            }
             Serial.println("ADS1256_DMA: device SPI aggiunto");
+        
+            // update static flag
             spi_initialized = true;
-        }
+        }   
 
         esp_err_t ret = spi_device_acquire_bus(spi, portMAX_DELAY);
         if(ret == ESP_OK) {
@@ -212,9 +238,13 @@ public:
                 Serial.println("Calibrazione ADS1256 fallita!");
                 errorHandler.setError(ADS1256_Error::CALIBRATION_FAILED, 
                     "ADS1256 initialization failed");
+                return;
             }
             spi_device_release_bus(spi);
-        }
+        }else{
+            Serial.println("ADS1256_DMA: BUS non acquisito");
+            //return;
+        }    
     }
 
 /*
@@ -390,7 +420,7 @@ public:
         
         if(spi) {
             spi_bus_remove_device(spi);
-            spi_bus_free(HSPI_HOST);
+            spi_bus_free(VSPI_HOST);
         }
     }
 
@@ -451,54 +481,65 @@ public:
         }
 
         return value + offset;
-    }    
-    
+    }  
+
     void read_data_batch(BatchData& batch, uint16_t samplesPerBatch, uint16_t decimationFactor = 1) {
         if(!isStreaming || !spi_initialized) return;
-
+        
         batch.count = 0;
         batch.timestamp = esp_timer_get_time();
         
-        CSON();  // CS basso una volta sola all'inizio
+        CSON();
         T2Delay();
-        
-        uint32_t value = 0;
-        spi_transaction_t t = {};
-        t.length = 24;
-        t.rx_buffer = &value;  // Legge direttamente in un uint32_t
 
+        SPI3.slave.trans_done = 0;  // resetta il flag che indica il completamento di una transazione
+        SPI3.cmd.usr = 1;           // avvia una nuova transazione SPI
+
+        uint32_t value = 0;
         while(batch.count < samplesPerBatch) {
             int32_t accumulator = 0;
             
             for(uint16_t i = 0; i < decimationFactor; i++) {
-                waitDRDY();                
+                waitDRDY();
                 
-                spi_device_transmit(spi, &t);
-                
+                // Avvia la transazione SPI
+                //SPI2.cmd.usr = 1;
+
+                // Attendi il completamento della transazione
+                //while (SPI2.cmd.usr);
+
+                // Leggi i dati ricevuti
+                value = SPI3.data_buf[0];  // 24 bit di dati
+
                 #if __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
                     value >>= 8;  // Allinea i 24 bit se big endian
                 #else
                     value = __builtin_bswap32(value) >> 8;  // Swap e allinea se little endian
-                #endif
-                
-                if(value & 0x800000) value |= 0xFF000000;
-                accumulator += (value + offset);
+                #endif  
+
+                // Se il dispositivo fornisce 24 bit, i bit più significativi (31-24) sono da ignorare
+                value &= 0x00FFFFFF; // Mantieni solo i 24 bit meno significativi
+
+                // Estensione del segno, se il dato è con segno (ADS1256 fornisce dati signed)
+                if (value & 0x800000) {  // Se il bit 23 è 1 (numero negativo)
+                    value |= 0xFF000000; // Estendi il segno nei bit superiori
+                }
+
+                //accumulator += (value + offset);
             }
             
-            // Calcolo media e filtro in un solo passaggio
-            emaFilteredValue = emaAlpha * (accumulator / decimationFactor) + 
-                                (1.0f - emaAlpha) * emaFilteredValue;
+            emaFilteredValue = emaAlpha * (value) + 
+                            (1.0f - emaAlpha) * emaFilteredValue;
             
-            // Converte direttamente in byte array evitando copia intermedia
             uint32_t output = (uint32_t)emaFilteredValue;
             batch.values[batch.count][0] = output >> 16;
             batch.values[batch.count][1] = output >> 8;
             batch.values[batch.count][2] = output;
-
+            
             batch.count++;
         }
         
-        CSOFF();  // CS alto una volta sola alla fine
+        CSOFF();
     }
 
     void enableTestSignal(bool enable) {
@@ -598,29 +639,6 @@ public:
         digitalWrite(ADS1256_PIN_CS, HIGH); // CS inattivo alto
     }
 
-    /*
-    static void resetSPI() {
-        Serial.println("resetSPI: inizio");
-        if (spi_initialized && spi != nullptr) {
-            if(isStreaming) {
-                sendCommand_static(ADS1256_CMD_SDATAC);
-                isStreaming = false;
-            }
-            
-            vTaskDelay(pdMS_TO_TICKS(50));
-            
-            Serial.println("resetSPI: removing device...");
-            spi_bus_remove_device(spi);
-            spi = nullptr;
-            
-            Serial.println("resetSPI: freeing bus...");
-            spi_bus_free(HSPI_HOST);
-            
-            spi_initialized = false;
-        }
-        Serial.println("resetSPI: completato");
-    }
-    */
     static void resetSPI() {
         Serial.println("resetSPI: inizio");
         
@@ -631,49 +649,25 @@ public:
 
         // 1. Prima fermiamo lo streaming se attivo
         if(isStreaming) {
-            // Assicuriamoci che il CS sia alto prima di inviare SDATAC
-            CSOFF_static();
-            delay(1);  // Breve delay per stabilizzazione
-            
-            // Stop streaming mode
-            uint8_t cmd = ADS1256_CMD_SDATAC;
-            spi_transaction_t t = {};
-            t.length = 8;
-            t.tx_buffer = &cmd;
-            t.flags = SPI_TRANS_USE_TXDATA;
-            
-            if (spi_device_transmit(spi, &t) != ESP_OK) {
-                Serial.println("resetSPI: errore nell'invio di SDATAC");
-            }
-            
-            isStreaming = false;
-            delay(50);  // Tempo per assicurarsi che il comando sia processato
+             stopStreaming();
         }
-
         // 2. Aspettiamo che eventuali transazioni in corso si completino
-        vTaskDelay(pdMS_TO_TICKS(100));
-        
-        // 3. Rimuoviamo il dispositivo SPI
-        Serial.println("resetSPI: removing device...");
-        if (spi != nullptr) {
-            spi_bus_remove_device(spi);
-            spi = nullptr;
-        }
+        vTaskDelay(pdMS_TO_TICKS(100)); 
 
-        // 4. Liberiamo il bus SPI
-        Serial.println("resetSPI: freeing bus...");
-        spi_bus_free(HSPI_HOST);
+        // 3. Rimuoviamo il dispositivo SPI
         
+        if(spi){
+            //spi_device_release_bus(spi);
+            Serial.println("resetSPI: removing device...");
+            spi_bus_remove_device(spi);
+            Serial.println("resetSPI: freeing device...");
+            spi_bus_free(VSPI_HOST);
+            spi = nullptr;
+        }  
+ 
         // 5. Reset dei flag
         spi_initialized = false;
         isStreaming = false;
-        
-        // 6. Reset dei pin GPIO
-        //gpio_reset_pin((gpio_num_t)ADS1256_PIN_CS);
-        //gpio_reset_pin((gpio_num_t)ADS1256_PIN_DRDY);
-        //gpio_reset_pin((gpio_num_t)ADS1256_PIN_MISO);
-        //gpio_reset_pin((gpio_num_t)ADS1256_PIN_MOSI);
-        //gpio_reset_pin((gpio_num_t)ADS1256_PIN_SCK);
         
         Serial.println("resetSPI: completato");
     }
@@ -799,6 +793,38 @@ public:
         uint8_t status = readRegister(ADS1256_REG_STATUS);
         Serial.printf("STATUS dopo power up: 0x%02X\n", status);
     }
+
+    ADS1256Status getDeviceStatus() {
+        ADS1256Status status = {0};
+        
+        // Verifica PWDN pin
+
+        // Test chip attivo provando a leggere STATUS
+        status.status = readRegister(ADS1256_REG_STATUS);
+        status.chip_active = (status.status != 0xFF && status.status != 0x00);
+        
+        //if(status.chip_active) {
+            // Se chip attivo, legge altri registri
+            status.mux = readRegister(ADS1256_REG_MUX);
+            status.adcon = readRegister(ADS1256_REG_ADCON);
+            status.drate = readRegister(ADS1256_REG_DRATE);
+            status.rdatac_active = (status.status & 0x80);
+        //}
+        
+        return status;
+    }
+
+    void printDeviceStatus(const ADS1256Status& status) {
+        Serial.printf("\nADS1256 Device Status:\n");
+        Serial.printf("Chip Active: %s\n", status.chip_active ? "YES" : "NO");
+        Serial.printf("RDATAC Mode: %s\n", status.rdatac_active ? "ON" : "OFF");
+        
+        Serial.printf("\nRegisters:\n");
+        Serial.printf("STATUS: 0x%02X\n", status.status);
+        Serial.printf("MUX: 0x%02X\n", status.mux);
+        Serial.printf("ADCON: 0x%02X\n", status.adcon);
+        Serial.printf("DRATE: 0x%02X\n", status.drate);
+    }
     
 private:
     static spi_device_handle_t spi;  // handle SPI statico
@@ -884,6 +910,12 @@ private:
         if(reg > ADS1256_REG_FSC2) return 0;
         if(!spi_initialized) return 0;
 
+        bool was_streaming = isStreaming;
+        if(was_streaming) {
+            sendCommand(ADS1256_CMD_SDATAC);
+            isStreaming = false;
+        }
+
         waitDRDY();
         
         CSON();
@@ -892,6 +924,7 @@ private:
         sendCommand(ADS1256_CMD_RDATA);
         T6Delay();
 
+/*
         uint8_t cmd[2] = {ADS1256_CMD_RREG | reg, 0x00};
         spi_transaction_t t1 = {};
         t1.length = 16;
@@ -906,9 +939,26 @@ private:
         t2.rx_buffer = &value;
         t2.tx_buffer = &dummy;
         spi_device_transmit(spi, &t2);
+*/
+        uint8_t cmd[2] = {ADS1256_CMD_RREG | reg, 0x00};  // Comando di lettura registro
+        uint8_t value = 0;
 
+        spi_transaction_t t = {};
+        t.length = 16;
+        t.tx_buffer = cmd;
+        t.rxlength = 8;
+        t.rx_buffer = &value;
+
+        esp_err_t ret = spi_device_transmit(spi, &t);
+
+        T6Delay();
         T3Delay();
         CSOFF();
+        
+        if(was_streaming) {
+            sendCommand(ADS1256_CMD_RDATAC);
+            isStreaming = true;
+        }
 
         return value;
     }
@@ -916,12 +966,6 @@ private:
     bool writeRegister(uint8_t reg, uint8_t value) {
         if(reg > ADS1256_REG_FSC2) return false;
         if(!spi_initialized) return false;
-
-        bool was_streaming = isStreaming;
-        if(was_streaming) {
-            sendCommand(ADS1256_CMD_SDATAC);
-            isStreaming = false;
-        }
 
         waitDRDY();
         
@@ -940,23 +984,18 @@ private:
 
         if(ret != ESP_OK) return false;
 
-        uint8_t readback = readRegister(reg);// chiama ADS1256_CMD_RDATA che non interferisce adesso con ADS1256_CMD_RDATAC
-        
-        if(was_streaming) {
-            sendCommand(ADS1256_CMD_RDATAC);
-            isStreaming = true;
-        }
+        uint8_t readback = readRegister(reg);// chiama ADS1256_CMD_RDATA che non interferisce con ADS1256_CMD_RDATAC
         
         return (readback == value);
     }
 
-    void CSON() {
+    inline void CSON() {
         gpio_set_level((gpio_num_t)ADS1256_PIN_CS, 0);
         //digitalWrite(ADS1256_PIN_CS, LOW);  // CS attivo basso
         T2Delay();  // Delay dopo CS basso
     }
 
-    void CSOFF() {
+    inline void CSOFF() {
         T3Delay();  // Delay prima di CS alto
         //digitalWrite(ADS1256_PIN_CS, HIGH); // CS inattivo alto
         gpio_set_level((gpio_num_t)ADS1256_PIN_CS, 1);
