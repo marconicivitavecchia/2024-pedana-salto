@@ -604,13 +604,15 @@ void wsTask(void* pvParameters) {
     BatchData batch;
     char buffer[2800]; 
     uint32_t startTime = 0;
-    const uint32_t timeout = 1000;
+    const uint32_t timeout = 4000;
+    uint32_t batchCount = 0;
          
     const int MAX_LEN = sizeof(buffer);
 
     while (true) {
         // invia se ci tsa qualcosa in coda
         if (xQueueReceive(batchQueue, &batch, 0) == pdTRUE) {
+            batchCount++;
             //if (ws.count() > 0) {
             // Inizia JSON
             int len = snprintf(buffer, MAX_LEN, 
@@ -691,9 +693,12 @@ void wsTask(void* pvParameters) {
                     Serial.println("ADC non risponde!");
                     adcMonitor->restartTask();
                 }
+                Serial.print("ADC OK! - ");
             } else {
                 Serial.println("ADC monitor non inizializzato!");
             }
+            Serial.print(" Batch per sec: "); Serial.println(batchCount * 1000 / timeout);
+            batchCount = 0;
         }
     }
 }

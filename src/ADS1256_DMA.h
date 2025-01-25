@@ -489,8 +489,8 @@ public:
         batch.count = 0;
         batch.timestamp = esp_timer_get_time();
         
-        CSON();
-        T2Delay();
+        //CSON();
+        //T2Delay();
 
         SPI3.slave.trans_done = 0;  // resetta il flag che indica il completamento di una transazione
         SPI3.cmd.usr = 1;           // avvia una nuova transazione SPI
@@ -539,7 +539,7 @@ public:
             batch.count++;
         }
         
-        CSOFF();
+        //CSOFF();
     }
 
     void enableTestSignal(bool enable) {
@@ -616,13 +616,15 @@ public:
         // RDATAC è "continua a darmi campioni finché non ti dico di fermarti"
         sendCommand(ADS1256_CMD_RDATAC);
         isStreaming = true;
+        CSON();
+        T2Delay();
     }
 
     static void stopStreaming() {
         if(!isStreaming || !spi_initialized) return;
         // SDATAC è "fermati"
         sendCommand_static(ADS1256_CMD_SDATAC);  // Usa la versione statica
-        //CSOFF_static();
+        CSOFF_static();
         isStreaming = false;
     }
 
