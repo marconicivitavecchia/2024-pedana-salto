@@ -88,6 +88,7 @@
 - https://github.com/Protocentral/ProtoCentral_ads1262
 - https://github.com/OLIMEX/BB-ADS1262
 - https://www.olimex.com/Products/Breadboarding/BB-ADS1262/open-source-hardware
+- https://community.element14.com/challenges-projects/project14/dataconversion/b/blog/posts/oscilloscope-on-a-24-bit-adc-chip-ads1256
 
 **Tutorials su ADC differenziali:**
 - [Misure con ponti](/manuali/sbaa532a.pdf)
