@@ -470,21 +470,9 @@ void adcTask(void* pvParameters) {
         Serial.printf("ADC task: Target interval: %d us\n", targetInterval);
         Serial.printf("ADC task: Expected samples per batch: %d\n", samplesPerBatch);
         // Imposta parametri del segnale: frequenza, ampiezza, frequenza AM
-        //adc.start();
         delay(100);
         adc.setTestSignalParams(1.0f, 1.25f, 0.1f);
         Serial.println("ADC task: Attendi connessione WiFi");
-        // Attendi connessione WiFi
-        //uint8_t maxdelay = 100;
-        //while (WiFi.status() != WL_CONNECTED && maxdelay > 0) {
-        //    vTaskDelay(pdMS_TO_TICKS(100));
-        //    maxdelay--;
-        //}
-        //delay(1000);
-        //adc.test_spi_registers();
-        //adc.print_spi_config();
-        //adc.test_chip_active();
-        //adc.printDeviceStatus(adc.getDeviceStatus());
         delay(100);
         Serial.println("ADC task: Start task tracking");        
 
@@ -509,7 +497,6 @@ void adcTask(void* pvParameters) {
                 lastSample = 0;
                 xQueueReset(batchQueue);   
                 Serial.println("adcTask: Queue reset");
-                //vTaskDelay(pdMS_TO_TICKS(100));
                 if (!gc.streaming) {
                     // Alla fine dello streaming
                     delay(50);
@@ -523,34 +510,26 @@ void adcTask(void* pvParameters) {
                     Serial.print("adcTask: ch2: ");Serial.println(gc.adcPort+1);
                     adc.printDeviceStatus(adc.getDeviceStatus());
                     timerCmd = 0;
-                    //adc.set_channel(ADS1256_AIN6, ADS1256_AIN7); 
-                    //delay(100);
                 }else{
                     overcount = 0;
-                    //lastOvercount = 1;
                     overflow = false;
                     enable1 = 127;
                     if(gc.mode == 2){
                         Serial.println("adcTask: start Tone");
                         freq = gc.toneFreq;
                         timerCmd = 1;
-                        //startDAC();
                         Serial.println("adcTask: enableTestSignal");
                         adc.enableTestSignal(false);
                         Serial.println("adcTask: dopo enableTestSignal");
-                        //adc.forceOffset(250000);
                     }else if(gc.mode == 1){
                         timerCmd = 0;
                         adc.setTestSignalParams(gc.toneFreq, 8388608.0f, 0.1f);
                         adc.enableTestSignal(true);
-                        //stopDAC();
                         Serial.println("adcTask: Segnale di test abilitato");
                     }else{
                         timerCmd = 0;
                         Serial.println("adcTask: stop Tone");
-                        //stopDAC();
                         adc.enableTestSignal(false);
-                        //adc.forceOffset(0);
                         Serial.println("adcTask: Segnale di test disabilitato");
                     }
                     // azzera batch
@@ -559,9 +538,7 @@ void adcTask(void* pvParameters) {
                     delay(50);
                     adc.startStreaming();
                     Serial.print("adcTask: startStreaming: ");    
-                    Serial.println(gc.streaming);
-                    //uint32_t now2 = micros();
-                    //Serial.print("adcTask: isRightTime? "); Serial.println((now2 - lastSample) >= targetInterval);                
+                    Serial.println(gc.streaming);           
                 }
                 last = curr;
             }        
@@ -574,17 +551,9 @@ void adcTask(void* pvParameters) {
                 //Serial.print(0);
                 if(gc.streaming){
                     if(timerCmd) updateDAC();
-                    //Serial.print(timerReadMillis(timer));
-                    //uint16_t decimationFactor = getDecimationFactor(globalConfig.sampleRate);
+
                     adc.read_data_batch(batch, samplesPerBatch, decimationFactor);         
-                    //int32_t value = (batch.values[0][0] << 16) | 
-                    //                (batch.values[0][1] << 8) | 
-                    //                batch.values[0][2];
-                    //if(value & 0x800000) {
-                    //    value |= 0xFF000000;  // Estendi il segno
-                    //}
-                    //float voltage = (float)value * 2.5f / 8388608.0f;  // Assumendo Vref = 2.5V
-                    //Serial.printf("Value: %d, Voltage: %.6f V\n", value, voltage);
+
                     if(batch.count > 0) {
                         if (xQueueSend(batchQueue, &batch, 0) != pdTRUE) {
                             //overcount++;
