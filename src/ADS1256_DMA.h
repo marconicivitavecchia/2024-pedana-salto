@@ -918,7 +918,7 @@ private:
 */
     // Funzione helper per attendere che DRDY diventi basso
     void waitDRDY() {
-        for(uint16_t i = 0; gpio_get_level((gpio_num_t)ADS1256_PIN_DRDY) && i < 500; i++) {
+        for(uint16_t i = 0; gpio_get_level((gpio_num_t)ADS1256_PIN_DRDY) && i < 1000; i++) {
             __asm__ __volatile__ ("nop\n\t"
                             "nop\n\t"
                             "nop\n\t" ::);
