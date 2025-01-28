@@ -20,8 +20,8 @@
 // Configurazione acquisizione
 #define DEFAULT_SAMPLE_RATE 30000  // Hz
 #define BATCH_PERIOD_US 5000      // 5ms = 200Hz
-#define QUEUE_SIZE 25              // Dimensione coda batch
-#define MAX_SAMPLES_PER_BATCH 310u  // Aggiunto 'u' per unsigned
+#define QUEUE_SIZE 20              // Dimensione coda batch
+//#define MAX_SAMPLES_PER_BATCH 160u  // Aggiunto 'u' per unsigned
 
 //const char* WIFI_SSID = "D-Link-6A30CC";
 //const char* WIFI_PASSWORD = "FabSeb050770250368120110";
@@ -75,6 +75,7 @@ volatile uint8_t timerCmd = 0;
 volatile uint8_t lastTimerCmd = 0;
 const uint32_t SAMPLES_PER_CYCLE = 200;  // 1000ms/5ms = 200 campioni per ciclo
 //ADS1256_DMA adc;
+ADS1256_DMA adc;
 
 
 void updateDAC() {
@@ -167,7 +168,7 @@ void stopDAC() {
 // Funzione per creare e inviare lo stato del sistema
 void sendSystemStatus(Config gc, WebSocketServer::WSClient* client = nullptr) {
     Serial.print("sendSystemStatus");
-    char statusBuffer[140];
+    char statusBuffer[150];
     snprintf(statusBuffer, sizeof(statusBuffer), 
         "{\"type\":\"status\",\"samplerate\":%u,\"alfaema\":%.3f,\"streaming\":\"%s\",\"mode\":\"%u\",\"freq\":\"%u\"}", 
         gc.sampleRate, emaAlpha, gc.streaming ? "true" : "false", gc.mode, gc.toneFreq);
@@ -284,9 +285,9 @@ void onControlEvent(WSEventType type, WebSocketServer::WSClient* client, uint8_t
                 Serial.printf("Sample rate impostato a: %d\n", newRate);
                 //curr = false; // arresto immediato del loop adc
                 //last = curr;
-                xQueueReset(batchQueue);
-                Serial.println("Queue reset");
-                delay(10);
+                //xQueueReset(batchQueue);
+                //Serial.println("Queue reset");
+                //delay(10);
                 //curr = gc1.streaming; // riavvio immediato del loop adc
                 //last = curr;
                 configChanged = true;
@@ -436,12 +437,14 @@ uint16_t getDecimationFactor(uint32_t desiredRate) {
 
 void adcTask(void* pvParameters) {
     TaskMonitor* monitor = (TaskMonitor*)pvParameters;
+    monitor->startTracking();
     Serial.println("ADC task: monitor acquisito");
+    Serial.println("ADC task: Stop monentarly task tracking");
     float Vref = 3.3;
     try {
         Serial.println("ADC task: prima ADS1256_DMA");
         // Verifichiamo lo stato prima della creazione
-        ADS1256_DMA adc;
+        //ADS1256_DMA adc;
         Serial.println("ADC task: dopo ADS1256_DMA");
         BatchData batch;
         Config gc;
@@ -463,26 +466,27 @@ void adcTask(void* pvParameters) {
         samplesPerBatch = std::min<uint16_t>(samplesPerBatch, MAX_SAMPLES_PER_BATCH);
         uint16_t decimationFactor = getDecimationFactor(gc.sampleRate);
         
-        Serial.printf("Sample rate: %d Hz\n", gc.sampleRate);
-        Serial.printf("Target interval: %d us\n", targetInterval);
-        Serial.printf("Expected samples per batch: %d\n", samplesPerBatch);
+        Serial.printf("ADC task: Sample rate: %d Hz\n", gc.sampleRate);
+        Serial.printf("ADC task: Target interval: %d us\n", targetInterval);
+        Serial.printf("ADC task: Expected samples per batch: %d\n", samplesPerBatch);
         // Imposta parametri del segnale: frequenza, ampiezza, frequenza AM
         //adc.start();
         delay(100);
         adc.setTestSignalParams(1.0f, 1.25f, 0.1f);
-        Serial.println("Attendi connessione WiFi");
+        Serial.println("ADC task: Attendi connessione WiFi");
         // Attendi connessione WiFi
-        uint8_t maxdelay = 100;
-        while (WiFi.status() != WL_CONNECTED && maxdelay > 0) {
-            vTaskDelay(pdMS_TO_TICKS(100));
-            maxdelay--;
-        }
+        //uint8_t maxdelay = 100;
+        //while (WiFi.status() != WL_CONNECTED && maxdelay > 0) {
+        //    vTaskDelay(pdMS_TO_TICKS(100));
+        //    maxdelay--;
+        //}
         //delay(1000);
         //adc.test_spi_registers();
         //adc.print_spi_config();
         //adc.test_chip_active();
-        adc.printDeviceStatus(adc.getDeviceStatus());
+        //adc.printDeviceStatus(adc.getDeviceStatus());
         delay(100);
+        Serial.println("ADC task: Start task tracking");        
 
         while (true) {
             //Serial.println("curr: "+String(curr)+" last: "+String(last));
@@ -491,7 +495,7 @@ void adcTask(void* pvParameters) {
                     gc = globalConfig;
                     xSemaphoreGive(configMutex);
                 }else {
-                    Serial.println("Timeout nel prendere il secondo semaforo");
+                    Serial.println("ADC task: Timeout nel prendere il secondo semaforo");
                 }   
                 Serial.println("adcTask: Cambio stato stream");
                 samplesPerBatch = (uint16_t)((gc.sampleRate * BATCH_PERIOD_US) / 1000000);
@@ -508,6 +512,7 @@ void adcTask(void* pvParameters) {
                 //vTaskDelay(pdMS_TO_TICKS(100));
                 if (!gc.streaming) {
                     // Alla fine dello streaming
+                    delay(50);
                     adc.stopStreaming();
                     Serial.print("adcTask: stopStreaming ");
                     Serial.println(gc.streaming);
@@ -519,7 +524,7 @@ void adcTask(void* pvParameters) {
                     adc.printDeviceStatus(adc.getDeviceStatus());
                     timerCmd = 0;
                     //adc.set_channel(ADS1256_AIN6, ADS1256_AIN7); 
-                    delay(100);
+                    //delay(100);
                 }else{
                     overcount = 0;
                     //lastOvercount = 1;
@@ -532,6 +537,7 @@ void adcTask(void* pvParameters) {
                         //startDAC();
                         Serial.println("adcTask: enableTestSignal");
                         adc.enableTestSignal(false);
+                        Serial.println("adcTask: dopo enableTestSignal");
                         //adc.forceOffset(250000);
                     }else if(gc.mode == 1){
                         timerCmd = 0;
@@ -548,7 +554,9 @@ void adcTask(void* pvParameters) {
                         Serial.println("adcTask: Segnale di test disabilitato");
                     }
                     // azzera batch
+                    Serial.print("adcTask: startStreaming: ");   
                     memset(batch.values, 0, MAX_SAMPLES_PER_BATCH * 3);
+                    delay(50);
                     adc.startStreaming();
                     Serial.print("adcTask: startStreaming: ");    
                     Serial.println(gc.streaming);
@@ -585,6 +593,7 @@ void adcTask(void* pvParameters) {
                         }else{
                             overflow = false; // lastOvercount == overcount;
                         }
+                        memset(batch.values, 0, MAX_SAMPLES_PER_BATCH * 3);
                     }
                 }                
             }        
@@ -692,12 +701,16 @@ void wsTask(void* pvParameters) {
                 if (!adcMonitor->isAlive()) {
                     Serial.println("ADC non risponde!");
                     adcMonitor->restartTask();
-                }
-                Serial.print("ADC OK! - ");
+                }else{
+                    Serial.print("ADC OK! - ");
+                }                
             } else {
                 Serial.println("ADC monitor non inizializzato!");
             }
-            Serial.print(" Batch per sec: "); Serial.println(batchCount * 1000 / timeout);
+            batchCount = batchCount * 1000 / timeout;
+            Serial.print(" Batch per sec: "); Serial.println(batchCount);
+            //if(batchCount < 20) 
+            //    xQueueReset(batchQueue);
             batchCount = 0;
         }
     }
@@ -735,6 +748,9 @@ void setup() {
         Serial.println("Failed to start WebSocket servers");
         ESP.restart();
     }
+    delay(100);
+    adc.begin();
+    delay(100);
 
     // Task WebSocket su core 0
     xTaskCreatePinnedToCore(
@@ -761,7 +777,7 @@ void setup() {
     delay(1000);
     adcMonitor = new TaskMonitor(
         "ADC_Task",
-        4000,       // timeout 2 secondi
+        8000,       // timeout 2 secondi
         adcTask,
         nullptr, 
         1,         // core 1

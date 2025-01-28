@@ -15,6 +15,7 @@ private:
     void* taskParams;
     BaseType_t coreID;
     std::function<void()> cleanupCallback;  // Callback per la cleanup
+    bool trackOn;
 
 public:
     TaskMonitor(const char* name, 
@@ -33,6 +34,7 @@ public:
         priority(prio),
         taskParams(monitor),
         coreID(core) {
+            trackOn = false;
     }
 
     void setTaskParams(void* params) {
@@ -40,17 +42,31 @@ public:
     }
 
     void heartbeat() {
+        //Serial.println("TaskMonitor: heartbeat");
         lastHeartbeatTime = esp_timer_get_time() / 1000;
     }
 
     bool isAlive() {
         uint32_t currentTime = esp_timer_get_time() / 1000;
         
-        if ((currentTime - startTime) < initialDelayMs) {
+        if (trackOn){
+            if ((currentTime - startTime) < initialDelayMs) {
+                return true;
+            }
+            return ((currentTime - lastHeartbeatTime) <= timeoutMs);
+        }else{
             return true;
-        }
-        
-        return ((currentTime - lastHeartbeatTime) <= timeoutMs);
+        }        
+    }
+
+    void startTracking(){
+        startTime = 0; 
+        lastHeartbeatTime = 0;
+        trackOn = true;
+    }
+
+    void stopTracking(){
+        trackOn = false;
     }
 
     bool startTask() {
@@ -78,23 +94,23 @@ public:
     }
 
     bool restartTask() {
-        Serial.println("Tentativo di restart del task...");
+        Serial.println("restartTask: Tentativo di restart del task...");
         if (taskHandle != nullptr) {
-            Serial.println("Chiamata resetSPI...");
-            ADS1256_DMA::resetSPI();  
+            //Serial.println("Chiamata resetSPI...");
+            //ADS1256_DMA::resetSPI();  
             
-            Serial.println("Primo delay...");
+            Serial.println("restartTask: Primo delay...");
             vTaskDelay(pdMS_TO_TICKS(50));
             
-            Serial.println("Eliminazione task...");
+            Serial.println("restartTask: Eliminazione task...");
             vTaskDelete(taskHandle);
             taskHandle = nullptr;
             
-            ADS1256_DMA::resetSPI(); 
-            Serial.println("Secondo delay...");
+            //ADS1256_DMA::resetSPI(); 
+            Serial.println("restartTask: Secondo delay...");
             vTaskDelay(pdMS_TO_TICKS(100));
         }
-        Serial.println("Avvio nuovo task");
+        Serial.println("restartTask: Avvio nuovo task");
         return startTask();
     }
 

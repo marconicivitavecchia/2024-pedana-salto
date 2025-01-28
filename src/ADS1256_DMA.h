@@ -47,7 +47,7 @@
 #define ADS1256_CMD_STANDBY 0xFD
 #define ADS1256_CMD_RESET   0xFE
 
-#define MAX_SAMPLES_PER_BATCH 310u  // Aggiunto 'u' per unsigned
+#define MAX_SAMPLES_PER_BATCH 160u  // Aggiunto 'u' per unsigned
 
 // Chip settings
 enum ads1256_channels_t {
@@ -140,40 +140,19 @@ public:
 
     ADS1256_DMA() : emaFilteredValue(0.0f) {
         Serial.println("Costruttore: inizio");
-        
-        // Setup delle direzioni GPIO con pull-up/down appropriati
-        gpio_config_t io_conf = {};
-       
+        //if (spi_bus_mutex == nullptr) {
+        //    spi_bus_mutex = xSemaphoreCreateRecursiveMutex();
+        //}     
         // CS come output, inizialmente alto
         pinMode(ADS1256_PIN_CS, OUTPUT);
         digitalWrite(ADS1256_PIN_CS, HIGH);
-        //gpio_set_direction((gpio_num_t)ADS1256_PIN_CS, GPIO_MODE_OUTPUT);
-        //gpio_set_level((gpio_num_t)ADS1256_PIN_CS, 1);
         pinMode(ADS1256_PIN_DRDY, INPUT);  // Input semplice senza pull-up
-        //gpio_set_direction((gpio_num_t)ADS1256_PIN_DRDY, GPIO_MODE_INPUT);
-        // Set PULL UP for DRDY Pin
-	    //gpio_set_pull_mode((gpio_num_t)ADS1256_PIN_DRDY, GPIO_FLOATING);
-
-        /*
-        // DRDY come input con pull-up
-        io_conf.pin_bit_mask = (1ULL << ADS1256_PIN_DRDY);
-        io_conf.mode = GPIO_MODE_INPUT;
-        io_conf.pull_up_en = GPIO_PULLUP_ENABLE;
-        io_conf.pull_down_en = GPIO_PULLDOWN_DISABLE;
-        io_conf.intr_type = GPIO_INTR_DISABLE;
-        gpio_config(&io_conf);
-        */
-
         pinMode(ADS1256_PIN_MISO, INPUT);       // MISO (input da ADS1256)
         pinMode(ADS1256_PIN_MOSI, OUTPUT);      // MOSI (output verso ADS1256)
-        pinMode(ADS1256_PIN_SCK, OUTPUT);       // SCLK (clock generato da ESP32)
-        // MISO come input
-        //gpio_set_direction((gpio_num_t)ADS1256_PIN_MISO, GPIO_MODE_INPUT);
-        
-        // MOSI e SCLK come output
-        //gpio_set_direction((gpio_num_t)ADS1256_PIN_MOSI, GPIO_MODE_OUTPUT);
-        //gpio_set_direction((gpio_num_t)ADS1256_PIN_SCK, GPIO_MODE_OUTPUT);
+        pinMode(ADS1256_PIN_SCK, OUTPUT);       // SCLK (clock generato da ESP32)      
+    }
 
+    bool begin(){
         // Setup SPI configuration
         spi_bus_config_t buscfg;
         memset(&buscfg, 0, sizeof(spi_bus_config_t));
@@ -185,10 +164,6 @@ public:
         buscfg.quadhd_io_num = -1;
         buscfg.max_transfer_sz = 32;
         buscfg.flags = 0;
-
-        // Configurazione dispositivo SPI
-        // spi_device_interface_config_t devcfg;
-        // memset(&devcfg, 0, sizeof(spi_device_interface_config_t));
 
         // Riconfigura SPI più lento
         spi_device_interface_config_t devcfg = {};
@@ -212,9 +187,9 @@ public:
             
             esp_err_t ret = spi_bus_initialize(VSPI_HOST, &buscfg, 1);
             if (ret != ESP_OK) {
-                Serial.print("Errore nell'inizializzazione del bus SPI: ");
+                Serial.print("ADS1256_DMA: Errore nell'inizializzazione del bus SPI: ");
                 Serial.println(esp_err_to_name(ret));  // Converte l'errore in una stringa leggibile
-                return;  // Esci dalla funzione in caso di errore
+                //return false;  // Esci dalla funzione in caso di errore
             }
             Serial.println("ADS1256_DMA: SPI bus inizializzato");
 
@@ -223,7 +198,7 @@ public:
             if (ret != ESP_OK) {
                 Serial.print("Errore nell'aggiunta del device SPI: ");
                 Serial.println(esp_err_to_name(ret));
-                return;  // Esci dalla funzione in caso di errore
+                return false;  // Esci dalla funzione in caso di errore
             }
             Serial.println("ADS1256_DMA: device SPI aggiunto");
         
@@ -233,137 +208,21 @@ public:
 
         esp_err_t ret = spi_device_acquire_bus(spi, portMAX_DELAY);
         if(ret == ESP_OK) {
-            Serial.println("Bus SPI acquisito, inizializzo ADS1256...");
+            Serial.println("ADS1256_DMA: Bus SPI acquisito, inizializzo ADS1256...");
             if(!init_ads1256()) {
-                Serial.println("Calibrazione ADS1256 fallita!");
+                Serial.println("ADS1256_DMA: Calibrazione ADS1256 fallita!");
                 errorHandler.setError(ADS1256_Error::CALIBRATION_FAILED, 
                     "ADS1256 initialization failed");
-                return;
+                //return;
             }
             spi_device_release_bus(spi);
         }else{
             Serial.println("ADS1256_DMA: BUS non acquisito");
-            //return;
-        }    
+            //return false;
+        }   
+        return true; 
     }
 
-/*
-    ADS1256_DMA() : emaFilteredValue(0.0f) {
-        Serial.println("\n=== Inizio inizializzazione ADS1256 ===");
-
-        // Reset completo di tutti i pin GPIO usati
-        Serial.println("Reset pin GPIO...");
-        gpio_reset_pin((gpio_num_t)ADS1256_PIN_CS);
-        gpio_reset_pin((gpio_num_t)ADS1256_PIN_DRDY);
-        gpio_reset_pin((gpio_num_t)ADS1256_PIN_MISO);
-        gpio_reset_pin((gpio_num_t)ADS1256_PIN_MOSI);
-        gpio_reset_pin((gpio_num_t)ADS1256_PIN_SCK);
-        
-        // Configurazione CS con pull-up hardware
-        gpio_config_t io_conf = {};
-        io_conf.pin_bit_mask = (1ULL << ADS1256_PIN_CS);
-        io_conf.mode = GPIO_MODE_OUTPUT;
-        io_conf.pull_up_en = GPIO_PULLUP_ENABLE;
-        io_conf.pull_down_en = GPIO_PULLDOWN_DISABLE;
-        io_conf.intr_type = GPIO_INTR_DISABLE;
-        ESP_ERROR_CHECK(gpio_config(&io_conf));
-
-        // Forza CS alto
-        gpio_set_level((gpio_num_t)ADS1256_PIN_CS, 1);
-        Serial.printf("CS dopo setup forzato: %d\n", gpio_get_level((gpio_num_t)ADS1256_PIN_CS));
-        delay(10);  // Delay più lungo per stabilizzazione
-
-        // Verifica nuovamente
-        Serial.printf("CS dopo delay: %d\n", gpio_get_level((gpio_num_t)ADS1256_PIN_CS));
-
-        // DRDY come input senza pull-up (è già pilotato dall'ADS1256)
-        Serial.println("Setup DRDY...");
-        gpio_set_direction((gpio_num_t)ADS1256_PIN_DRDY, GPIO_MODE_INPUT);
-        gpio_set_pull_mode((gpio_num_t)ADS1256_PIN_DRDY, GPIO_FLOATING);
-        Serial.printf("DRDY level dopo setup: %d\n", gpio_get_level((gpio_num_t)ADS1256_PIN_DRDY));
-
-        // Altri pin GPIO
-        Serial.println("Setup altri pin SPI...");
-        gpio_set_direction((gpio_num_t)ADS1256_PIN_MISO, GPIO_MODE_INPUT);
-        gpio_set_direction((gpio_num_t)ADS1256_PIN_MOSI, GPIO_MODE_OUTPUT);
-        gpio_set_direction((gpio_num_t)ADS1256_PIN_SCK, GPIO_MODE_OUTPUT);
-
-        Serial.println("\nStato pin dopo setup iniziale:");
-        Serial.printf("CS: %d\n", gpio_get_level((gpio_num_t)ADS1256_PIN_CS));
-        Serial.printf("DRDY: %d\n", gpio_get_level((gpio_num_t)ADS1256_PIN_DRDY));
-        Serial.printf("MISO: %d\n", gpio_get_level((gpio_num_t)ADS1256_PIN_MISO));
-        Serial.printf("MOSI: %d\n", gpio_get_level((gpio_num_t)ADS1256_PIN_MOSI));
-        Serial.printf("SCLK: %d\n", gpio_get_level((gpio_num_t)ADS1256_PIN_SCK));
-
-        // Setup SPI configuration
-        Serial.println("\nConfigurazione SPI...");
-        spi_bus_config_t buscfg;
-        memset(&buscfg, 0, sizeof(spi_bus_config_t));
-            
-        buscfg.mosi_io_num = ADS1256_PIN_MOSI;
-        buscfg.miso_io_num = ADS1256_PIN_MISO;
-        buscfg.sclk_io_num = ADS1256_PIN_SCK;
-        buscfg.quadwp_io_num = -1;
-        buscfg.quadhd_io_num = -1;
-        buscfg.max_transfer_sz = 32;
-        buscfg.flags = 0;
-
-        // Configurazione dispositivo SPI
-        spi_device_interface_config_t devcfg;
-        memset(&devcfg, 0, sizeof(spi_device_interface_config_t));
-
-        devcfg.mode = 1;                    // CPOL=0, CPHA=1
-        devcfg.clock_speed_hz = 1000000;    // Ridotto a 1MHz per debug
-        devcfg.spics_io_num = -1;           // CS gestito via software
-        devcfg.queue_size = 1;
-        devcfg.flags = SPI_DEVICE_NO_DUMMY;
-        devcfg.command_bits = 0;
-        devcfg.address_bits = 0;
-        devcfg.dummy_bits = 0;
-        devcfg.duty_cycle_pos = 128;        // Default duty cycle
-        devcfg.cs_ena_pretrans = 0;
-        devcfg.cs_ena_posttrans = 0;
-        devcfg.pre_cb = NULL;
-        devcfg.post_cb = NULL;
-
-        if (!spi_initialized) {
-            Serial.println("Inizializzo SPI bus...");
-            ESP_ERROR_CHECK(spi_bus_initialize(HSPI_HOST, &buscfg, 1));
-            Serial.println("SPI bus inizializzato");
-            
-            Serial.println("Aggiunta device SPI...");
-            ESP_ERROR_CHECK(spi_bus_add_device(HSPI_HOST, &devcfg, &spi));
-            Serial.println("Device SPI aggiunto");
-            spi_initialized = true;
-        }
-
-        Serial.println("\nStato pin dopo inizializzazione SPI:");
-        Serial.printf("CS: %d\n", gpio_get_level((gpio_num_t)ADS1256_PIN_CS));
-        Serial.printf("DRDY: %d\n", gpio_get_level((gpio_num_t)ADS1256_PIN_DRDY));
-        Serial.printf("MISO: %d\n", gpio_get_level((gpio_num_t)ADS1256_PIN_MISO));
-        Serial.printf("MOSI: %d\n", gpio_get_level((gpio_num_t)ADS1256_PIN_MOSI));
-        Serial.printf("SCLK: %d\n\n", gpio_get_level((gpio_num_t)ADS1256_PIN_SCK));
-
-        esp_err_t ret = spi_device_acquire_bus(spi, portMAX_DELAY);
-        if(ret == ESP_OK) {
-            Serial.println("Bus SPI acquisito, inizializzo ADS1256...");
-            if(!init_ads1256()) {
-                Serial.println("Calibrazione ADS1256 fallita!");
-                errorHandler.setError(ADS1256_Error::CALIBRATION_FAILED, 
-                    "ADS1256 initialization failed");
-            }
-            spi_device_release_bus(spi);
-        }
-
-        Serial.println("\nStato finale pin:");
-        Serial.printf("CS: %d\n", gpio_get_level((gpio_num_t)ADS1256_PIN_CS));
-        Serial.printf("DRDY: %d\n", gpio_get_level((gpio_num_t)ADS1256_PIN_DRDY));
-        Serial.printf("MISO: %d\n", gpio_get_level((gpio_num_t)ADS1256_PIN_MISO));
-        Serial.printf("MOSI: %d\n", gpio_get_level((gpio_num_t)ADS1256_PIN_MOSI));
-        Serial.printf("SCLK: %d\n", gpio_get_level((gpio_num_t)ADS1256_PIN_SCK));
-        Serial.println("=== Fine inizializzazione ADS1256 ===\n");
-    }
-*/
     bool init_ads1256() {
         if (!spi_initialized) return false;
         
@@ -371,7 +230,7 @@ public:
         sendCommand(ADS1256_CMD_RESET);
         T11Delay();  // 25ms delay dopo reset
         
-        waitDRDY();
+        //waitDRDY();
 
         // Stop continuous mode
         sendCommand(ADS1256_CMD_SDATAC);
@@ -397,19 +256,19 @@ public:
         sendCommand(ADS1256_CMD_SELFCAL);
         
         // Attendi completamento calibrazione con timeout
-        if(!waitDRDY(1000)) {
-            Serial.println("Timeout durante la calibrazione");
+        if(!waitDRDY(10000)) {
+            Serial.println("init_ads1256Timeout durante la calibrazione");
             return false;
         }
         
         // Verifica status register per conferma calibrazione
         uint8_t status = readRegister(ADS1256_REG_STATUS);
         if(status & 0x01) { // Bit 0 = Order Status Bit
-            Serial.println("Calibrazione fallita - Status check");
+            Serial.println("init_ads1256: Calibrazione fallita - Status check");
             return false;
         }
         
-        Serial.println("Inizializzazione ADS1256 completata con successo");
+        Serial.println("ADS1256_DMA: Inizializzazione ADS1256 completata con successo");
         return true;
     }
 
@@ -650,9 +509,7 @@ public:
         }
 
         // 1. Prima fermiamo lo streaming se attivo
-        if(isStreaming) {
-             stopStreaming();
-        }
+        stopStreaming();
         // 2. Aspettiamo che eventuali transazioni in corso si completino
         vTaskDelay(pdMS_TO_TICKS(100)); 
 
@@ -663,7 +520,10 @@ public:
             Serial.println("resetSPI: removing device...");
             spi_bus_remove_device(spi);
             Serial.println("resetSPI: freeing device...");
-            spi_bus_free(VSPI_HOST);
+            //if(xSemaphoreTakeRecursive(spi_bus_mutex, pdMS_TO_TICKS(1000)) == pdTRUE) {
+            //spi_bus_free(VSPI_HOST);
+            ////    xSemaphoreGiveRecursive(spi_bus_mutex);
+            ////}
             spi = nullptr;
         }  
  
@@ -685,12 +545,12 @@ public:
     bool set_channel(ads1256_channels_t positive_ch, ads1256_channels_t negative_ch = ADS1256_AINCOM) {
         if(!spi_initialized) {
             errorHandler.setError(ADS1256_Error::SPI_INIT_FAILED, 
-                "SPI not initialized");
+                "Set_channel: SPI not initialized");
             return false;
         }
         if(positive_ch > ADS1256_AIN7 || negative_ch > ADS1256_AINCOM) {
             errorHandler.setError(ADS1256_Error::INVALID_CHANNEL, 
-                "Invalid channel selection");
+                "Set_channel: Invalid channel selection");
             return false;
         }
         /* 
@@ -720,12 +580,12 @@ public:
     bool set_gain(ads1256_gain_t gain) {
         if(!spi_initialized) {
             errorHandler.setError(ADS1256_Error::SPI_INIT_FAILED, 
-                "SPI not initialized");
+                "set_gain SPI not initialized");
             return false;
         }
         if(gain > ADS1256_GAIN_64) {
             errorHandler.setError(ADS1256_Error::INVALID_GAIN, 
-                "Gain not valid");
+                "set_gain Gain not valid");
             return false;
         }
         /* 
@@ -836,6 +696,7 @@ private:
     static bool isStreaming;  //  // flag statico per tracciare lo stato dello streaming
     static bool spi_initialized;  // flag statico
     static bool resetInProgress;  // flag statico
+    static SemaphoreHandle_t spi_bus_mutex;
     uint8_t dma_buffer[32];
     // Test signal configuration
     bool testSignalEnabled;
@@ -859,14 +720,14 @@ private:
     bool sendCommand(uint8_t cmd) {
         if (!spi_initialized) return false;
         CSON();
-
+        
         // Comandi che non richiedono DRDY
         if (cmd != ADS1256_CMD_SYNC && 
             cmd != ADS1256_CMD_RESET && 
             cmd != ADS1256_CMD_SDATAC) {
             waitDRDY();
         }
-        
+
         spi_transaction_t t = {};
         t.length = 8;
         t.tx_buffer = &cmd;
@@ -1057,7 +918,11 @@ private:
 */
     // Funzione helper per attendere che DRDY diventi basso
     void waitDRDY() {
-        while(gpio_get_level((gpio_num_t)ADS1256_PIN_DRDY));
+        for(uint16_t i = 0; gpio_get_level((gpio_num_t)ADS1256_PIN_DRDY) && i < 500; i++) {
+            __asm__ __volatile__ ("nop\n\t"
+                            "nop\n\t"
+                            "nop\n\t" ::);
+        }
     }
 
     bool waitDRDY(uint32_t timeout) {
@@ -1100,6 +965,7 @@ bool ADS1256_DMA::spi_initialized = false;
 bool ADS1256_DMA::resetInProgress = false;
 bool ADS1256_DMA::isStreaming = false;
 spi_device_handle_t ADS1256_DMA::spi = nullptr;
+SemaphoreHandle_t ADS1256_DMA::spi_bus_mutex = nullptr;
 //spi_transaction_t ADS1256_DMA::tr = {};  // Inizializzazione della tr statica
 #endif
 
