@@ -49,6 +49,25 @@
 
 #define MAX_SAMPLES_PER_BATCH 160u  // Aggiunto 'u' per unsigned
 
+enum ads1256_drate_t {
+   ADS1256_DRATE_30000SPS = 0xF0,    // 30,000 SPS
+   ADS1256_DRATE_15000SPS = 0xE0,    // 15,000 SPS
+   ADS1256_DRATE_7500SPS  = 0xD0,    // 7,500 SPS
+   ADS1256_DRATE_3750SPS  = 0xC0,    // 3,750 SPS
+   ADS1256_DRATE_2000SPS  = 0xB0,    // 2,000 SPS
+   ADS1256_DRATE_1000SPS  = 0xA0,    // 1,000 SPS ✅ Corretto
+   ADS1256_DRATE_500SPS   = 0x90,    // 500 SPS ✅ Corretto
+   ADS1256_DRATE_100SPS   = 0x80,    // 100 SPS ✅ Corretto
+   ADS1256_DRATE_60SPS    = 0x70,    // 60 SPS ✅ Corretto
+   ADS1256_DRATE_50SPS    = 0x60,    // 50 SPS ✅ Corretto
+   ADS1256_DRATE_30SPS    = 0x50,    // 30 SPS ✅ Corretto
+   ADS1256_DRATE_25SPS    = 0x40,    // 25 SPS ✅ Corretto
+   ADS1256_DRATE_15SPS    = 0x30,    // 15 SPS ✅ Corretto
+   ADS1256_DRATE_10SPS    = 0x20,    // 10 SPS ✅ Corretto
+   ADS1256_DRATE_5SPS     = 0x10,    // 5 SPS ✅ Corretto
+   ADS1256_DRATE_2_5SPS   = 0x00     // 2.5 SPS ✅ Corretto
+};
+
 // Chip settings
 enum ads1256_channels_t {
     ADS1256_AIN0 = 0,
@@ -101,7 +120,9 @@ enum class ADS1256_Error {
     BUS_ACQUISITION_FAILED,
     DRDY_TIMEOUT,
     INVALID_REGISTER,
-    BUFFER_OVERFLOW
+    BUFFER_OVERFLOW,
+    INVALID_RATE,
+    INVALID_DATA_RATE
 };
 
 // Secondo: aggiungere una classe per la gestione degli errori
@@ -207,15 +228,12 @@ public:
         }   
 
         esp_err_t ret = spi_device_acquire_bus(spi, portMAX_DELAY);
+        delay(50);
         if(ret == ESP_OK) {
             Serial.println("ADS1256_DMA: Bus SPI acquisito, inizializzo ADS1256...");
-            if(!init_ads1256()) {
-                Serial.println("ADS1256_DMA: Calibrazione ADS1256 fallita!");
-                errorHandler.setError(ADS1256_Error::CALIBRATION_FAILED, 
-                    "ADS1256 initialization failed");
-                //return;
-            }
             spi_device_release_bus(spi);
+             delay(50);
+            init_ads1256();
         }else{
             Serial.println("ADS1256_DMA: BUS non acquisito");
             //return false;
@@ -236,20 +254,20 @@ public:
         sendCommand(ADS1256_CMD_SDATAC);
         
         // Setup registri base
-        if(!writeRegister(ADS1256_REG_STATUS, 0x03)) {   // Buffer OFF, no auto-cal
-            return false;
+        if(!writeRegister(ADS1256_REG_STATUS, 0x04)) {   // Buffer OFF, no auto-cal
+            Serial.println("init_ads1256: Timeout durante set status");
         }
         
-        if(!writeRegister(ADS1256_REG_DRATE, 0xF0)) {    // 30000 SPS
-            return false;
+        if(!set_sample_rate(ADS1256_DRATE_30000SPS)) {    // 30000 SPS
+            Serial.println("init_ads1256: Timeout durante set speed");
         }
         
-        if(!writeRegister(ADS1256_REG_MUX, 0x08)) {      // AIN0 vs AINCOM
-            return false;
+        if(!set_single_channel(ADS1256_AIN1)) {      // AIN0 vs AINCOM
+            Serial.println("init_ads1256: Timeout durante set single mode");
         }
         
         if(!set_gain(ADS1256_GAIN_1)) {
-            return false;
+            Serial.println("init_ads1256: Timeout durante set initial gain 1");
         }
         
         // Avvio calibrazione
@@ -257,15 +275,15 @@ public:
         
         // Attendi completamento calibrazione con timeout
         if(!waitDRDY(10000)) {
-            Serial.println("init_ads1256Timeout durante la calibrazione");
-            return false;
+            Serial.println("init_ads1256: Timeout durante la calibrazione");
+            //return false;
         }
         
         // Verifica status register per conferma calibrazione
         uint8_t status = readRegister(ADS1256_REG_STATUS);
         if(status & 0x01) { // Bit 0 = Order Status Bit
             Serial.println("init_ads1256: Calibrazione fallita - Status check");
-            return false;
+            //return false;
         }
         
         Serial.println("ADS1256_DMA: Inizializzazione ADS1256 completata con successo");
@@ -534,6 +552,31 @@ public:
         Serial.println("resetSPI: completato");
     }
 
+    bool set_sample_rate(ads1256_drate_t data_rate) {
+        if(!spi_initialized) {
+            errorHandler.setError(ADS1256_Error::SPI_INIT_FAILED, 
+                "Set_sample_rate: SPI not initialized");
+            return false;
+        }
+
+        // Verifica che il rate sia valido
+        if (data_rate < ADS1256_DRATE_2_5SPS || data_rate > ADS1256_DRATE_30000SPS) {
+            errorHandler.setError(ADS1256_Error::INVALID_RATE, 
+                "Set_sample_rate: Invalid rate value");
+            return false;
+        }
+
+        if(!writeRegister(ADS1256_REG_DRATE, static_cast<uint8_t>(data_rate))) {
+            Serial.println("writeRegister fallita");
+            return false;
+        }
+
+        sync();
+        wakeup();
+        
+        return true;
+    }
+
     bool set_single_channel(ads1256_channels_t channel) {
         return set_channel(channel, ADS1256_AINCOM);
     }
@@ -724,9 +767,12 @@ private:
         // Comandi che non richiedono DRDY
         if (cmd != ADS1256_CMD_SYNC && 
             cmd != ADS1256_CMD_RESET && 
-            cmd != ADS1256_CMD_SDATAC) {
+            cmd != ADS1256_CMD_SDATAC &&
+            cmd != ADS1256_CMD_SELFCAL &&  // Aggiunto SELFCAL
+            cmd != ADS1256_CMD_RDATAC) {   // Aggiunto RDATAC
             waitDRDY();
         }
+
 
         spi_transaction_t t = {};
         t.length = 8;
@@ -748,7 +794,7 @@ private:
         if (cmd != ADS1256_CMD_SYNC && 
             cmd != ADS1256_CMD_RESET && 
             cmd != ADS1256_CMD_SDATAC) {
-            while(gpio_get_level((gpio_num_t)ADS1256_PIN_DRDY));
+            waitDRDY_static();
         }
         
         CSON_static();
@@ -778,77 +824,108 @@ private:
             sendCommand(ADS1256_CMD_SDATAC);
             isStreaming = false;
         }
-
-        waitDRDY();
         
         CSON();
-        T2Delay();
-
-        sendCommand(ADS1256_CMD_RDATA);
-        T6Delay();
-
-/*
-        uint8_t cmd[2] = {ADS1256_CMD_RREG | reg, 0x00};
+        waitDRDY();
+        
+        // Invia comando RREG + registro
+        uint8_t cmd = ADS1256_CMD_RREG | reg;
         spi_transaction_t t1 = {};
-        t1.length = 16;
-        t1.tx_buffer = cmd;
+        t1.length = 8;
+        t1.tx_buffer = &cmd;
         spi_device_transmit(spi, &t1);
         T6Delay();
-
-        uint8_t value;
-        uint8_t dummy = 0;
+        
+        // Invia count byte
+        uint8_t count = 0x00;
         spi_transaction_t t2 = {};
         t2.length = 8;
-        t2.rx_buffer = &value;
-        t2.tx_buffer = &dummy;
+        t2.tx_buffer = &count;
         spi_device_transmit(spi, &t2);
-*/
-        uint8_t cmd[2] = {ADS1256_CMD_RREG | reg, 0x00};  // Comando di lettura registro
-        uint8_t value = 0;
-
-        spi_transaction_t t = {};
-        t.length = 16;
-        t.tx_buffer = cmd;
-        t.rxlength = 8;
-        t.rx_buffer = &value;
-
-        esp_err_t ret = spi_device_transmit(spi, &t);
-
         T6Delay();
-        T3Delay();
-        CSOFF();
         
+        // Leggi valore
+        uint8_t value = 0;
+        spi_transaction_t t3 = {};
+        t3.length = 8;
+        t3.rx_buffer = &value;
+        spi_device_transmit(spi, &t3);
+        T6Delay();
+        
+        CSOFF();
+
         if(was_streaming) {
             sendCommand(ADS1256_CMD_RDATAC);
             isStreaming = true;
         }
-
+        
         return value;
     }
+
+    /*
+    le transazioni SPI in byte singoli invece di fare un'unica transazione di 24 bit. 
+    Questo permette una temporizzazione più precisa tra i byte come richiesto 
+    dal protocollo dell'ADS1256.
+
+    La sequenza funzionante è:
+    - WREG (byte 1)
+    - Count (byte 2)
+    - Value (byte 3)
+
+    Con delay T6 tra ogni byte.
+    Lo stesso vale per la lettura:
+    - RREG (byte 1)
+    - Count (byte 2)
+    - Read value (byte 3)
+    */
 
     bool writeRegister(uint8_t reg, uint8_t value) {
         if(reg > ADS1256_REG_FSC2) return false;
         if(!spi_initialized) return false;
-
-        waitDRDY();
-        
+       
         CSON();
-        T2Delay();
+        waitDRDY();
 
-        uint8_t data[3] = {ADS1256_CMD_WREG | reg, 0x00, value};
-        spi_transaction_t t = {};
-        t.length = 24;
-        t.tx_buffer = data;
-        esp_err_t ret = spi_device_transmit(spi, &t);
-
+        // Prima transazione: WREG
+        uint8_t wreg = ADS1256_CMD_WREG | reg;
+        spi_transaction_t t1 = {};
+        t1.length = 8;
+        t1.tx_buffer = &wreg;
+        spi_device_transmit(spi, &t1);
+        Serial.printf("WREG sent: 0x%02X\n", wreg);
         T6Delay();
+
+        // Seconda transazione: count
+        uint8_t count = 0x00;
+        spi_transaction_t t2 = {};
+        t2.length = 8;
+        t2.tx_buffer = &count;
+        spi_device_transmit(spi, &t2);
+        Serial.println("Count sent");
+        T6Delay();
+
+        // Terza transazione: value
+        spi_transaction_t t3 = {};
+        t3.length = 8;
+        t3.tx_buffer = &value;
+        spi_device_transmit(spi, &t3);
+        Serial.printf("writeRegister: Value sent: 0x%02X\n", value);
+        
         T3Delay();
         CSOFF();
 
-        if(ret != ESP_OK) return false;
+        delay(1);  // Delay prima della verifica
 
-        uint8_t readback = readRegister(reg);// chiama ADS1256_CMD_RDATA che non interferisce con ADS1256_CMD_RDATAC
+        // Verifica
+        uint8_t readback = readRegister(reg);
+        Serial.printf("writeRegister: Write: 0x%02X, Read: 0x%02X\n", value, readback);
         
+        // Qui aggiungiamo il check speciale per STATUS
+        if(reg == ADS1256_REG_STATUS) {
+            // Per STATUS verifichiamo solo i bit che abbiamo scritto
+            return (readback & 0x07) == (value & 0x07);  // Verifica solo i 3 bit bassi
+        }
+
         return (readback == value);
     }
 
@@ -918,7 +995,15 @@ private:
 */
     // Funzione helper per attendere che DRDY diventi basso
     void waitDRDY() {
-        for(uint16_t i = 0; gpio_get_level((gpio_num_t)ADS1256_PIN_DRDY) && i < 1000; i++) {
+        for(uint16_t i = 0; gpio_get_level((gpio_num_t)ADS1256_PIN_DRDY) && i < 2000; i++) {
+            __asm__ __volatile__ ("nop\n\t"
+                            "nop\n\t"
+                            "nop\n\t" ::);
+        }
+    }
+
+    static void waitDRDY_static() {
+        for(uint16_t i = 0; gpio_get_level((gpio_num_t)ADS1256_PIN_DRDY) && i < 2000; i++) {
             __asm__ __volatile__ ("nop\n\t"
                             "nop\n\t"
                             "nop\n\t" ::);

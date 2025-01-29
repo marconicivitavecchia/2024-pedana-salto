@@ -533,7 +533,7 @@ void adcTask(void* pvParameters) {
                         Serial.println("adcTask: Segnale di test disabilitato");
                     }
                     // azzera batch
-                    Serial.print("adcTask: startStreaming: ");   
+                    Serial.print("adcTask: startStreaming: ");     
                     memset(batch.values, 0, MAX_SAMPLES_PER_BATCH * 3);
                     delay(50);
                     adc.startStreaming();
