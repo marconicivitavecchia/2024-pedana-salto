@@ -31,6 +31,18 @@ enum WSEventType {
     WS_EVT_PONG
 };
 
+struct ProxyConfig {
+    bool check_proxy_headers;
+    String trusted_proxies;
+    String base_path;
+    
+    ProxyConfig() : 
+        check_proxy_headers(false),
+        trusted_proxies(""),
+        base_path("")
+    {}
+};
+
 class WebSocketServer {
 public:
     struct WSClient {
@@ -43,7 +55,10 @@ public:
 
     typedef std::function<void(WSEventType type, WSClient* client, uint8_t* data, size_t len, void* arg)> WSEventCallback;
 
-    WebSocketServer(uint16_t port) : _port(port), _server(nullptr) {
+    WebSocketServer(uint16_t port, ProxyConfig proxy_config = ProxyConfig()) : 
+        _port(port), 
+        _server(nullptr),
+        _proxy_config(proxy_config) {
         memset(_clients, 0, sizeof(_clients));
         _onEvent = nullptr;
         _lastCheck = 0;
@@ -83,8 +98,9 @@ public:
             return false;
         }
 
+        String ws_path = _proxy_config.base_path + "/ws";
         httpd_uri_t ws = {
-            .uri = "/ws",
+            .uri = ws_path.c_str(),
             .method = HTTP_GET,
             .handler = _wsHandler,
             .user_ctx = this,
@@ -318,6 +334,38 @@ private:
     WSEventCallback _onEvent;
     uint32_t _lastCheck;
     int _activeClients;
+    ProxyConfig _proxy_config;
+
+    bool verify_proxy_request(httpd_req_t *req) {
+        if (!_proxy_config.check_proxy_headers) return true;
+
+        size_t proto_len = httpd_req_get_hdr_value_len(req, "X-Forwarded-Proto");
+        if (proto_len > 0) {
+            char* proto = (char*)malloc(proto_len + 1);
+            if (httpd_req_get_hdr_value_str(req, "X-Forwarded-Proto", proto, proto_len + 1) == ESP_OK) {
+                if (strcmp(proto, "https") != 0) {
+                    free(proto);
+                    return false;
+                }
+            }
+            free(proto);
+        }
+
+        if (!_proxy_config.trusted_proxies.isEmpty()) {
+            size_t ip_len = httpd_req_get_hdr_value_len(req, "X-Real-IP");
+            if (ip_len > 0) {
+                char* ip = (char*)malloc(ip_len + 1);
+                if (httpd_req_get_hdr_value_str(req, "X-Real-IP", ip, ip_len + 1) == ESP_OK) {
+                    bool trusted = _proxy_config.trusted_proxies.indexOf(ip) >= 0;
+                    free(ip);
+                    return trusted;
+                }
+                free(ip);
+            }
+        }
+
+        return true;
+    }
 
     void handleError(int client_id, esp_err_t error, const char* operation) {
         for (int i = 0; i < MAX_CLIENTS; i++) {
@@ -382,7 +430,13 @@ private:
     static esp_err_t _wsHandler(httpd_req_t *req) {
         WebSocketServer* ws = (WebSocketServer*)req->user_ctx;
         if (!ws) return ESP_FAIL;
-    
+
+        // Verifica proxy headers
+        if (!ws->verify_proxy_request(req)) {
+            return httpd_resp_send_err(req, HTTPD_403_FORBIDDEN, 
+                "Invalid proxy configuration");
+        }
+
         WSClient client;
         client.id = httpd_req_to_sockfd(req);
 

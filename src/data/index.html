@@ -1,0 +1,1791 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WebSocket Test</title>
+    <style>
+        .limit-indicator {
+            color: red;
+            font-weight: bold;
+            visibility: hidden;
+        }
+        .limit-indicator.active {
+            visibility: visible;
+        }
+        #scrollLeft:disabled, #scrollRight:disabled {
+            cursor: not-allowed;
+        }
+        .scope-controls {
+            margin: 5px 0;
+            padding: 5px;
+            background: #f5f5f5;
+            border: 1px solid #ddd;
+        }
+        .timebase-controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin: 5px 0;
+        }
+        .control-panel {
+            margin: 20px;
+            padding: 10px;
+            border: 1px solid #ccc;
+        }
+        .config-item {
+            margin: 10px 0;
+        }
+        #log {
+            margin-top: 20px;
+            padding: 10px;
+            background-color: #f0f0f0;
+            height: 200px;
+            overflow-y: auto;
+        }
+        .stats {
+            margin: 10px 0;
+            padding: 10px;
+            background-color: #e0e0e0;
+        }
+        .plot-container {
+            position: relative;
+            margin: 10px 0;
+        }
+        #plotCanvas {
+            width: 100%;
+            height: 400px;  /* ridotto da 600px a 400px per comprimere verticalmente */
+            border: 1px solid #ccc;
+        }
+        .plot-controls {
+            margin: 5px 0;
+            padding: 5px;
+            background: #f5f5f5;
+            border: 1px solid #ddd;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        .buffer-controls {
+            margin: 5px 0;
+            padding: 5px;
+            background: #f5f5f5;
+            border: 1px solid #ddd;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        .zoom-box {
+            position: absolute;
+            border: 1px dashed blue;
+            background: rgba(0, 0, 255, 0.1);
+            pointer-events: none;
+            display: none;
+        }
+        .value-info {
+            position: absolute;
+            background: rgba(255, 255, 255, 0.9);
+            border: 1px solid #ccc;
+            padding: 5px;
+            display: none;
+            pointer-events: none;
+        }
+        #fileInput {
+            display: none;
+        }
+        .test-signal-controls {
+            margin: 5px 0;
+            padding: 5px;
+            background: #f5f5f5;
+            border: 1px solid #ddd;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        .green {
+            background-color: #22c55e;
+        }
+
+        .red {
+            background-color: #ef4444;
+        }
+        .overflow-box {
+            width: 150px;
+            padding: 5px;
+            text-align: center;
+            border-radius: 8px;
+            font-weight: bold;
+            color: white;
+            transition: background-color 0.3s;
+            mask-origin: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>WebSocket Test</h1>
+
+    <div class="control-panel">
+        <div class="config-item">
+            <label for="sampleRate">Sample Rate:</label>
+            <select id="sampleRate" onchange="updateConfig('samplerate', this.value)">
+                <option value="200">200 Hz</option>
+                <option value="500">500 Hz</option>
+                <option value="1000">1000 Hz</option>
+                <option value="10000">10 kHz</option>
+                <option value="15000">15 kHz</option>
+                <option value="30000" selected>30 kHz</option>
+            </select>
+        </div>
+
+        <div class="config-item">
+            <label for="emaAlpha">EMA Alpha:</label>
+            <select id="emaAlpha" onchange="updateConfig('alfaema', this.value)">
+                <option value="0.05">0.05</option>
+                <option value="0.1" selected>0.10</option>
+                <option value="0.2">0.20</option>
+                <option value="0.3">0.30</option>
+                <option value="0.5">0.50</option>
+            </select>
+        </div>
+        <div class="buffer-controls">
+            <label>Buffer Duration (s):
+                <input type="number" id="bufferDuration" value="10" min="1" max="3600" 
+                       onchange="updateBufferSize()">
+            </label>
+            <span>Buffer Size: <span id="bufferInfo">0/0</span></span>
+            <div id="overflowBox" class="overflow-box green">
+                OVERFLOW
+            </div>
+        </div>       
+        <div class="config-item">
+            <label>Streaming Control:</label>
+            <button id="streamToggle" onclick="toggleStreaming()">Start Streaming</button>
+        </div>
+
+        <div class="config-item">
+            <label>Current Configuration:</label>
+            <div id="currentConfig">Waiting for connection...</div>
+        </div>
+
+        <div class="stats">
+            <div>Batch Stats:</div>
+            <div id="batchStats">No data yet</div>
+        </div>
+        <div class="test-signal-controls">
+            <label>Input selection:</label>
+            <label>
+                <input type="radio" id="enableADCSignal" name="testSignal">
+                ADC real input
+            </label>
+            <label>
+                <input type="radio" id="enableTestSignal0" name="testSignal">
+                Local emulated sine wave
+            </label>
+            <label>
+                <input type="radio" id="enableTestSignal1" name="testSignal">
+                Local emulated jump
+            </label>
+            <label>
+                <input type="radio" id="remoteTest" name="testSignal">
+                Remote Emulated Ramp signal
+            </label>
+            <label>
+                <input type="radio" id="enableADCTone" name="testSignal">
+                ADC real tone
+            </label>
+            <label>Sine wave params:</label>
+            <label>Frequency (Hz):
+                <input type="number" id="testFrequency" value="1" min="1" max="100" step="1" 
+                       onchange="updateConfig('freq', this.value)">
+            </label>
+            <label>Base Amplitude:
+                <input type="number" id="testAmplitude" value="4194304" min="1000" max="8388608">
+            </label>
+            <span id="testSignalInfo">Samples per batch: 0</span>
+        </div>
+        <div class="filter-controls"></div>
+            <label>Recorded data filtering:</label>
+            <label>
+                <input type="radio" name="filter" value="none" checked>
+                None
+            </label>
+            <label>
+                <input type="radio" name="filter" value="kalman" checked>
+                Kalman
+            </label>
+        </div>
+        <div class="scope-controls">
+            <div class="timebase-controls">
+                <label>Timebase (ms/div):
+                    <select id="timebaseDiv" onchange="updateTimebase()">
+                        <option value="0.005">0.005</option>
+                        <option value="0.01">0.01</option>
+                        <option value="0.02">0.02</option>
+                        <option value="0.05">0.05</option>
+                        <option value="0.1">0.1</option>
+                        <option value="0.2">0.2</option>
+                        <option value="0.5">0.5</option>
+                        <option value="1" selected>1</option>
+                        <option value="2">2</option>
+                        <option value="5">5</option>
+                        <option value="10">10</option>
+                        <option value="20">20</option>
+                        <option value="50">50</option>
+                    </select>
+                </label>
+                <button id="recordBtn" onclick="toggleRecording()">Start Recording</button>
+                <button id="loadRecordBtn" onclick="document.getElementById('recordFileInput').click()">Load Record</button>
+                <button id="play" onclick="playRecord()">></button>
+                <button id="scrollLeft"><<</button>
+                <button id="scrollRight">>></button>
+                <button id="scrollLeftFast"><<<</button>
+                <button id="scrollRightFast">>>></button>
+                <label>File Name Prefix:
+                    <input type="text" id="filePrefix" value="data">
+                </label>
+                <input type="file" id="recordFileInput" accept=".txt,.json" style="display: none" onchange="loadRecord(this.files[0])"> 
+            </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="plot-container">
+        <div class="plot-controls">
+            <button onclick="resetView()">Reset View</button>
+        </div>
+        <canvas id="plotCanvas"></canvas>
+        <div class="zoom-box" id="zoomBox"></div>
+        <div class="value-info" id="valueInfo"></div>
+    </div>
+
+    <div id="log"></div>
+
+    <script src="matrixUtils.js"></script>
+    <script src="filter.js"></script>       
+
+    <script>
+        // Base configuration variables
+        let SAMPLE_RATE = 30000;
+        const EXPECTED_BATCH_RATE = 200;
+        let wsData, wsControl;
+        let isStreaming = false;
+        let isPaused = false;
+        let batchCount = 0;
+        let lastBatchTime = null;
+        let batchIntervals = [];
+        // Test signal variables
+        let testSignalTime = 0;
+        let lastTestSignalUpdate = 0;
+        let thresholds = null;
+        let testSignalEnabled0 = false;
+        let testSignalEnabled1 = false;
+        let remoteTestEnabled = false;
+        let adcSignalEnabled = false;
+        let remoteTestTone = false;
+        let inputMode = true;
+        
+        const MAX_INTERVALS = 200;
+        let batchBuffer = [];
+        let bufferDurationSec = 10;
+        let bufferTimespan = bufferDurationSec * 1000000; // converti in microsecondi
+        let maxBufferSize = Math.ceil((bufferDurationSec * 1000) / 5);
+        let currBatchIndex = 0;
+        let lastFrameTime = 0;
+        let filterh = new Filter();
+        let filtera = new Filter();
+
+        // Variabili per registrazione
+        let isRecording = false;
+        let recordBuffer = [];
+        let recordBufferSize = 50000; // Circa 250 secondi di dati con intervallo 5ms
+        let currPlayIndex = 0;
+
+        // Display configuration
+        const MIN_PLOT_INTERVAL = 5;
+        const MIN_PIXEL_DELTA = 2;
+        const padding = 40;
+        const TARGET_POINTS = 3000;
+
+        // Oscilloscope specific variables
+        // Variabili di stato per la vista
+        let xScale = { min: 0, max: 100 };
+        let yScale = { min: 0, max: 8388608 };
+        let timebaseDiv = 5;      // ms per divisione
+        const DIVISIONS_X = 10;   // divisioni orizzontali
+        let viewOffset = 0;       // offset temporale per lo scroll
+        let pausedAt = null;      // timestamp quando messo in pausa
+        let animationFrameId = null;  // ID per cancelAnimationFrame
+        let isAtLeftLimit = false;  // flag per limite sinistro
+
+        // Variabili di stato per zoom e pan
+        //let isMouseDown = false;
+        let startX = 0;
+        let startY = 0;
+        let timers = [];
+        //let autoScale = true;
+        //let dragStartPos = null;
+        //let lastMousePos = null;
+
+        // scroll management
+        const delay = (msec) => new Promise(resolve => setTimeout(resolve, msec)) ;
+        let isScrolling = false;
+        let right = true;
+        const leftButton = document.getElementById('scrollLeft');
+        const rightButton = document.getElementById('scrollRight');
+        const leftButtonFast = document.getElementById('scrollLeftFast');
+        const rightButtonFast = document.getElementById('scrollRightFast');
+        // Setup canvas
+        const canvas = document.getElementById('plotCanvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = canvas.offsetWidth;
+        canvas.height = canvas.offsetHeight;
+        window.addEventListener('resize', resizeCanvas);
+        
+
+        leftButton.onmousedown = async () => {
+            isScrolling = true;
+            while (isScrolling) {
+                scrollView(-timebaseDiv * 10000);
+                await delay(200);
+            }
+        }
+        rightButton.onmousedown = async () => {
+            isScrolling = true;
+            while (isScrolling) {
+                scrollView(timebaseDiv * 10000);
+                await delay(200);
+            }
+        }
+        leftButtonFast.onmousedown = async () => {
+            isScrolling = true;
+            while (isScrolling) {
+                scrollView(-timebaseDiv * 100000);
+                await delay(200);
+            }
+        }
+        rightButtonFast.onmousedown = async () => {
+            isScrolling = true;
+            while (isScrolling) {
+                scrollView(timebaseDiv * 100000);
+                await delay(200);
+            }
+        }
+        leftButton.onmouseup = () => {
+            isScrolling = false;
+        }
+        rightButton.onmouseup = () => {
+            isScrolling = false;
+        }
+        leftButtonFast.onmouseup = () => {
+            isScrolling = false;
+        }
+        rightButtonFast.onmouseup = () => {
+            isScrolling = false;
+        }
+        
+        const radioButtons = document.querySelectorAll('input[name="filter"]');
+        radioButtons.forEach(radio => {
+            radio.addEventListener('change', (e) => {
+                if (e.target.checked) {
+                    console.log('Selected:', e.target.value);
+                    if(e.target.value =="kalman"){
+                        filterh = new JumpHeightKalmanFilter(1/SAMPLE_RATE);
+                        filtera = new AccelerationKalmanFilter(1/SAMPLE_RATE);
+                    }else{
+                        filterh = new Filter();
+                        filtera = new Filter();
+                    }
+                }
+            });
+        });
+
+        // Seleziona tutti i radio button con lo stesso nome
+        const radioButtons2 = document.querySelectorAll('input[name="testSignal"]');
+        // Funzione per gestire checked/unchecked
+        function handleRadioChange() {
+            const radio1 = document.getElementById('enableADCSignal');
+            const radio2 = document.getElementById('enableTestSignal0');
+            const radio3 = document.getElementById('enableTestSignal1');
+            const radio4 = document.getElementById('remoteTest');
+            const radio5 = document.getElementById('enableADCTone');
+
+            if (radio1.checked) {
+                console.log('Opzione adc input selezionata');
+                inputMode = true;
+                adcSignalEnabled = true;
+                testSignalTime = 0;
+                resetView();
+                updateSamplesPerBatch();
+                const batch = {
+                    t: 0,
+                    v: [0]
+                };
+                onmessageEvent({ data: JSON.stringify(batch) });
+                updateConfig("mode", 0);
+            } else {
+                adcSignalEnabled = false;
+                console.log('Opzione adc input deselezionata');
+            }
+
+            if (radio2.checked) {
+                console.log('Opzione sine input selezionata');
+                inputMode = true;
+                testSignalEnabled0 = true;
+                testSignalTime = 0;
+                resetView();
+                updateSamplesPerBatch();
+                generateTestSignal0();
+            } else {
+                testSignalEnabled0 = false;
+                console.log('Opzione sine input deselezionata');
+            }
+
+            if (radio3.checked) {
+                console.log('Opzione simulated jump selezionata');                   
+                inputMode = true;
+                testSignalEnabled1 = true;
+                testSignalTime = 0;
+                resetView();
+                updateSamplesPerBatch();
+                generateTestSignal1();   
+            } else {
+                testSignalEnabled1 = false;
+                console.log('Opzione simulated jump deselezionata');
+            }
+
+            if (radio4.checked) {
+                console.log('Opzione remote ramp wave selezionata');
+                remoteTestEnabled = true;
+                inputMode = true;
+                resetView();
+                updateConfig("mode", 1);
+                const batch = {
+                    t: 0,
+                    v: [0]
+                };
+                onmessageEvent({ data: JSON.stringify(batch) });
+            } else {
+                remoteTestEnabled = false;
+                console.log('Opzione remote ramp wave deselezionata');
+            }
+
+            if (radio5.checked) {
+                console.log('Opzione tono adc selezionata');
+                remoteTestTone = true;
+                adcSignalEnabled = true;
+                inputMode = true;
+                resetView();
+                testSignalTime = 0;
+                updateSamplesPerBatch();
+                updateConfig("mode", 2);
+                const batch = {
+                    t: 0,
+                    v: [0]
+                };
+                onmessageEvent({ data: JSON.stringify(batch) });
+            } else {
+                console.log('Opzione tono adc deselezionata');
+            }
+        }
+        // Aggiungi il gestore dell'evento "change" a ogni radio button
+        radioButtons2.forEach(radio => {
+            radio.addEventListener('change', handleRadioChange);
+        });
+
+        updateConfig('freq', 1);
+
+        /*
+        function resizeCanvas() {
+        // Ottieni le dimensioni del contenitore
+        const container = canvas.parentElement;
+        const rect = container.getBoundingClientRect();
+        
+        // Aggiorna le dimensioni del canvas
+        canvas.width = rect.width;
+        canvas.height = rect.height;
+        
+        // Forza un ridisegno
+        if (recordBuffer && recordBuffer.length > 0) {
+            drawPlot();
+        }
+    }
+*/
+        function resizeCanvas() {
+            console.log("resizeCanvas");
+            canvas.width = canvas.offsetWidth;
+            canvas.height = canvas.offsetHeight;
+            if (inputMode){
+                drawPlotInc();
+                //currBatchIndex = 20;
+            }else{
+                playRecord();
+             }
+        }
+//-----------------------------------------------------------------------------------------------------------------------
+        // JavaScript
+        function saveRecordedBatches() {
+            const content = recordBuffer.map(batch => {
+                const hexBatch = {
+                    //t: batch.t.toString(16),
+                    t: batch.t,
+                    v: batch.v
+                };
+                return JSON.stringify(hexBatch);
+            }).join('\n');
+            
+            const blob = new Blob([content], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = getDefaultFileName();
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        async function loadRecord(file) {
+            console.log("loadRecord");
+            if (!file) return;
+            try {
+                const text = await file.text();
+                const lines = text.split('\n').filter(line => line.trim());
+                recordBuffer = lines.map(line => {
+                    const hexBatch = JSON.parse(line);
+                    return {
+                        //t: parseInt(hexBatch.t, 16),
+                        t: parseInt(hexBatch.t),
+                        v: hexBatch.v
+                    };
+                });
+            } catch (error) {
+                console.error('Error loading record:', error);
+            }
+        }
+
+        function detectJumpThresholds(recordBuffer, sampleRate) {
+            let result = {t1: null, t2: null, t3: null, t4: null, t5: null};
+            let minDerivative = Infinity;
+            let maxDerivative = -Infinity;
+            let precBatchTime;
+            let currBatchTime;
+            let batchLen;
+            let lastForce = null;
+            result.t1 = null;
+            result.t2 = null;
+            result.t3 = null;
+            result.t4 = null;
+            result.t5 = null;
+
+            // Calcolo peso statico
+            let staticWeight = 0;
+            let staticCount = 0;
+            for(let batchIdx = 0; batchIdx < recordBuffer.length && staticCount < 20; batchIdx++) {
+                const batch = recordBuffer[batchIdx];
+                for(let i = 0; i < batch.v.length && staticCount < 20; i++) {
+                    staticWeight +=  calculateValue(batch.v[i]);
+                    staticCount++;
+                }
+            }
+            staticWeight /= staticCount;
+
+            const dt0 = 1/sampleRate;
+            precBatchTime = recordBuffer[0].t / 1000000 - dt0;
+            filterh.predict();
+            lastForce = filterh.update(calculateValue(recordBuffer[0].v[0]));
+            batchLen = recordBuffer[0].v.length;
+            // Analisi principale
+            let lastDerivative = null;            
+            for(let batchIdx = 0; batchIdx < recordBuffer.length; batchIdx++) {
+                const batch = recordBuffer[batchIdx];
+                const batchTime = batch.t / 1000000;
+
+                // Calcola dt medio dai primi due batch
+                currBatchTime = recordBuffer[batchIdx].t / 1000000;
+                const dt = (currBatchTime - precBatchTime) / batchLen;
+                
+                for(let i = 0; i < batch.v.length; i++) {                   
+                    filterh.predict();
+                    let force = filterh.update(calculateValue(batch.v[i]));
+                    
+                    const currentTime = batchTime + (i * dt);
+                    const derivative = (force - lastForce) / dt;
+                    
+                    if(result.t1 === null && (derivative > 1000 || derivative < -1000)) {
+                        result.t1 = currentTime;
+                    }
+
+                    /*
+                    if(result.t2 == null && result.t1 !== null && derivative > maxDerivative && lastDerivative < derivative) {
+                        maxDerivative = derivative;
+                        result.t2 = currentTime;
+                        console.log(maxDerivative);
+                    }
+                    
+                    if(result.t3 == null && result.t2 !== null && derivative < minDerivative && lastDerivative > derivative) {
+                        minDerivative = derivative;
+                        result.t3 = currentTime;
+                    }
+                    */
+
+                    if(result.t2 == null && result.t1 !== null && derivative > 0 && force > staticWeight && lastForce <= staticWeight) {
+                        result.t2 = currentTime;
+                    }
+                    
+                    if(result.t3 == null && result.t2 !== null && derivative < 0 && force < staticWeight && lastForce >= staticWeight) {
+                        result.t3 = currentTime;
+                    }
+
+                    if(result.t4 == null && result.t3 !== null && result.t4 === null && force < 0.05 * staticWeight && derivative < -100) {
+                        result.t4 = currentTime;
+                    }
+                    
+                    if(result.t5 == null && result.t4 !== null && result.t5 === null && force > 0 && derivative > 10) {
+                        result.t5 = currentTime;
+                    }
+                    
+                    lastForce = force;
+                    lastDerivative = derivative;
+                }
+
+                precBatchTime = currBatchTime;
+            }
+            
+            console.log(`t1: ${result.t1} - t2: ${result.t2} - t3: ${result.t3} - t4: ${result.t4} - t5: ${result.t5}`);
+            return result;
+        }
+
+        function analyzeJump(recordBuffer, sampleRate) {
+            const times = detectJumpThresholds(recordBuffer, sampleRate);
+            thresholds = times;
+
+            const g = 9.81;
+            const Fstatico = 700; 
+            const sensitivity = 50000;
+            
+            // Calcolo velocità iniziale (t1->t4)
+            let vIniziale = 0;
+            let dt = 1/sampleRate;
+            
+            // Calcolo velocità di caduta (t5->stabilizzazione)
+            let vCaduta = 0;
+            let stabilized = false;
+            let tStabilizzazione = times.t5;
+            
+            for(let batchIdx = 0; batchIdx < recordBuffer.length; batchIdx++) {
+                const batch = recordBuffer[batchIdx];
+                const batchTime = batch.t / 1000000;
+                
+                for(let i = 0; i < batch.v.length; i++) {
+                    let value = calculateValue(batch.v[i]);
+                    
+                    filtera.predict();
+                    value = filtera.update(value);
+                    const force = (value * Fstatico) / sensitivity;
+                    
+                    // Integrazione pre-salto
+                    if(batchTime >= times.t1 && batchTime <= times.t4) {
+                        vIniziale += g * ((force - Fstatico) / Fstatico) * dt;
+                    }
+                    
+                    // Cerca punto di stabilizzazione post-atterraggio
+                    if(batchTime > times.t5 && !stabilized) {
+                        if(Math.abs(force - Fstatico) < Fstatico * 0.05) { // ±5% del peso statico
+                            stabilized = true;
+                            tStabilizzazione = batchTime;
+                        }
+                        // Integra fino alla stabilizzazione
+                        vCaduta += g * ((force - Fstatico) / Fstatico) * dt;
+                    }
+                }
+            }
+
+            const flightTime = times.t5 - times.t4;
+            const h_flight = (g * flightTime * flightTime) / 8;
+            const h_velocity = (vIniziale * vIniziale) / (2 * g);
+            const h_landing = (vCaduta * vCaduta) / (2 * g);
+
+            return {
+                flightTime,
+                height_from_time: h_flight,
+                height_from_velocity: h_velocity,
+                height_from_landing: h_landing,
+                initial_velocity: vIniziale,
+                landing_velocity: vCaduta,
+                stabilization_time: tStabilizzazione - times.t5,
+                thresholdTimes: times
+            };
+        }
+
+        function printJumpReport(data) {
+            // Console report
+            console.table({
+                "Flight Time": `${(data.flightTime * 1000).toFixed(1)} ms`,
+                "Height (from time)": `${(data.height_from_time * 100).toFixed(1)} cm`,
+                "Height (from velocity)": `${(data.height_from_velocity * 100).toFixed(1)} cm`, 
+                "Height (from landing)": `${(data.height_from_landing * 100).toFixed(1)} cm`,
+                "Initial Velocity": `${data.initial_velocity.toFixed(2)} m/s`,
+                "Landing Velocity": `${data.landing_velocity.toFixed(2)} m/s`,
+                "Stabilization Time": `${(data.stabilization_time * 1000).toFixed(1)} ms`,
+                "Time Events": {
+                    "Start of Movement (t1)": `${(data.thresholdTimes.t1 * 1000).toFixed(1)} ms`,
+                    "Max Descent Speed (t2)": `${(data.thresholdTimes.t2 * 1000).toFixed(1)} ms`, 
+                    "Max Ascent Speed (t3)": `${(data.thresholdTimes.t3 * 1000).toFixed(1)} ms`,
+                    "Takeoff (t4)": `${(data.thresholdTimes.t4 * 1000).toFixed(1)} ms`,
+                    "Landing (t5)": `${(data.thresholdTimes.t5 * 1000).toFixed(1)} ms`
+                }
+            });
+
+            // HTML report
+            const div = document.createElement('div');
+            div.innerHTML = `
+                <div class="jump-report" style="font-family: Arial; padding: 20px; max-width: 600px; margin: auto;">
+                    <h2>Jump Analysis Report</h2>
+                    
+                    <div style="background: #f5f5f5; padding: 15px; border-radius: 5px; margin: 10px 0;">
+                        <h3>Jump Heights</h3>
+                        <p>From Flight Time: <strong>${(data.height_from_time * 100).toFixed(1)} cm</strong></p>
+                        <p>From Initial Velocity: <strong>${(data.height_from_velocity * 100).toFixed(1)} cm</strong></p>
+                        <p>From Landing Force: <strong>${(data.height_from_landing * 100).toFixed(1)} cm</strong></p>
+                    </div>
+
+                    <div style="background: #f5f5f5; padding: 15px; border-radius: 5px; margin: 10px 0;">
+                        <h3>Time Metrics</h3>
+                        <p>Flight Time: <strong>${(data.flightTime * 1000).toFixed(1)} ms</strong></p>
+                        <p>Stabilization Time: <strong>${(data.stabilization_time * 1000).toFixed(1)} ms</strong></p>
+                    </div>
+
+                    <div style="background: #f5f5f5; padding: 15px; border-radius: 5px; margin: 10px 0;">
+                        <h3>Velocity Metrics</h3>
+                        <p>Initial Velocity: <strong>${data.initial_velocity.toFixed(2)} m/s</strong></p>
+                        <p>Landing Velocity: <strong>${data.landing_velocity.toFixed(2)} m/s</strong></p>
+                    </div>
+
+                    <div style="background: #f5f5f5; padding: 15px; border-radius: 5px; margin: 10px 0;">
+                        <h3>Time Events</h3>
+                        <p>Start of Movement (t1): <strong>${(data.thresholdTimes.t1 * 1000).toFixed(1)} ms</strong></p>
+                        <p>Max Descent Speed (t2): <strong>${(data.thresholdTimes.t2 * 1000).toFixed(1)} ms</strong></p>
+                        <p>Max Ascent Speed (t3): <strong>${(data.thresholdTimes.t3 * 1000).toFixed(1)} ms</strong></p>
+                        <p>Takeoff (t4): <strong>${(data.thresholdTimes.t4 * 1000).toFixed(1)} ms</strong></p>
+                        <p>Landing (t5): <strong>${(data.thresholdTimes.t5 * 1000).toFixed(1)} ms</strong></p>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(div);
+            return div;
+        }
+/*
+        function doBufferFiltering(recordBuffer, filterh, filtera){
+            if(filterh){
+                const content = recordBuffer.map(batch => {
+                    const filteredBatch = {
+                        t: batch.t,
+                        v: batch.v,
+                        vh: batch.v.map(val => {
+                            filterh.predict();
+                            const filtered = filterh.update(val);
+                            return filtered;
+                        }),
+                        va: batch.v.map(val => {
+                            filtera.predict();
+                            const filtered = filtera.update(val);
+                            return filtered;
+                        })
+                    };
+                    return filteredBatch;
+                })
+            }else{
+                const content = recordBuffer.map(batch => {
+                    const filteredBatch = {
+                        t: batch.t,
+                        v: batch.v,
+                        vh: batch.v,
+                        va: batch.v,
+                    };
+                    return filteredBatch;
+                })
+            }
+        }
+
+        function doBatchFiltering(batch, filterh, filtera, type){
+            filter = null;
+            if(filterh && type == "h"){
+                filter = filterh;
+            }else if(filterh && type == "a"){
+                filter = filtera;
+            }else{
+                 return batch;
+            }
+            const filteredBatch = {
+                t: batch.t,
+                v: batch.v.map(val => {
+                    filter.predict();
+                    const filtered = filter.update(val);
+                    return filtered;
+                }),
+            };
+            return filteredBatch;
+        }
+*/
+        function playRecord() {
+            // disabilita il modo test se attivo
+            adcSignalEnabled = false;
+            testSignalEnabled0 = false;
+            testSignalEnabled1 = false;
+            if(isStreaming) {
+                toggleStreaming();
+            }
+            inputMode = false;
+            recordBuffer = recordBuffer.slice(0, maxBufferSize);
+            currPlayIndex = 0;
+            const firstBatch = recordBuffer[0];
+            xScale.min = firstBatch.t;
+            xScale.max = firstBatch.t + bufferTimespan;
+            report = analyzeJump(recordBuffer, SAMPLE_RATE);   
+            printJumpReport(report);  
+            drawPlot();       
+            scrollView(0);            
+        }
+
+        function toggleRecording() {
+            if (!isRecording) {
+                // Start recording
+                recordBuffer = []; // Reset buffer
+                isRecording = true;
+                document.getElementById('recordBtn').innerHTML = 'Stop Recording';
+            } else {
+                // Stop and save
+                isRecording = false;
+                saveRecordedBatches();
+                document.getElementById('recordBtn').innerHTML = 'Start Recording';
+            }
+        }
+
+        function scrollView(deltaMs) {
+            console.log("scrollView: "+deltaMs);
+            // Verifica che ci siano dati
+            if (recordBuffer.length === 0) return;
+
+            // Calcola la nuova finestra temporale
+            //const timeWindow = timebaseDiv * DIVISIONS_X * 1000;
+            //const timeWindow = bufferDurationSec * 1000000; // converti in microsecondi
+            const timeWindow = timebaseDiv * DIVISIONS_X * 1000000;  // in microsecondi
+
+            console.log("scrollView timeWindow: "+timeWindow);
+            // Sposta la finestra di visualizzazione
+            xScale.min += deltaMs;
+            xScale.max = xScale.min + timeWindow;
+            console.log("scrollView xScale.min: "+xScale.min);
+            console.log("scrollView xScale.max: "+xScale.max);
+            
+
+            // Verifica limiti
+            /*
+            if (xScale.min < recordBuffer[0].t) {
+                console.log("xScale.min < recordBuffer[0].t "+recordBuffer[0].t);
+                // Non andare prima del primo campione
+                xScale.min = recordBuffer[0].t;
+                xScale.max = xScale.min + timeWindow;
+            } else if (xScale.max > recordBuffer[recordBuffer.length - 1].t) {
+                console.log("xScale.max > recordBuffer[recordBuffer.length - 1].t "+recordBuffer[recordBuffer.length - 1].t);
+                // Non andare oltre l'ultimo campione
+                xScale.max = recordBuffer[recordBuffer.length - 1].t;
+                xScale.min = xScale.max - timeWindow;
+            }
+            */
+            // Ridisegna con la nuova finestra temporale
+            drawPlot();
+        }
+
+        function drawThresholds(times) {
+            if (recordBuffer.length > 0) {
+                ctx.save();
+                
+                // Linee
+                ctx.strokeStyle = 'green';
+                ctx.lineWidth = 2;
+                ctx.setLineDash([5, 5]);
+                
+                // Testo
+                ctx.font = '12px Arial';
+                ctx.fillStyle = 'green';
+                ctx.textAlign = 'left';
+                ctx.setLineDash([]); // Rimuove tratteggio per il testo
+                
+                const labels = {
+                    t1: 'T1: Start',
+                    t2: 'T2: Max Down',
+                    t3: 'T3: Max Up', 
+                    t4: 'T4: Takeoff',
+                    t5: 'T5: Landing'
+                };
+                
+                let count = 0;
+                for (const [key, label] of Object.entries(labels)) {
+                    if (times[key]) {
+                        const x = timeToScreen(times[key] * 1000000);
+                        // Linea
+                        ctx.beginPath();
+                        ctx.moveTo(x, padding);
+                        ctx.lineTo(x, canvas.height - padding);
+                        ctx.stroke();
+                        
+                        // Etichetta
+                        ctx.fillText(label, x + 5, padding + 20 + count);
+                    }
+                    count +=10;
+                }
+                
+                ctx.restore();
+                console.log("Times:", times);
+                console.log("Window:", {min: xScale.min, max: xScale.max});
+            }
+        }
+
+        function drawScrollLimits() {
+            if (recordBuffer.length > 0) {
+                const firstTime = recordBuffer[0].t;
+                const lastTime = recordBuffer[recordBuffer.length - 1].t;
+                
+                ctx.save();
+                ctx.strokeStyle = 'red';
+                ctx.lineWidth = 2;
+                ctx.setLineDash([5, 5]);               
+
+                // Limite sinistro
+                const x1 = timeToScreen(firstTime);
+                ctx.beginPath();
+                ctx.moveTo(x1, padding);
+                ctx.lineTo(x1, canvas.height - padding);
+                ctx.stroke();
+                
+                // Limite destro
+                const x2 = timeToScreen(lastTime);
+                ctx.beginPath();
+                ctx.moveTo(x2, padding);
+                ctx.lineTo(x2, canvas.height - padding);
+                ctx.stroke();
+                
+                ctx.restore();
+            }
+        }
+
+        function calculateValue(hexString) {
+            let value = parseInt(hexString, 16);
+            if (value & 0x800000) value -= 0x1000000;
+            return value;
+        }
+//-------------------------------------------------------------------------------------------------------------
+        function drawPlotInc() {
+            // Cancella l'animazione precedente se esiste
+            if (animationFrameId && currBatchIndex > 2) {
+                cancelAnimationFrame(animationFrameId);
+                animationFrameId = null;
+                //console.log("Animazione precedente cancellata.");
+            }
+
+            // Verifica buffer vuoto
+            if (batchBuffer.length === 0) {
+                //console.log("Buffer vuoto, nessun dato da disegnare.");
+                return;
+            }
+
+            function draw(timestamp, index) {
+                // Salva lo stato iniziale del contesto grafico
+                //ctx.save();
+
+                //ctx.beginPath();
+                ctx.strokeStyle = 'blue';
+                ctx.lineWidth = 2;
+
+                const batch = batchBuffer[index];
+              
+                // Test dei range
+                const timeInRange = batch && (batch.t >= xScale.min && batch.t <= xScale.max);
+                //console.log(`Batch ${index} - Time range: ${timeInRange} (${batch.t})`);
+
+                if (timeInRange) {
+                    let value = parseInt(batch.v[0], 16);
+                    if (value & 0x800000) value -= 0x1000000;
+                   
+                    //console.log("value: "+value);
+                    // Calcola coordinate
+                    //const x = timeToScreen(batch.t);
+
+                    const x = timeToScreen(batch.t);
+                    //const y = valueToScreen(value);
+
+                    //const x = timeToScreen(xScale.min + index*5000);
+                    const y = valueToScreen(value);
+                    //console.log(`Coordinate: x=${x}, y=${y}, minx=${xScale.min}, maxx==${xScale.max}`);
+                    //console.log(`Coordinate: x=${x}, y=${batch.first}`);
+                    // Test coordinate nel plot
+                    const inPlotArea = x >= padding && x <= canvas.width - padding &&
+                                    y >= padding && y <= canvas.height - padding;
+                    //console.log(`Coordinate in area plot: ${inPlotArea}`);
+
+                    if (true) {
+                        if (index === 0) {
+                            // Reset e primo punto
+                            ctx.clearRect(0, 0, canvas.width, canvas.height);
+                            drawGrid();
+                            drawAxes();
+                            ctx.beginPath();
+                            ctx.moveTo(x, y);                            
+                            console.log(`Reset e MoveTo: ${x},${y}`);
+                        } else {
+                            // Punti successivi
+                            //ctx.moveTo(lastX, lastY);
+                            ctx.lineTo(x, y);
+                            //console.log(`LineTo: ${x},${y}`);
+                        }
+                        ctx.stroke();
+                    }
+                }
+
+                // Ripristina lo stato iniziale del contesto grafico
+                //ctx.restore();
+
+                // Aggiorna l'ultimo punto
+            }
+            
+            // Pianifica il prossimo frame se non in pausa
+            if (!isPaused) {
+                animationFrameId = requestAnimationFrame(((value) => (timestamp) => {
+                                        draw(timestamp, value); // Cattura il valore corrente di `dynamicValue`
+                                    })(currBatchIndex)); // Passa una copia al wrapper
+                //console.log("Frame pianificato");
+            }
+        }
+//--------------------------------------------------------------------------------------------------------------------------
+        // Stampa di un batch
+        function drawPlot() {
+            if (animationFrameId) {
+                cancelAnimationFrame(animationFrameId);
+            }
+
+            animationFrameId = requestAnimationFrame(() => {
+                // Usa recordBuffer invece di batchBuffer
+                if (recordBuffer.length === 0) return;
+
+                const timeWindow = timebaseDiv * DIVISIONS_X * 1000000;
+                
+                // Clear e disegna griglia
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                drawGrid();
+                drawAxes();
+
+                // Plot dei dati
+                ctx.beginPath();
+                ctx.strokeStyle = 'blue';
+                ctx.lineWidth = 2;
+
+                let isFirstPoint = true;
+                let lastX = -1;
+                let lastY = -1;
+                let n = 1;
+
+                //xScale.min = recordBuffer[0].t;
+                // Prima trova i batch nella finestra temporale
+                const batchesInWindow = recordBuffer.filter(batch => 
+                    batch.t >= xScale.min && batch.t <= xScale.max
+                );
+                
+                if(batchesInWindow.length < TARGET_POINTS){
+                    n = Math.ceil((TARGET_POINTS - batchesInWindow.length) / batchesInWindow.length)+1;
+                    n = Math.min(n, recordBuffer[0].v.length);
+                }
+                console.log("batchesInWindow.length: " + batchesInWindow.length);
+                console.log("n: " + n);
+                // Disegna tutti i punti nella finestra temporale corrente
+                let count = 0;
+                for (let batch of batchesInWindow) {
+                    for(let j=0; j < n; j++){  
+                        // filtra i campioni                      
+                        filterh.predict();
+                        value = filterh.update(calculateValue(batch.v[j]));
+                        
+                        // Calcola il timestamp preciso per questo campione nel batch
+                        const sampleTime = batch.t + (j * (1000000 / SAMPLE_RATE)); // in microsecondi
+                
+                        const x = Math.round(timeToScreen(sampleTime));
+                        const y = Math.round(valueToScreen(value));
+
+                        if (isFirstPoint) {
+                            ctx.moveTo(x, y);
+                            isFirstPoint = false;
+                        } else {
+                            ctx.lineTo(x, y);
+                        }
+                        
+                        lastX = x;
+                        lastY = y;
+                        count++;
+                    }
+                }
+                console.log("count: " + count);
+                ctx.stroke();
+
+                drawScrollLimits();
+                drawThresholds(thresholds);
+
+                /*
+                // Aggiorna display
+                document.getElementById('xRange').textContent = 
+                    `${((xScale.max - xScale.min)/1000).toFixed(1)}ms`;
+                document.getElementById('yRange').textContent = 
+                    `${yScale.min.toFixed(0)} to ${yScale.max.toFixed(0)}`;
+                    */
+            });
+        }
+//--------------------------------------------------------------------------------------------------------------------------
+
+        function drawGrid() {
+            ctx.strokeStyle = '#ddd';
+            ctx.lineWidth = 1;           // Grid verticale ogni 5ms
+            const timeStart = Math.floor(xScale.min / 5000) * 5000;
+            for (let t = timeStart; t <= xScale.max; t += 5000) {
+                const x = timeToScreen(t);
+                ctx.beginPath();
+                ctx.moveTo(x, padding);
+                ctx.lineTo(x, canvas.height - padding);
+                ctx.stroke();
+            }
+
+            // Grid orizzontale ogni 10% del range
+            const valueStep = (yScale.max - yScale.min) / 10;
+            for (let v = yScale.min; v <= yScale.max; v += valueStep) {
+                const y = valueToScreen(v);
+                ctx.beginPath();
+                ctx.moveTo(padding, y);
+                ctx.lineTo(canvas.width - padding, y);
+                ctx.stroke();
+            }
+        }
+
+        function drawAxes() {
+            ctx.beginPath();
+            ctx.strokeStyle = '#000';
+            ctx.lineWidth = 1;
+            ctx.moveTo(padding, padding);
+            ctx.lineTo(padding, canvas.height - padding);
+            ctx.lineTo(canvas.width - padding, canvas.height - padding);
+            ctx.stroke();
+        }                
+        /*-------------------------------------------------------------------------
+            CONTROL CALLBACKS SECTION 
+          -------------------------------------------------------------------------
+        */
+       
+        function updateTimebase() {
+            timebaseDiv = parseFloat(document.getElementById('timebaseDiv').value);
+            console.log("timebaseDiv update: "+timebaseDiv);
+            // Aggiorna la finestra temporale in base alla nuova base dei tempi
+            const timeWindow = timebaseDiv * DIVISIONS_X * 1000000;  // in microsecondi
+            
+            // Mantieni il centro della vista ma cambia la scala
+            const centerTime = (xScale.max + xScale.min) / 2;
+            console.log("centerTime: "+centerTime);
+            console.log("timeWindow: "+timeWindow);
+            xScale.min = centerTime - timeWindow / 2;
+            xScale.max = centerTime + timeWindow / 2;
+            
+            // Ridisegna con la nuova scala temporale
+            //drawPlot();
+            if (!inputMode){
+                playRecord();
+            }
+        }
+        
+        function updateSamplesPerBatch() {
+            SAMPLE_RATE = parseInt(document.getElementById('sampleRate').value);
+            samplesPerBatch = Math.floor(SAMPLE_RATE / EXPECTED_BATCH_RATE);
+            document.getElementById('testSignalInfo').textContent = 
+                `Samples per batch: ${samplesPerBatch} (${SAMPLE_RATE}Hz)`;
+        }
+       
+        function resizeCanvas() {
+            canvas.width = canvas.offsetWidth;
+            canvas.height = canvas.offsetHeight;
+            //if (!isPaused) drawPlot();
+        }
+
+        function toggleStreaming() {
+            isStreaming = !isStreaming;
+            
+            if(isStreaming){
+                inputMode = true;
+            }else{
+                inputMode = false;
+            }
+
+            updateConfig("streaming", isStreaming);
+
+            if(isStreaming) {
+                batchCount = 0;
+                lastBatchTime = null;
+                batchIntervals = [];
+                batchBuffer = [];
+                inputMode = true;
+                resetView();
+            }
+        }
+
+        function resetView() {
+            batchBuffer.length = 0;
+            currBatchIndex = 0;
+            drawPlotInc();
+        }
+
+        function updateBufferSize() {
+            bufferDurationSec = parseInt(document.getElementById('bufferDuration').value);
+            bufferTimespan = bufferDurationSec * 1000000; // converti in microsecondi
+            const avgInterval = batchIntervals.length > 0 ? 
+                batchIntervals.reduce((a, b) => a + b, 0) / batchIntervals.length : 5;
+            //maxBufferSize = Math.ceil((bufferDurationSec * 1000) / avgInterval);
+            maxBufferSize = Math.ceil((bufferDurationSec * 1000) / 5);
+            //trimBuffer();
+            updateBufferInfo();
+        }
+
+        function updateBufferInfo() {
+            document.getElementById('bufferInfo').textContent = 
+                `${batchBuffer.length}/${maxBufferSize} batches`;
+        }
+
+        function trimBuffer() {
+            if (batchBuffer.length > maxBufferSize) {
+                batchBuffer = batchBuffer.slice(-maxBufferSize);
+            }
+        }
+
+        function updateBatchStats() {
+            if(batchIntervals.length > 0) {
+                const avgInterval = batchIntervals.reduce((a, b) => a + b, 0) / batchIntervals.length;
+                const actualRate = 1000 / avgInterval;
+                const lastBatch = batchBuffer[batchBuffer.length - 1];
+                const lastBatchSize = lastBatch ? lastBatch.v.length : 0;
+
+                document.getElementById('batchStats').innerHTML = 
+                    `Received Batches: ${batchCount}<br>` +
+                    `Avg Interval: ${avgInterval.toFixed(2)} ms<br>` +
+                    `Actual Rate: ${actualRate.toFixed(1)} Hz<br>` +
+                    `Last Batch Size: ${lastBatchSize} samples`;
+            }
+        }
+
+        function getDefaultFileName() {
+            const now = new Date();
+            const prefix = document.getElementById('filePrefix').value;
+            return `${prefix}_${now.getFullYear()}${(now.getMonth()+1).toString().padStart(2,'0')}${
+                now.getDate().toString().padStart(2,'0')}_${
+                now.getHours().toString().padStart(2,'0')}${
+                now.getMinutes().toString().padStart(2,'0')}${
+                now.getSeconds().toString().padStart(2,'0')}.txt`;
+        }
+
+        /*-------------------------------------------------------------------------
+            POINT TO SCREEN CONVERSIONS SECTION
+          -------------------------------------------------------------------------
+        */        
+        function timeToScreen(t) {
+            return padding + (t - xScale.min) * (canvas.width - 2 * padding) / (xScale.max - xScale.min);
+        }
+
+        function valueToScreen(v) {
+            return canvas.height - padding - (v - yScale.min) * (canvas.height - 2 * padding) / (yScale.max - yScale.min);
+        }
+
+        function screenToTime(x) {
+            return xScale.min + (x - padding) * (xScale.max - xScale.min) / (canvas.width - 2 * padding);
+        }
+
+        function screenToValue(y) {
+            return yScale.min + (canvas.height - padding - y) * (yScale.max - yScale.min) / (canvas.height - 2 * padding);
+        }
+
+        document.getElementById('sampleRate').addEventListener('change', function() {
+            updateSamplesPerBatch();
+            updateConfig('samplerate', this.value);
+        });
+
+        window.addEventListener('load', updateSamplesPerBatch);
+        /*-------------------------------------------------------------------------
+            TEST SIGNAL GENERATION SECTION
+          -------------------------------------------------------------------------
+        */
+        
+        /*
+        //const initialTime = 1655484153000000; // Timestamp base
+        const initialTime = Date.now();
+        let count = 1000;
+        async function generateTestSignal1() {
+            const baseAmplitude = parseFloat(document.getElementById('testAmplitude').value);
+            // Timestamp base: 1655484153000000 (62ad7af907880 in hex)
+            const batches = [
+            // 8 batch iniziali statici
+            ...Array(count).fill().map((_, i) => ({
+                t: (initialTime + i * 5000),
+                v: Array(150).fill().map(() => {
+                    const val = Math.floor(baseAmplitude + (Math.random() - 0.5) * 200);
+                    return val.toString(16).padStart(6, '0');
+                })
+            })),
+            // Le 5 fasi del salto come prima
+            {
+                t: (initialTime + count++ * 5000), // Statico pre-stacco
+                v: Array(150).fill().map(() => {
+                    const val = Math.floor(baseAmplitude + (Math.random() - 0.5) * 200);
+                    return val.toString(16).padStart(6, '0');
+                })
+            },
+            {
+                t: (initialTime + count++ * 5000), // Stacco
+                v: Array(150).fill().map((_, i) => {
+                    const progress = i/150;
+                    const val = Math.floor(baseAmplitude * (1 + 0.4 * Math.sin(Math.PI * progress)) + (Math.random() - 0.5) * 200);
+                    return val.toString(16).padStart(6, '0');
+                })
+            },
+            {
+                t: (initialTime + count++ * 5000), // Volo
+                v: Array(150).fill().map(() => {
+                    const val = Math.floor(Math.random() * 400 - 200);
+                    return val.toString(16).padStart(6, '0');
+                })
+            },
+            {
+                t: (initialTime + count++ * 5000), // Atterraggio
+                v: Array(150).fill().map((_, i) => {
+                    const progress = i/150;
+                    const val = Math.floor(baseAmplitude * (1.8 * Math.exp(-progress * 5) + 1) + (Math.random() - 0.5) * 200);
+                    return val.toString(16).padStart(6, '0');
+                })
+            },
+            {
+                t: (initialTime + count++ * 5000), // Ritorno statico
+                v: Array(150).fill().map(() => {
+                    const val = Math.floor(baseAmplitude + (Math.random() - 0.5) * 200);
+                    return val.toString(16).padStart(6, '0');
+                })
+            }
+            ];
+
+            console.log("count: "+count);
+            //console.log(JSON.stringify(batches));
+
+            for (batch of batches) {
+                processBatch(batch);
+                //console.log(JSON.stringify(batch));
+                await delay(5);
+            }
+        }*/        
+        
+        function generateTestSignal1() {
+        const baseAmplitude = parseFloat(document.getElementById('testAmplitude').value);
+        const batchSize = Math.floor(SAMPLE_RATE / EXPECTED_BATCH_RATE);
+        const samples = [];
+        
+        const offset = 8; // 40ms = 8 batch da 5ms
+
+        // genero tutti i campioni del batch immediatamente
+        for (let i = 0; i < batchSize; i++) {
+            // Ricalcola batchProgress e batchPhase per ogni campione
+            const batchProgress = Math.floor(testSignalTime / 0.005);
+            const batchPhase = (testSignalTime % 0.005) / 0.005;
+            
+            let value;
+            
+            if (batchProgress < offset) {
+                value = baseAmplitude;
+            } else if (batchProgress < 6 + offset) {
+                value = baseAmplitude;
+            } else if (batchProgress < 12 + offset) {
+                const t = (batchProgress - (6 + offset) + batchPhase) / 6;
+                value = baseAmplitude * (1 - 0.3 * Math.sin(Math.PI * t));
+            } else if (batchProgress < 16 + offset) {
+                const t = (batchProgress - (12 + offset) + batchPhase) / 4;
+                value = baseAmplitude * (1 + Math.sin(Math.PI * t));
+            } else if (batchProgress < 24 + offset) {
+                value = 0;
+            } else if (batchProgress < 28 + offset) {
+                const t = (batchProgress - (24 + offset) + batchPhase) / 4;
+                value = baseAmplitude * 2.5 * Math.exp(-t * 2);
+            } else if (batchProgress < 36 + offset) {
+                const t = (batchProgress - (28 + offset) + batchPhase) / 8;
+                value = baseAmplitude * (1 + 0.4 * Math.exp(-t * 3) * Math.cos(2 * Math.PI * t));
+            } else {
+                testSignalTime = 0;
+                return;
+            }
+            
+            if(value > 8388607) value = 8388607;
+            value = Math.round(value); // Arrotonda il valore
+            value = value & 0xFFFFFF;  // Tronca a 24 bit
+            if (value < 0) {
+                value += 0x1000000;
+            }
+            
+            let sample = value.toString(16).padStart(6, '0');
+            samples.push(sample);
+            
+            testSignalTime += 1 / SAMPLE_RATE;
+        }
+        
+        const batch = {
+            t: Date.now() * 1000,
+            v: samples
+        };
+        
+        processBatch(batch);
+        
+        if (testSignalEnabled1) {
+            timers[1] = setTimeout(generateTestSignal1, 1000 / EXPECTED_BATCH_RATE);
+        } else {
+            clearTimeout(timers[1]);
+        }
+    }
+
+        function generateTestSignal0() {
+            /*
+            const currentTime = Date.now();
+            if (lastTestSignalUpdate && currentTime - lastTestSignalUpdate < 5) {
+                return; // Limit update rate
+            }
+            lastTestSignalUpdate = currentTime;
+            */
+
+            const frequency = parseFloat(document.getElementById('testFrequency').value);
+            const baseAmplitude = parseFloat(document.getElementById('testAmplitude').value);
+            //const amFrequency = parseFloat(document.getElementById('amFrequency').value);
+            
+            // Generate a batch of samples
+            const batchSize = Math.floor(SAMPLE_RATE / EXPECTED_BATCH_RATE);
+            const samples = [];
+            
+            // genero tutti i campioni del batch immediatamente
+            for (let i = 0; i < batchSize; i++) {
+                // Calculate amplitude modulation
+                //const amplitude = baseAmplitude * (2 + Math.sin(2 * Math.PI * amFrequency * testSignalTime));
+                
+                // Generate sine wave sample
+                let value = Math.round(baseAmplitude * Math.sin(2 * Math.PI * frequency * testSignalTime) + baseAmplitude);
+
+                if(value > 8388607) value = 8388607;
+
+                value = value & 0xFFFFFF;  // Tronca a 24 bit
+                if (value < 0) {
+                    value += 0x1000000;
+                }               
+                let sample = value.toString(16).padStart(6, '0');  // Converti in stringa hex di 6 caratteri
+               
+                // on batch sample queing
+                samples.push(sample);
+                
+                testSignalTime += 1 / SAMPLE_RATE;
+            }
+            
+            // Create batch object
+            const batch = {
+                t: Date.now() * 1000, // microseconds
+                v: samples
+            };
+            
+            // Process batch as if received from WebSocket
+            processBatch(batch);
+            
+            // Schedule next batch if still enabled
+            if (testSignalEnabled0) {
+                timers[0] = setTimeout(generateTestSignal0, 1000 / EXPECTED_BATCH_RATE);
+            }else{
+                clearTimeout(timers[0]); 
+            }
+        }
+
+    
+        /*-------------------------------------------------------------------------
+            WEBSOCKET CONTROL SECTION
+          -------------------------------------------------------------------------
+        */
+        function onmessageEvent(event) {
+            if(!(adcSignalEnabled || remoteTestEnabled)) return;
+            //console.log(`event.data: ${event.data}`);
+            // All'arrivo di un batch
+            let batch = JSON.parse(event.data);
+            //console.log("first: "+batch.first);
+
+            processBatch(batch);
+        }
+
+        function processBatch(batch) {   
+            if(!inputMode) return; 
+            const timestamp = batch.t;
+            // Aggiungilo al buffer
+            batchBuffer.push(batch);
+            //console.log("v: "+batch.v);
+            // Buffer circolare per registrazione
+            if (isRecording) {
+                recordBuffer.push(batch);
+                if (recordBuffer.length > recordBufferSize) {
+                    recordBuffer.shift(); // Buffer circolare
+                    console.log("Record buffer full, dropping oldest samples");
+                }
+            }
+    
+            // Aggiorna statistiche
+            if(lastBatchTime !== null) {
+                const interval = (timestamp - lastBatchTime) / 1000;
+                batchIntervals.push(interval);
+                if(batchIntervals.length > MAX_INTERVALS) {
+                    batchIntervals.shift();
+                }
+            }
+
+            lastBatchTime = timestamp;
+            batchCount++;
+
+            // Aggiorna le statistiche a schermo
+            if(batchCount % 10 === 0) {
+                updateBatchStats();
+                updateBufferInfo();
+            }
+
+            // Aggiorna la scala X per mantenere la finestra temporale costante
+            //const timeWindow = xScale.max - xScale.min;  // manteniamo la stessa finestra temporale
+            //if (timestamp > xScale.max) {
+            //    xScale.max = timestamp;
+            //    xScale.min = timestamp - timeWindow;
+           // }
+
+            /*
+            // Realizza l'autoscale dei valori in ordinata
+            if (autoScale && batchBuffer.length > 0) {
+                // Trova min e max dei valori in tutti i batch
+                let yMin = 0;  // forza minimo a zero
+                let yMax = 0;
+                batchBuffer.forEach(batch => {
+                    const values = batch.v.map(sample => {
+                        let value = (sample[0] << 16) | (sample[1] << 8) | sample[2];
+                        if (value & 0x800000) {
+                            value -= 0x1000000;
+                        }
+                        return value;
+                    });
+                    yMax = Math.max(yMax, ...values);
+                });
+
+                // Aggiungi un po' di padding superiore (10%)
+                yScale.min = 0;  // minimo sempre zero
+                yScale.max = yMax * 1.1;
+            }
+            */
+            // Stampa a schermo
+            if (currBatchIndex === 0) {
+                // Inizializzazione finestra temporale
+                const firstBatch = batchBuffer[0];
+                xScale.min = firstBatch.t;
+                xScale.max = firstBatch.t + bufferTimespan;
+                console.log(`Finestra temporale: ${xScale.min} - ${xScale.max}`);
+                drawPlotInc();
+                currBatchIndex++;
+            } else if (currBatchIndex < maxBufferSize - 1) {
+                //console.log(`currBatchIndex: ${currBatchIndex}, t: ${batchBuffer[currBatchIndex].t}`);
+                // Batch intermedi
+                drawPlotInc();
+                currBatchIndex++;
+                //console.log(`Batch corrente: ${currBatchIndex}`);
+            } else {
+                // Ultimo batch e reset
+                drawPlotInc();
+                console.log("Reset indice batch");
+                currBatchIndex = 0;
+            }
+        }
+
+        function onControlEvent(event) {
+            const status = JSON.parse(event.data);
+            console.log("Received current status: " + event.data);
+            if(status.type === 'status') {
+                document.getElementById('currentConfig').innerHTML = 
+                    `Sample Rate: ${status.samplerate} Hz<br>` +
+                    `EMA Alpha: ${status.alfaema}<br>` +
+                    `Streaming: ${status.streaming == "true" ? 'In corso' : 'Bloccato'}<br>`+
+                    `ADC Input: ${status.mode == 0 ? 'Attivato' : 'Disattivato'}<br>` +
+                    `Remote Test: ${status.mode == 1 ? 'Attivato' : 'Disattivato'}<br>` +
+                    `ADC Tone: ${status.mode == 2 ? 'Attivato' : 'Disattivato'}<br>` +
+                    `Test frequency: ${status.freq}`;
+                
+                document.getElementById('streamToggle').innerHTML = status.streaming == "true" ? 'Stop Streaming' : 'Start Streaming';   
+                document.getElementById('sampleRate').value = status.samplerate;
+                document.getElementById('emaAlpha').value = status.alfaema;
+                document.getElementById('remoteTest').checked = (status.mode == 1);
+                document.getElementById('enableADCTone').checked = (status.mode == 2);
+                document.getElementById('enableADCSignal').checked = (status.mode == 0);
+                document.getElementById('testFrequency').value = status.freq;
+
+                SAMPLE_RATE = status.samplerate;
+            }else if(status.type == "event"){
+                if (status.overflow > 0) {
+                    overflowBox.classList.remove('green');
+                    overflowBox.classList.add('red');
+                } else {
+                    overflowBox.classList.remove('red');
+                    overflowBox.classList.add('green');
+                }
+            }
+        }
+
+        function connectWebSocket(ip, port, path, name, onMessageCallback) {
+            let wsh = null;
+
+            function init() {
+                wsh = new WebSocket(`ws://${ip}:${port}/${path}`);
+                
+                wsh.onopen = () => {
+                    console.log(`WebSocket ${name} connesso`);
+                    isConnected = true;
+                };
+
+                wsh.onclose = () => {
+                    console.log(`WebSocket ${name} disconnesso, riconnessione...`);
+                    isConnected = false;
+                };
+
+                wsh.onerror = (error) => {
+                    console.log(`Errore WebSocket ${name}:`, error);
+                };
+
+                if (typeof onMessageCallback === "function") {
+                    wsh.onmessage = onMessageCallback;
+                }
+            }
+            init();
+            return wsh;
+        }
+
+        function updateConfig(param, value) {
+            if(wsControl && wsControl.readyState === WebSocket.OPEN) {
+                const config = {};
+                
+                // Gestione dei diversi tipi di valore
+                if (typeof value === 'string') {
+                    // Converti in booleano se è "true" o "false"
+                    if (value.toLowerCase() === 'true') {
+                        config[param] = true;
+                    } else if (value.toLowerCase() === 'false') {
+                        config[param] = false;
+                    } else {
+                        // Prova a convertire in numero se non è un booleano
+                        config[param] = isNaN(parseFloat(value)) ? value : parseFloat(value);
+                    }
+                } else {
+                    // Mantieni il tipo originale per booleani e numeri
+                    config[param] = value;
+                }
+                
+                wsControl.send(JSON.stringify(config));
+            } else {
+                console.log('WebSocket not connected');
+            }
+        }
+
+        //wsData = connectWebSocket("192.168.1.167", "81", "ws", "", onmessageEvent);
+        //wsControl = connectWebSocket("192.168.1.167", "82", "ws", "", onControlEvent);
+
+        //wsData = connectWebSocket("192.168.10.136", "81", "ws", "", onmessageEvent);
+        //wsControl = connectWebSocket("192.168.10.136", "82", "ws", "", onControlEvent);
+
+        //wsData = connectWebSocket("10.12.1.149", "81", "ws", "", onmessageEvent);
+        //wsControl = connectWebSocket("10.12.1.149", "82", "ws", "", onControlEvent);
+
+        // Ottiene l'hostname corrente dal browser
+        const hostname = window.location.hostname;
+        // Usa l'hostname per connettersi ai WebSocket
+        wsData = connectWebSocket(hostname, "81", "ws", "", onmessageEvent);
+        wsControl = connectWebSocket(hostname, "82", "ws", "", onControlEvent);
+
+        const log = document.getElementById('log');
+        const originalConsoleLog = console.log;
+        console.log = function(...args) {
+            originalConsoleLog.apply(console, args);
+            const message = args.join(' ');
+            log.innerHTML = message + '<br>' + log.innerHTML;
+        };
+        /*
+Capisco, vuoi un comportamento tipo oscilloscopio con:
+
+- Plot incrementale senza cancellazione fino al bordo destro
+- Scroll manuale del margine sinistro della vista
+- Plot fisico solo quando arriva un nuovo batch
+- Decimazione dei punti mantenuta
+Le modifiche principali sono:
+
+Sì, questa soluzione è intelligente! Ha diversi vantaggi:
+
+Adatta automaticamente il numero di punti da plottare per ogni batch:
+
+javascriptCopyif(batchesInWindow.length < 1000){
+    n =  Math.ceil((1000 - batchesInWindow.length) / batchesInWindow.length)+1;
+    n = Math.min(n, batchesInWindow[0].v.length);
+}
+
+Se ci sono pochi batch (<1000), aumenta il numero di punti per batch
+Ma non supera mai il numero di campioni disponibili nel batch
+Se ci sono molti batch, usa solo il primo punto di ogni batch
+
+
+Il calcolo del timestamp è preciso:
+
+javascriptCopyconst sampleTime = batch.t + (j * (1000000 / SAMPLE_RATE));
+
+Mantiene una densità di punti ragionevole:
+
+
+Con molti batch: ~1000 punti (un punto per batch)
+Con pochi batch: fino a 1000 punti distribuiti tra i batch disponibili
+
+// Modifica i bottoni nell'HTML:
+<button onmousedown="startScrolling(-timebaseDiv * 5000)" 
+        onmouseup="stopScrolling()" 
+        onmouseleave="stopScrolling()">◄◄</button>
+<button onmousedown="startScrolling(timebaseDiv * 5000)" 
+        onmouseup="stopScrolling()" 
+        onmouseleave="stopScrolling()">►►</button>
+        
+// Funzione per iniziare lo scroll continuo
+function startScrolling(deltaMs) {
+    if (scrollInterval) return; // Evita intervalli multipli
+    
+    // Prima chiamata immediata
+    scrollView(deltaMs);
+    
+    // Poi chiamate periodiche ogni 100ms
+    scrollInterval = setInterval(() => {
+        scrollView(deltaMs);
+    }, 100); // Regola questo valore per cambiare la velocità dello scroll
+}
+
+// Funzione per fermare lo scroll
+function stopScrolling() {
+    if (scrollInterval) {
+        clearInterval(scrollInterval);
+        scrollInterval = null;
+    }
+}
+
+// Modifica i bottoni nell'HTML:
+<button onmousedown="startScrolling(-timebaseDiv * 5000)" 
+        onmouseup="stopScrolling()" 
+        onmouseleave="stopScrolling()">◄◄</button>
+<button onmousedown="startScrolling(timebaseDiv * 5000)" 
+        onmouseup="stopScrolling()" 
+        onmouseleave="stopScrolling()">►►</button>
+
+t1: contatto con la piattaforma di forza
+t2: velocità discendente massima
+t3: velocità ascendente massima
+t4: stacco
+t5: atterraggio
+*/
+    </script>
+</body>
+</html>
