@@ -233,11 +233,11 @@
                 </label>
                 <button id="recordBtn" onclick="toggleRecording()">Start Recording</button>
                 <button id="loadRecordBtn" onclick="document.getElementById('recordFileInput').click()">Load Record</button>
-                <button id="play" onclick="playRecord()">►</button>
-                <button id="scrollLeft">◄◄</button>
-                <button id="scrollRight">►►</button>
-                <button id="scrollLeftFast">◄◄◄</button>
-                <button id="scrollRightFast">►►►</button>
+                <button id="play" onclick="playRecord()">></button>
+                <button id="scrollLeft"><<</button>
+                <button id="scrollRight">>></button>
+                <button id="scrollLeftFast"><<<</button>
+                <button id="scrollRightFast">>>></button>
                 <label>File Name Prefix:
                     <input type="text" id="filePrefix" value="data">
                 </label>
@@ -271,6 +271,7 @@
         let batchCount = 0;
         let lastBatchTime = null;
         let batchIntervals = [];
+        let batchBuffer = [];
         // Test signal variables
         let testSignalTime = 0;
         let lastTestSignalUpdate = 0;
@@ -283,7 +284,6 @@
         let inputMode = true;
         
         const MAX_INTERVALS = 200;
-        let batchBuffer = [];
         let bufferDurationSec = 10;
         let bufferTimespan = bufferDurationSec * 1000000; // converti in microsecondi
         let maxBufferSize = Math.ceil((bufferDurationSec * 1000) / 5);
@@ -400,7 +400,8 @@
         // Seleziona tutti i radio button con lo stesso nome
         const radioButtons2 = document.querySelectorAll('input[name="testSignal"]');
         // Funzione per gestire checked/unchecked
-        function handleRadioChange() {
+
+        function handleRadioChange(send = true) {
             const radio1 = document.getElementById('enableADCSignal');
             const radio2 = document.getElementById('enableTestSignal0');
             const radio3 = document.getElementById('enableTestSignal1');
@@ -419,7 +420,7 @@
                     v: [0]
                 };
                 onmessageEvent({ data: JSON.stringify(batch) });
-                updateConfig("mode", 0);
+                if(send) updateConfig("mode", 0);
             } else {
                 adcSignalEnabled = false;
                 console.log('Opzione adc input deselezionata');
@@ -456,7 +457,7 @@
                 remoteTestEnabled = true;
                 inputMode = true;
                 resetView();
-                updateConfig("mode", 1);
+                if(send) updateConfig("mode", 1);
                 const batch = {
                     t: 0,
                     v: [0]
@@ -475,7 +476,7 @@
                 resetView();
                 testSignalTime = 0;
                 updateSamplesPerBatch();
-                updateConfig("mode", 2);
+                if(send) updateConfig("mode", 2);
                 const batch = {
                     t: 0,
                     v: [0]
@@ -1231,6 +1232,7 @@
         }
 
         function resetView() {
+            updateSamplesPerBatch();
             batchBuffer.length = 0;
             currBatchIndex = 0;
             drawPlotInc();
@@ -1549,35 +1551,6 @@
                 updateBufferInfo();
             }
 
-            // Aggiorna la scala X per mantenere la finestra temporale costante
-            //const timeWindow = xScale.max - xScale.min;  // manteniamo la stessa finestra temporale
-            //if (timestamp > xScale.max) {
-            //    xScale.max = timestamp;
-            //    xScale.min = timestamp - timeWindow;
-           // }
-
-            /*
-            // Realizza l'autoscale dei valori in ordinata
-            if (autoScale && batchBuffer.length > 0) {
-                // Trova min e max dei valori in tutti i batch
-                let yMin = 0;  // forza minimo a zero
-                let yMax = 0;
-                batchBuffer.forEach(batch => {
-                    const values = batch.v.map(sample => {
-                        let value = (sample[0] << 16) | (sample[1] << 8) | sample[2];
-                        if (value & 0x800000) {
-                            value -= 0x1000000;
-                        }
-                        return value;
-                    });
-                    yMax = Math.max(yMax, ...values);
-                });
-
-                // Aggiungi un po' di padding superiore (10%)
-                yScale.min = 0;  // minimo sempre zero
-                yScale.max = yMax * 1.1;
-            }
-            */
             // Stampa a schermo
             if (currBatchIndex === 0) {
                 // Inizializzazione finestra temporale
@@ -1623,6 +1596,10 @@
                 document.getElementById('testFrequency').value = status.freq;
 
                 SAMPLE_RATE = status.samplerate;
+                batchIntervals = [];
+                batchBuffer = [];
+                handleRadioChange(false);// feedback, non comando...
+                resetView();
             }else if(status.type == "event"){
                 if (status.overflow > 0) {
                     overflowBox.classList.remove('green');
@@ -1711,75 +1688,6 @@
             log.innerHTML = message + '<br>' + log.innerHTML;
         };
         /*
-Capisco, vuoi un comportamento tipo oscilloscopio con:
-
-- Plot incrementale senza cancellazione fino al bordo destro
-- Scroll manuale del margine sinistro della vista
-- Plot fisico solo quando arriva un nuovo batch
-- Decimazione dei punti mantenuta
-Le modifiche principali sono:
-
-Sì, questa soluzione è intelligente! Ha diversi vantaggi:
-
-Adatta automaticamente il numero di punti da plottare per ogni batch:
-
-javascriptCopyif(batchesInWindow.length < 1000){
-    n =  Math.ceil((1000 - batchesInWindow.length) / batchesInWindow.length)+1;
-    n = Math.min(n, batchesInWindow[0].v.length);
-}
-
-Se ci sono pochi batch (<1000), aumenta il numero di punti per batch
-Ma non supera mai il numero di campioni disponibili nel batch
-Se ci sono molti batch, usa solo il primo punto di ogni batch
-
-
-Il calcolo del timestamp è preciso:
-
-javascriptCopyconst sampleTime = batch.t + (j * (1000000 / SAMPLE_RATE));
-
-Mantiene una densità di punti ragionevole:
-
-
-Con molti batch: ~1000 punti (un punto per batch)
-Con pochi batch: fino a 1000 punti distribuiti tra i batch disponibili
-
-// Modifica i bottoni nell'HTML:
-<button onmousedown="startScrolling(-timebaseDiv * 5000)" 
-        onmouseup="stopScrolling()" 
-        onmouseleave="stopScrolling()">◄◄</button>
-<button onmousedown="startScrolling(timebaseDiv * 5000)" 
-        onmouseup="stopScrolling()" 
-        onmouseleave="stopScrolling()">►►</button>
-        
-// Funzione per iniziare lo scroll continuo
-function startScrolling(deltaMs) {
-    if (scrollInterval) return; // Evita intervalli multipli
-    
-    // Prima chiamata immediata
-    scrollView(deltaMs);
-    
-    // Poi chiamate periodiche ogni 100ms
-    scrollInterval = setInterval(() => {
-        scrollView(deltaMs);
-    }, 100); // Regola questo valore per cambiare la velocità dello scroll
-}
-
-// Funzione per fermare lo scroll
-function stopScrolling() {
-    if (scrollInterval) {
-        clearInterval(scrollInterval);
-        scrollInterval = null;
-    }
-}
-
-// Modifica i bottoni nell'HTML:
-<button onmousedown="startScrolling(-timebaseDiv * 5000)" 
-        onmouseup="stopScrolling()" 
-        onmouseleave="stopScrolling()">◄◄</button>
-<button onmousedown="startScrolling(timebaseDiv * 5000)" 
-        onmouseup="stopScrolling()" 
-        onmouseleave="stopScrolling()">►►</button>
-
 t1: contatto con la piattaforma di forza
 t2: velocità discendente massima
 t3: velocità ascendente massima
