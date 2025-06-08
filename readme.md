@@ -90,6 +90,7 @@
 - https://www.olimex.com/Products/Breadboarding/BB-ADS1262/open-source-hardware
 - https://www.industrialshields.com/blog/arduino-industrial-1/how-to-use-spi-on-an-esp32-based-plc-528#:~:text=The%20ESP32%20microcontroller%20has%20four,SPI%20drivers%2C%20open%20to%20users.
 - https://community.element14.com/challenges-projects/project14/dataconversion/b/blog/posts/oscilloscope-on-a-24-bit-adc-chip-ads1256
+- https://digitaltown.co.uk/components6ads1256ADC.php
 
 **Tutorials su ADC differenziali:**
 - [Misure con ponti](/manuali/sbaa532a.pdf)
