@@ -3,6 +3,18 @@
 <head>
     <title>WebSocket Test</title>
     <style>
+		.yscale-controls {
+			margin: 5px 0;
+			padding: 5px;
+			background: #e8f4fd;
+			border: 1px solid #0ea5e9;
+			border-radius: 4px;
+		}
+		.yscale-info {
+			font-size: 12px;
+			color: #0369a1;
+			font-weight: bold;
+		}
         .limit-indicator {
             color: red;
             font-weight: bold;
@@ -320,10 +332,9 @@
         let startX = 0;
         let startY = 0;
         let timers = [];
-        //let autoScale = true;
-        //let dragStartPos = null;
-        //let lastMousePos = null;
-
+		let autoScale = true; // Flag per abilitare/disabilitare auto-scaling
+		let yScaleBuffer = []; // Buffer per valori recenti
+		const Y_SCALE_BUFFER_SIZE = 500; // Numero di campioni da considerare per la scala
         // scroll management
         const delay = (msec) => new Promise(resolve => setTimeout(resolve, msec)) ;
         let isScrolling = false;
@@ -508,7 +519,74 @@
             drawPlot();
         }
     }
-*/
+*/		function updateYScale(newValues) {
+			if (!autoScale) return;
+			
+			// Aggiungi nuovi valori al buffer
+			yScaleBuffer.push(...newValues);
+			
+			// Mantieni solo gli ultimi Y_SCALE_BUFFER_SIZE valori
+			if (yScaleBuffer.length > Y_SCALE_BUFFER_SIZE) {
+				yScaleBuffer = yScaleBuffer.slice(-Y_SCALE_BUFFER_SIZE);
+			}
+			
+			if (yScaleBuffer.length === 0) return;
+			
+			// Calcola min e max dai valori nel buffer
+			const minValue = Math.min(...yScaleBuffer);
+			const maxValue = Math.max(...yScaleBuffer);
+			
+			// Aggiungi margine del 10%
+			const range = maxValue - minValue;
+			const margin = Math.max(range * 0.1, 1000);
+			
+			// Aggiorna gradualmente la scala per evitare salti bruschi
+			const smoothFactor = 0.1;
+			
+			const targetMin = minValue - margin;
+			const targetMax = maxValue + margin;
+			
+			// Smooth transition verso i nuovi valori
+			yScale.min = yScale.min + (targetMin - yScale.min) * smoothFactor;
+			yScale.max = yScale.max + (targetMax - yScale.max) * smoothFactor;
+		}
+
+		function resetYScale() {
+			yScaleBuffer = [];
+			yScale.min = 0;
+			yScale.max = 8388608;
+			console.log("YScale resettata ai valori di default");
+		}
+
+		function addYScaleControls() {
+			const controlPanel = document.querySelector('.control-panel');
+			
+			const yScaleDiv = document.createElement('div');
+			yScaleDiv.className = 'config-item yscale-controls';
+			yScaleDiv.innerHTML = `
+				<label><strong>Y Scale Controls:</strong></label>
+				<button onclick="resetYScale()">Reset Y Scale</button>
+				<label>
+					<input type="checkbox" id="autoScaleCheckbox" checked onchange="toggleAutoScale()">
+					Auto Scale Y
+				</label>
+				<div id="yScaleInfo" class="yscale-info">Y Range: 0 to 8388608</div>
+			`;
+			
+			controlPanel.appendChild(yScaleDiv);
+		}
+
+		function toggleAutoScale() {
+			autoScale = document.getElementById('autoScaleCheckbox').checked;
+			console.log("Auto-scaling:", autoScale ? "abilitato" : "disabilitato");
+		}
+
+		function updateYScaleInfo() {
+			const infoElement = document.getElementById('yScaleInfo');
+			if (infoElement) {
+				infoElement.textContent = `Y Range: ${yScale.min.toFixed(0)} to ${yScale.max.toFixed(0)}`;
+			}
+		}
         function resizeCanvas() {
             console.log("resizeCanvas");
             canvas.width = canvas.offsetWidth;
@@ -1008,6 +1086,7 @@
                     let value = parseInt(batch.v[0], 16);
                     if (value & 0x800000) value -= 0x1000000;
                    
+				    updateYScale([value]);
                     //console.log("value: "+value);
                     // Calcola coordinate
                     //const x = timeToScreen(batch.t);
@@ -1235,6 +1314,7 @@
             updateSamplesPerBatch();
             batchBuffer.length = 0;
             currBatchIndex = 0;
+			resetYScale();
             drawPlotInc();
         }
 
@@ -1310,7 +1390,11 @@
             updateConfig('samplerate', this.value);
         });
 
-        window.addEventListener('load', updateSamplesPerBatch);
+        window.addEventListener('load', () => {
+			updateSamplesPerBatch();
+			addYScaleControls();
+			setInterval(updateYScaleInfo, 1000);
+		});
         /*-------------------------------------------------------------------------
             TEST SIGNAL GENERATION SECTION
           -------------------------------------------------------------------------
@@ -1571,6 +1655,7 @@
                 drawPlotInc();
                 console.log("Reset indice batch");
                 currBatchIndex = 0;
+				batchBuffer.length = 0;
             }
         }
 
