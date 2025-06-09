@@ -1,12 +1,14 @@
 
 #include <Arduino.h>
 #include <WiFi.h>
+#include <ESPmDNS.h>
 #include <SPI.h>
 #include <ArduinoJson.h>
 #include "DualWebSocket.h"
 #include "ADS1256_DMA.h"
 #include "TaskMonitor.h"
 #include <driver/spi_master.h>
+#include "ESP32WebServer.h"
 
 #define ADS1256_DEBUG
 //#include "esp32-hal-timer.h"
@@ -26,12 +28,12 @@
 //const char* WIFI_SSID = "D-Link-6A30CC";
 //const char* WIFI_PASSWORD = "FabSeb050770250368120110";
 
-//const char* WIFI_SSID = "RedmiSeb";
-//const char* WIFI_PASSWORD = "pippo2503";
+const char* WIFI_SSID = "RedmiSeb";
+const char* WIFI_PASSWORD = "pippo2503";
 
 // Configurazione Wi-Fi
-const char* WIFI_SSID = "WebPocket-E280";
-const char* WIFI_PASSWORD = "dorabino.7468!";
+//const char* WIFI_SSID = "WebPocket-E280";
+//const char* WIFI_PASSWORD = "dorabino.7468!";
 
 //const char* WIFI_SSID = "sensori";
 //const char* WIFI_PASSWORD = "sensori2019";
@@ -44,6 +46,7 @@ struct Config {
     uint8_t mode;
     uint16_t toneFreq;
     uint8_t adcPort;
+	uint16_t toneAmp;
 };
 
 /*
@@ -70,15 +73,17 @@ TaskHandle_t adcTaskHandle = NULL;
 //hw_timer_t * timer = NULL;
 //portMUX_TYPE timerMux = portMUX_INITIALIZER_UNLOCKED;
 volatile float freq = 1;
+volatile uint16_t amp = 200;
 volatile uint32_t angle = 0;
 volatile uint8_t timerCmd = 0;
 volatile uint8_t lastTimerCmd = 0;
 const uint32_t SAMPLES_PER_CYCLE = 200;  // 1000ms/5ms = 200 campioni per ciclo
 //ADS1256_DMA adc;
 ADS1256_DMA adc;
+//HTTPSServer https_server;
+ESP32WebServer server;
 
-
-void updateDAC() {
+void updateDAC(int a) {
     //Serial.println("updateDAC");
     // Calcola il valore della sinusoide
     float sinValue = sin(2 * PI * angle / SAMPLES_PER_CYCLE);
@@ -87,10 +92,10 @@ void updateDAC() {
     //int value1 = 150 + 50 * sinValue;
     // DAC2: invertito (controfase)
     //int value2 = 150 - 50 * sinValue;
-
+    // 200
     // Aumenta l'ampiezza al massimo (0-255)
-    int value1 = 200 * (sinValue + 1) / 2;  // Onda sinusoidale 0-255V
-    int value2 = 200 * (-sinValue + 1) / 2; // Controfase
+    int value1 = a * (sinValue + 1) / 2;  // Onda sinusoidale 0-255V
+    int value2 = a * (-sinValue + 1) / 2; // Controfase
     
     // Aggiorna entrambi i DAC
     dacWrite(DAC1_PIN, value1);
@@ -182,7 +187,7 @@ void sendSystemStatus(Config gc, WebSocketServer::WSClient* client = nullptr) {
 }
 
 void sendOverflowStatus(bool status, WebSocketServer::WSClient* client = nullptr) {
-    char statusBuffer[40];
+    char statusBuffer[50];
     snprintf(statusBuffer, sizeof(statusBuffer), 
         "{\"type\":\"event\",\"overflow\":%u}", status);
     
@@ -330,6 +335,14 @@ void onControlEvent(WSEventType type, WebSocketServer::WSClient* client, uint8_t
             Serial.printf("Found streaming: %d\n", newStreaming);
             gc1.streaming = newStreaming;
             Serial.printf("Streaming: %s\n", gc1.streaming ? "avviato" : "fermato");
+            configChanged = true;
+        }
+		
+		if(doc.containsKey("testamp")) {
+            uint16_t newAmp = doc["streaming"].as<uint16_t>();
+            Serial.printf("Found streaming: %d\n", newAmp);
+            gc1.toneAmp = newAmp; 
+            Serial.printf("Streaming: %s\n", gc1.toneAmp ? "avviato" : "fermato");
             configChanged = true;
         }
 
@@ -518,6 +531,7 @@ void adcTask(void* pvParameters) {
                         Serial.println("adcTask: start Tone");
                         freq = gc.toneFreq;
                         timerCmd = 1;
+						amp = gc.toneAmp = 200;
                         Serial.println("adcTask: enableTestSignal");
                         adc.enableTestSignal(false);
                         Serial.println("adcTask: dopo enableTestSignal");
@@ -527,7 +541,9 @@ void adcTask(void* pvParameters) {
                         adc.enableTestSignal(true);
                         Serial.println("adcTask: Segnale di test abilitato");
                     }else{
-                        timerCmd = 0;
+                        //timerCmd = 0;
+						timerCmd = 1;
+						amp = gc.toneAmp = 200;
                         Serial.println("adcTask: stop Tone");
                         adc.enableTestSignal(false);
                         Serial.println("adcTask: Segnale di test disabilitato");
@@ -550,7 +566,8 @@ void adcTask(void* pvParameters) {
                 monitor->heartbeat();
                 //Serial.print(0);
                 if(gc.streaming){
-                    if(timerCmd) updateDAC();
+                    if(timerCmd) updateDAC(amp);
+					
 
                     adc.read_data_batch(batch, samplesPerBatch, decimationFactor);         
 
@@ -625,20 +642,10 @@ void wsTask(void* pvParameters) {
             if (final > 0 && (len + final) < MAX_LEN) {
                 len += final;
                 //ws.sendDataSync(buffer, len);
-                //if (ws.hasDataClients()) {
                 ws.sendDataSync(buffer, len);
-                //int max = findMaxAllocation();
-                //Serial.printf("Max possible allocation %d\n", max);
-                //printMemoryInfo();
-                //if (len > max) {
-                //    Serial.printf("Send failed: requested size %d larger than max possible allocation %d\n", len, max);
-                //    return;
-                //} 
-                //ws.sendDataAsync(buffer, len);
-                //if(!ws.sendDataSync(buffer, len)) Serial.println("wsTask: send error");
-                //Serial.println(buffer);
-                //}
                 //Serial.println("Buffer");
+            }else{
+                Serial.println("send syn error\n");
             }
             
             // overflow signalling management
@@ -685,8 +692,16 @@ void wsTask(void* pvParameters) {
     }
 }
 
+
 void setup() {
+	//optimizeESP32();
     Serial.begin(115200);
+    // Inizializza il filesystem
+    Serial.println("\nInizializzazione filesystem");
+    if(!LittleFS.begin(true)) {
+        Serial.println("LittleFS Mount Failed");
+        return;
+    }
     Serial.println("\nInizializzazione ADC");
     //adc.start();
     configMutex = xSemaphoreCreateMutex();
@@ -700,8 +715,13 @@ void setup() {
     Serial.println("\nConnesso al WiFi");
     Serial.print("IP: ");
     Serial.println(WiFi.localIP());
+    
+    String hostname = "adcstreamer-" + String((uint32_t)ESP.getEfuseMac(), HEX);
+    Serial.println("\nhostname: "+hostname);
+    MDNS.begin(hostname.c_str());
     //setupDAC();
     delay(1000);
+    
     //startDAC();
     // Crea la coda per i batch
     batchQueue = xQueueCreate(QUEUE_SIZE, sizeof(BatchData));
@@ -713,8 +733,23 @@ void setup() {
     // Configurazione WebSocket
     ws.onDataEvent(onDataEvent);
     ws.onControlEvent(onControlEvent);
+    // Configurazione di default (porta 80)
+    // Oppure con configurazione personalizzata
+    // ESP32WebServer::Config config;
+    // config.port = 8080;
+    // config.check_proxy_headers = true;
+    if (!server.begin()) {
+        Serial.println("Server failed to start");
+        ESP.restart();
+    }
+
+    delay(100);  // Breve pausa per stabilizzazione
+
+    // Configura e avvia il WebSocket server
+    ws.onDataEvent(onDataEvent);
+    ws.onControlEvent(onControlEvent);
     if (!ws.begin()) {
-        Serial.println("Failed to start WebSocket servers");
+        ESP_LOGE("MAIN", "Failed to start WebSocket servers");
         ESP.restart();
     }
     delay(100);
