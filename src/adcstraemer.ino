@@ -542,8 +542,8 @@ void adcTask(void* pvParameters) {
                         Serial.println("adcTask: Segnale di test abilitato");
                     }else{
                         //timerCmd = 0;
-						timerCmd = 1;
-						amp = gc.toneAmp = 200;
+						timerCmd = 0;
+						//amp = gc.toneAmp = 200;
                         Serial.println("adcTask: stop Tone");
                         adc.enableTestSignal(false);
                         Serial.println("adcTask: Segnale di test disabilitato");
