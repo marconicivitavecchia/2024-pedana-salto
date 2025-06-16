@@ -139,7 +139,7 @@
             <label for="sampleRate">Sample Rate:</label>
             <select id="sampleRate" onchange="updateConfig('samplerate', this.value)">
                 <option value="200">200 Hz</option>
-                <option value="500">500 Hz</option>
+                <option value="600">600 Hz</option>
                 <option value="1000">1000 Hz</option>
                 <option value="10000">10 kHz</option>
                 <option value="15000">15 kHz</option>
@@ -274,6 +274,7 @@
     <script src="filter.js"></script>       
 
     <script>
+		var counter = 0;
         // Base configuration variables
         let SAMPLE_RATE = 30000;
         const EXPECTED_BATCH_RATE = 200;
@@ -1593,12 +1594,17 @@
           -------------------------------------------------------------------------
         */
         function onmessageEvent(event) {
-            if(!(adcSignalEnabled || remoteTestEnabled)) return;
+            //if(!(adcSignalEnabled || remoteTestEnabled)) return;
             //console.log(`event.data: ${event.data}`);
             // All'arrivo di un batch
             let batch = JSON.parse(event.data);
             //console.log("first: "+batch.first);
-
+			//console.log("p");
+			//counter++;
+			if(counter == 100) {
+				console.log("counter: "+counter);
+                counter = 0;
+            }
             processBatch(batch);
         }
 
@@ -1634,7 +1640,7 @@
                 updateBatchStats();
                 updateBufferInfo();
             }
-
+			
             // Stampa a schermo
             if (currBatchIndex === 0) {
                 // Inizializzazione finestra temporale
@@ -1679,7 +1685,11 @@
                 document.getElementById('enableADCTone').checked = (status.mode == 2);
                 document.getElementById('enableADCSignal').checked = (status.mode == 0);
                 document.getElementById('testFrequency').value = status.freq;
-
+				
+				if(status.streaming == "false"){
+					counter = 0;
+				}					
+				
                 SAMPLE_RATE = status.samplerate;
                 batchIntervals = [];
                 batchBuffer = [];
