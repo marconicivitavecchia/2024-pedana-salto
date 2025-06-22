@@ -676,7 +676,7 @@
             let lastDerivative = null;            
             for(let batchIdx = 0; batchIdx < recordBuffer.length; batchIdx++) {
                 const batch = recordBuffer[batchIdx];
-                const batchTime = batch.t / 1000000;
+                const batchTime = parseInt(batch.t, 16) / 1000000;
 
                 // Calcola dt medio dai primi due batch
                 currBatchTime = recordBuffer[batchIdx].t / 1000000;
@@ -752,7 +752,7 @@
             
             for(let batchIdx = 0; batchIdx < recordBuffer.length; batchIdx++) {
                 const batch = recordBuffer[batchIdx];
-                const batchTime = batch.t / 1000000;
+                const batchTime = parseInt(batch.t, 16) / 1000000;
                 
                 for(let i = 0; i < batch.v.length; i++) {
                     let value = calculateValue(batch.v[i]);
@@ -918,8 +918,8 @@
             recordBuffer = recordBuffer.slice(0, maxBufferSize);
             currPlayIndex = 0;
             const firstBatch = recordBuffer[0];
-            xScale.min = firstBatch.t;
-            xScale.max = firstBatch.t + bufferTimespan;
+            xScale.min = parseInt(firstBatch.t, 16);
+            xScale.max = xScale.min + bufferTimespan;
             report = analyzeJump(recordBuffer, SAMPLE_RATE);   
             printJumpReport(report);  
             drawPlot();       
@@ -1080,7 +1080,7 @@
                 const batch = batchBuffer[index];
               
                 // Test dei range
-                const timeInRange = batch && (batch.t >= xScale.min && batch.t <= xScale.max);
+                const timeInRange = batch && (parseInt(batch.t, 16) >= xScale.min && parseInt(batch.t, 16) <= xScale.max);
                 //console.log(`Batch ${index} - Time range: ${timeInRange} (${batch.t})`);
 
                 if (timeInRange) {
@@ -1092,7 +1092,7 @@
                     // Calcola coordinate
                     //const x = timeToScreen(batch.t);
 
-                    const x = timeToScreen(batch.t);
+                    const x = timeToScreen(parseInt(batch.t, 16));
                     //const y = valueToScreen(value);
 
                     //const x = timeToScreen(xScale.min + index*5000);
@@ -1168,7 +1168,7 @@
                 //xScale.min = recordBuffer[0].t;
                 // Prima trova i batch nella finestra temporale
                 const batchesInWindow = recordBuffer.filter(batch => 
-                    batch.t >= xScale.min && batch.t <= xScale.max
+                    parseInt(batch.t, 16) >= xScale.min && parseInt(batch.t, 16) <= xScale.max
                 );
                 
                 if(batchesInWindow.length < TARGET_POINTS){
@@ -1186,7 +1186,7 @@
                         value = filterh.update(calculateValue(batch.v[j]));
                         
                         // Calcola il timestamp preciso per questo campione nel batch
-                        const sampleTime = batch.t + (j * (1000000 / SAMPLE_RATE)); // in microsecondi
+                        const sampleTime = parseInt(batch.t, 16) + (j * (1000000 / SAMPLE_RATE)); // in microsecondi
                 
                         const x = Math.round(timeToScreen(sampleTime));
                         const y = Math.round(valueToScreen(value));
@@ -1284,11 +1284,11 @@
                 `Samples per batch: ${samplesPerBatch} (${SAMPLE_RATE}Hz)`;
         }
        
-        function resizeCanvas() {
-            canvas.width = canvas.offsetWidth;
-            canvas.height = canvas.offsetHeight;
-            //if (!isPaused) drawPlot();
-        }
+        //function resizeCanvas() {
+        //    canvas.width = canvas.offsetWidth;
+        //    canvas.height = canvas.offsetHeight;
+        //    //if (!isPaused) drawPlot();
+        //}
 
         function toggleStreaming() {
             isStreaming = !isStreaming;
@@ -1610,7 +1610,7 @@
 
         function processBatch(batch) {   
             if(!inputMode) return; 
-            const timestamp = batch.t;
+			const timestamp = parseInt(batch.t, 16);
             // Aggiungilo al buffer
             batchBuffer.push(batch);
             //console.log("v: "+batch.v);
@@ -1645,8 +1645,8 @@
             if (currBatchIndex === 0) {
                 // Inizializzazione finestra temporale
                 const firstBatch = batchBuffer[0];
-                xScale.min = firstBatch.t;
-                xScale.max = firstBatch.t + bufferTimespan;
+                xScale.min = parseInt(firstBatch.t, 16);
+                xScale.max = xScale.min + bufferTimespan;
                 console.log(`Finestra temporale: ${xScale.min} - ${xScale.max}`);
                 drawPlotInc();
                 currBatchIndex++;

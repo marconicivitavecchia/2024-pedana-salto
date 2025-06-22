@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WiFi Configuration - SPA Control</title>
+    <link rel="stylesheet" href="/style.css">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📶</text></svg>">
+</head>
+<body>
+    <div id="app">
+        <!-- Header -->
+        <header class="header">
+            <div class="container">
+                <h1>📶 WiFi Configuration</h1>
+                <div class="header-actions">
+                    <button id="refreshStatusBtn" class="btn btn-outline">🔄 Refresh</button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Status Messages -->
+        <div id="statusMessage" class="status" style="display: none;"></div>
+
+        <!-- Main Content -->
+        <main class="main">
+            <div class="container">
+                <!-- System Status Card -->
+                <div class="card">
+                    <div class="card-header">
+                        <h2>📊 System Status</h2>
+                    </div>
+                    <div class="card-body">
+                        <div id="systemStatus" class="system-status">
+                            <div class="loading">Loading system status...</div>
+                        </div>
+                        <div id="connectionStatus" class="connection-status">
+                            <div class="loading">Loading connection status...</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Network Scanner Card -->
+                <div class="card">
+                    <div class="card-header">
+                        <h2>📡 Available Networks</h2>
+                        <button id="scanBtn" class="btn btn-primary">📡 Scan Networks</button>
+                    </div>
+                    <div class="card-body">
+                        <div class="form-group">
+                            <label for="networkSelect">Select Network:</label>
+                            <select id="networkSelect" class="form-control">
+                                <option value="">Click "Scan Networks" to discover WiFi networks</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- WiFi Configuration Card -->
+                <div class="card">
+                    <div class="card-header">
+                        <h2>⚙️ WiFi Configuration</h2>
+                        <div class="card-actions">
+                            <button id="loadBtn" class="btn btn-outline">📥 Load Config</button>
+                            <button id="testBtn" class="btn btn-secondary">🧪 Test Connection</button>
+                            <button id="resetBtn" class="btn btn-danger">🗑️ Reset Config</button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <form id="wifiForm" class="wifi-form">
+                            <!-- Primary Network -->
+                            <fieldset class="form-section">
+                                <legend>🔗 Primary Network</legend>
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label for="primarySSID">Network Name (SSID) *</label>
+                                        <input type="text" 
+                                               id="primarySSID" 
+                                               name="primarySSID" 
+                                               class="form-control" 
+                                               maxlength="32" 
+                                               required
+                                               placeholder="Enter WiFi network name">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="primaryPassword">Password</label>
+                                        <input type="password" 
+                                               id="primaryPassword" 
+                                               name="primaryPassword" 
+                                               class="form-control" 
+                                               maxlength="63"
+                                               placeholder="Enter WiFi password">
+                                    </div>
+                                </div>
+                            </fieldset>
+
+                            <!-- Backup Network -->
+                            <fieldset class="form-section">
+                                <legend>🔄 Backup Network (Optional)</legend>
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label for="backupSSID">Backup Network Name (SSID)</label>
+                                        <input type="text" 
+                                               id="backupSSID" 
+                                               name="backupSSID" 
+                                               class="form-control" 
+                                               maxlength="32"
+                                               placeholder="Enter backup WiFi network name">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="backupPassword">Backup Password</label>
+                                        <input type="password" 
+                                               id="backupPassword" 
+                                               name="backupPassword" 
+                                               class="form-control" 
+                                               maxlength="63"
+                                               placeholder="Enter backup WiFi password">
+                                    </div>
+                                </div>
+                            </fieldset>
+
+                            <!-- Options -->
+                            <fieldset class="form-section">
+                                <legend>⚙️ Options</legend>
+                                <div class="form-group checkbox-group">
+                                    <label class="checkbox-label">
+                                        <input type="checkbox" id="autoConnect" name="autoConnect" checked>
+                                        <span class="checkmark"></span>
+                                        Auto-connect on startup
+                                    </label>
+                                </div>
+                            </fieldset>
+
+                            <!-- Submit Button -->
+                            <div class="form-actions">
+                                <button type="submit" id="saveBtn" class="btn btn-success btn-large">
+                                    💾 Save Configuration
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Debug Info Card (Hidden by default) -->
+                <div class="card debug-card" style="display: none;">
+                    <div class="card-header">
+                        <h2>🐛 Debug Information</h2>
+                    </div>
+                    <div class="card-body">
+                        <pre id="debugInfo"></pre>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <div class="container">
+                <p>&copy; 2025 SPA WiFi Configuration System</p>
+                <p>Powered by ESP32 HTTPS Server</p>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" class="loading-overlay" style="display: none;">
+        <div class="loading-spinner">
+            <div class="spinner"></div>
+            <p>Processing...</p>
+        </div>
+    </div>
+
+    <!-- JavaScript -->
+    <script src="/modern_spa_wifi_config.js"></script>
+</body>
+</html>
