@@ -47,7 +47,7 @@
 #define ADS1256_CMD_STANDBY 0xFD
 #define ADS1256_CMD_RESET   0xFE
 
-#define MAX_SAMPLES_PER_BATCH 160u  // Aggiunto 'u' per unsigned
+#define MAX_SAMPLES_PER_BATCH 150u  // Aggiunto 'u' per unsigned
 
 // Fuori dalla classe, nel file .cpp
 static bool g_spi_native_configured = false;
@@ -96,12 +96,18 @@ enum ads1256_gain_t {
 
 // Struttura per il batch di campioni
 struct BatchData {
-    uint32_t timestamp;
-    //int32_t first;
+    uint32_t t;
     uint8_t count;
-    uint8_t values[MAX_SAMPLES_PER_BATCH][3];  // 3 bytes per valore
+    uint8_t v[MAX_SAMPLES_PER_BATCH][3];  // 3 bytes per valore
 };
-
+/*
+// Versione ottimizzata per memoria
+struct __attribute__((packed)) BatchData {
+    uint32_t timestamp;
+    uint8_t count;
+    uint8_t values[MAX_SAMPLES_PER_BATCH][3];
+} BatchData;  // Elimina padding
+*/
 struct ADS1256Status {
    uint8_t status;      // STATUS register
    uint8_t mux;         // MUX register
@@ -519,7 +525,7 @@ public:
 		if (!isStreaming) return;
 		
 		batch.count = 0;
-		batch.timestamp = esp_timer_get_time();
+		batch.t = esp_timer_get_time();
 		
 		spi_dev_t* SPI_DEV = &SPI2;
 		
@@ -550,9 +556,9 @@ public:
 			emaFilteredValue = emaAlpha * (float)accumulator + (1.0f - emaAlpha) * emaFilteredValue;
 			uint32_t output = (uint32_t)emaFilteredValue;
 			
-			batch.values[batch.count][0] = (output >> 16) & 0xFF;
-			batch.values[batch.count][1] = (output >> 8) & 0xFF;
-			batch.values[batch.count][2] = output & 0xFF;
+			batch.v[batch.count][0] = (output >> 16) & 0xFF;
+			batch.v[batch.count][1] = (output >> 8) & 0xFF;
+			batch.v[batch.count][2] = output & 0xFF;
 			
 			batch.count++;			
 		}
@@ -562,7 +568,7 @@ public:
 		if (!isStreaming) return;
 		
 		batch.count = 0;
-		batch.timestamp = esp_timer_get_time();
+		batch.t = esp_timer_get_time();
 		
 		// ✅ Pre-alloca transazione per efficienza
 		spi_transaction_t trans = {};
@@ -591,9 +597,9 @@ public:
 					emaFilteredValue = emaAlpha * (float)result + (1.0f - emaAlpha) * emaFilteredValue;
 					uint32_t output = (uint32_t)emaFilteredValue;
 					
-					batch.values[batch.count][0] = (output >> 16) & 0xFF;
-					batch.values[batch.count][1] = (output >> 8) & 0xFF;
-					batch.values[batch.count][2] = output & 0xFF;
+					batch.v[batch.count][0] = (output >> 16) & 0xFF;
+					batch.v[batch.count][1] = (output >> 8) & 0xFF;
+					batch.v[batch.count][2] = output & 0xFF;
 					
 					batch.count++;
 				}
@@ -608,7 +614,7 @@ public:
 		if (!isStreaming) return;
 		
 		batch.count = 0;
-		batch.timestamp = esp_timer_get_time();
+		batch.t = esp_timer_get_time();
 		
 		spi_dev_t* SPI_DEV = &SPI2;  // Dichiarazione mancante!
 				
@@ -650,9 +656,9 @@ public:
 			uint32_t output = (uint32_t)emaFilteredValue;
 			
 			// Salva nel batch
-			batch.values[batch.count][0] = (output >> 16) & 0xFF;
-			batch.values[batch.count][1] = (output >> 8) & 0xFF;
-			batch.values[batch.count][2] = output & 0xFF;
+			batch.v[batch.count][0] = (output >> 16) & 0xFF;
+			batch.v[batch.count][1] = (output >> 8) & 0xFF;
+			batch.v[batch.count][2] = output & 0xFF;
 			
 			batch.count++;
 		}
@@ -670,7 +676,7 @@ public:
 
 
         batch.count = 0;
-        batch.timestamp = esp_timer_get_time();
+        batch.t = esp_timer_get_time();
 
         while(batch.count < samplesPerBatch) {
 			if (!wait_drdy_fast(5000)) {
@@ -689,9 +695,9 @@ public:
             emaFilteredValue = emaAlpha * value + (1.0f - emaAlpha) * emaFilteredValue;
             uint32_t output = (uint32_t)emaFilteredValue;
 
-            batch.values[batch.count][0] = output >> 16;
-            batch.values[batch.count][1] = output >> 8;
-            batch.values[batch.count][2] = output;
+            batch.v[batch.count][0] = output >> 16;
+            batch.v[batch.count][1] = output >> 8;
+            batch.v[batch.count][2] = output;
 
             batch.count++;
         }
@@ -719,7 +725,7 @@ public:
 
         float signalPeriod = (float) decimationFactor / 30000;
         batch.count = 0;
-        batch.timestamp = esp_timer_get_time();
+        batch.t = esp_timer_get_time();
         float t = 1 / testFrequency;
         float amp = baseAmplitude;
 
@@ -746,9 +752,9 @@ public:
                 value += 0x1000000;
             }
             
-            batch.values[i][0] = ((int32_t) value >> 16) & 0xFF;
-            batch.values[i][1] = ((int32_t) value >> 8) & 0xFF;
-            batch.values[i][2] = (int32_t) value & 0xFF;
+            batch.v[i][0] = ((int32_t) value >> 16) & 0xFF;
+            batch.v[i][1] = ((int32_t) value >> 8) & 0xFF;
+            batch.v[i][2] = (int32_t) value & 0xFF;
 
             testSignalTime += signalPeriod;
             batch.count++;
@@ -1195,7 +1201,7 @@ public:
 		if (!isStreaming) return;
 		
 		batch.count = 0;
-		batch.timestamp = esp_timer_get_time();
+		batch.t = esp_timer_get_time();
 		
 		spi_dev_t* SPI_DEV = &SPI2;
 		
@@ -1231,9 +1237,9 @@ public:
 				emaFilteredValue = emaAlpha * (float)result + (1.0f - emaAlpha) * emaFilteredValue;
 				uint32_t output = (uint32_t)emaFilteredValue;
 				
-				batch.values[batch.count][0] = (output >> 16) & 0xFF;
-				batch.values[batch.count][1] = (output >> 8) & 0xFF;
-				batch.values[batch.count][2] = output & 0xFF;
+				batch.v[batch.count][0] = (output >> 16) & 0xFF;
+				batch.v[batch.count][1] = (output >> 8) & 0xFF;
+				batch.v[batch.count][2] = output & 0xFF;
 				
 				batch.count++;
 			}

@@ -1,4 +1,3 @@
-
 #include <Arduino.h>
 #include <WiFi.h>
 #include <ESPmDNS.h>
@@ -9,8 +8,17 @@
 #include "TaskMonitor.h"
 #include <driver/spi_master.h>
 #include "ESP32WebServer.h"
-#include "freertos/stream_buffer.h"  // per streambuffer
-#include "GenericWebSocketOptimizer.h"
+//#include "freertos/stream_buffer.h"  // per streambuffer
+#include "WiFiManager.h"
+#include "Handlers.h"
+#include "VirtualStringQueue.h"
+//#include "ADS1256ZeroCopySerializer.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "freertos/ringbuf.h"
+#include "esp_log.h"
+//#include "BinaryPacker.h"
+
 //#include "ADS1256_BitBang.h"
 
 #include "esp_task_wdt.h"
@@ -27,8 +35,10 @@
 #define DEFAULT_SAMPLE_RATE 30000  // Hz
 #define BATCH_PERIOD_US 5000       // 5ms = 200Hz
 //#define QUEUE_SIZE 20              // Dimensione coda batch
-#define STREAM_BUFFER_SIZE (8192)          // 8KB per BatchData structures
-#define TRIGGER_LEVEL (sizeof(BatchData))  // Sveglia dopo 1 BatchData
+//#define STREAM_BUFFER_SIZE (8192)          // 8KB per BatchData structures
+//#define TRIGGER_LEVEL (sizeof(BatchData))  // Sveglia dopo 1 BatchData
+#define QUEUE_SIZE 200              // Dimensione coda batch
+#define DATALEN 1371
 
 //#define MAX_SAMPLES_PER_BATCH 160u  // Aggiunto 'u' per unsigned
 
@@ -57,10 +67,10 @@ struct Config {
 };
 
 /*
-BatchData {
-    uint32_t timestamp;
-    uint16_t count;
-    uint32_t values[MAX_SAMPLES_PER_BATCH][3];  // 3 bytes per valore
+struct BatchData {
+    uint32_t t;
+    uint8_t count;
+    uint8_t v[MAX_SAMPLES_PER_BATCH][3];  // 3 bytes per valore
 };
 */
 // Variabili globali
@@ -74,8 +84,14 @@ volatile bool curr = false;
 volatile bool overflow;
 volatile uint8_t enable1 = 128;
 float emaAlpha = 0.1;
+//VirtualStringQueue batchQueue;
+//StreamBufferHandle_t batchStream;
 //QueueHandle_t batchQueue;
-StreamBufferHandle_t batchStream;
+//CharCircularBuffer batchQueue(55, DATALEN);
+// Dichiara il ring buffer come variabile globale
+RingbufHandle_t batchQueue = NULL;
+// Tag per logging (opzionale)
+static const char* TAGBUF = "RINGBUF_APP";
 SemaphoreHandle_t configMutex;
 TaskHandle_t adcTaskHandle = NULL;
 //hw_timer_t * timer = NULL;
@@ -91,6 +107,7 @@ ADS1256_DMA adc;
 //ADS1256_BitBang adc1;
 //HTTPSServer https_server;
 ESP32WebServer server;
+//BinaryPacker packer;
 
 void updateDAC() {
   //Serial.println("updateDAC");
@@ -461,154 +478,151 @@ void adcTask(void* pvParameters) {
   Serial.println("ADC task: monitor acquisito");
   Serial.println("ADC task: Stop monentarly task tracking");
   float Vref = 3.3;
+  //char buffer[1478];
   try {
-    Serial.println("ADC task: prima ADS1256_DMA");
-    // Verifichiamo lo stato prima della creazione
-    //ADS1256_DMA adc;
-    Serial.println("ADC task: dopo ADS1256_DMA");
-    BatchData batch;
-    Config gc;
-    uint32_t lastSample = 0;
-    //uint32_t overcount = 0;
-	//uint32_t start, end, duration;
-    // uint32_t lastOvercount = 0;
-    // Per leggere
-    Serial.println("ADC task: prima semaforo");
-    if (xSemaphoreTake(configMutex, pdMS_TO_TICKS(1000)) == pdTRUE) {
-      gc = globalConfig;
-      xSemaphoreGive(configMutex);
-    } else {
-      Serial.println("Timeout nel prendere il primo semaforo");
-    }
-    Serial.println("ADC task: dopo semaforo");
-    // Calcola parametri di batch
-    uint32_t targetInterval = 5000;
-    uint16_t samplesPerBatch = (uint16_t)((gc.sampleRate * BATCH_PERIOD_US) / 1000000);
-    samplesPerBatch = std::min<uint16_t>(samplesPerBatch, MAX_SAMPLES_PER_BATCH);
-    uint16_t decimationFactor = getDecimationFactor(gc.sampleRate);
-	if(decimationFactor == 0){
-		decimationFactor = 1;
-	}
-    Serial.printf("ADC task: Sample rate: %d Hz\n", gc.sampleRate);
-    Serial.printf("ADC task: Target interval: %d us\n", targetInterval);
-    Serial.printf("ADC task: Expected samples per batch: %d\n", samplesPerBatch);
-    // Imposta parametri del segnale: frequenza, ampiezza, frequenza AM
-    delay(100);
-    adc.setTestSignalParams(1.0f, 1.25f, 0.1f);
-    Serial.println("ADC task: Attendi connessione WiFi");
-    delay(100);
-    Serial.println("ADC task: Start task tracking");
+		Serial.println("ADC task: prima ADS1256_DMA");
+		// Verifichiamo lo stato prima della creazione
+		//ADS1256_DMA adc;
+		Serial.println("ADC task: dopo ADS1256_DMA");
+		BatchData batch;
+		Config gc;
+		uint32_t lastSample = 0;
+		//uint32_t overcount = 0;
+		//uint32_t start, end, duration;
+		// uint32_t lastOvercount = 0;
+		// Per leggere
+		Serial.println("ADC task: prima semaforo");
+		if (xSemaphoreTake(configMutex, pdMS_TO_TICKS(1000)) == pdTRUE) {
+		  gc = globalConfig;
+		  xSemaphoreGive(configMutex);
+		} else {
+		  Serial.println("Timeout nel prendere il primo semaforo");
+		}
+		Serial.println("ADC task: dopo semaforo");
+		// Calcola parametri di batch
+		uint32_t targetInterval = 5000;
+		uint16_t samplesPerBatch = (uint16_t)((gc.sampleRate * BATCH_PERIOD_US) / 1000000);
+		samplesPerBatch = std::min<uint16_t>(samplesPerBatch, MAX_SAMPLES_PER_BATCH);
+		uint16_t decimationFactor = getDecimationFactor(gc.sampleRate);
+		if(decimationFactor == 0){
+			decimationFactor = 1;
+		}
+		Serial.printf("ADC task: Sample rate: %d Hz\n", gc.sampleRate);
+		Serial.printf("ADC task: Target interval: %d us\n", targetInterval);
+		Serial.printf("ADC task: Expected samples per batch: %d\n", samplesPerBatch);
+		// Imposta parametri del segnale: frequenza, ampiezza, frequenza AM
+		delay(100);
+		adc.setTestSignalParams(1.0f, 1.25f, 0.1f);
+		Serial.println("ADC task: Attendi connessione WiFi");
+		delay(100);
+		Serial.println("ADC task: Start task tracking");
+	    uint32_t last_t = 0;
+		while (true) {
+		    //Serial.println("curr: "+String(curr)+" last: "+String(last));
+		    if (last != curr) {
+				if (xSemaphoreTake(configMutex, pdMS_TO_TICKS(1000)) == pdTRUE) {
+				  gc = globalConfig;
+				  xSemaphoreGive(configMutex);
+				} else {
+				  Serial.println("ADC task: Timeout nel prendere il secondo semaforo");
+				}
+				Serial.println("adcTask: Cambio stato stream");
+				samplesPerBatch = (uint16_t)((gc.sampleRate * BATCH_PERIOD_US) / 1000000);
+				samplesPerBatch = min(samplesPerBatch, (uint16_t)MAX_SAMPLES_PER_BATCH);
+				adc.setEMAalfa(emaAlpha);
+				decimationFactor = getDecimationFactor(gc.sampleRate);
+				Serial.printf("adcTask: Blocco task: %d Hz\n", gc.sampleRate);
+				Serial.printf("adcTask: targetInterval: %d\n", targetInterval);
+				Serial.printf("adcTask: samplesPerBatch: %d\n", samplesPerBatch);
+				Serial.printf("adcTask: decimationFactor: %d\n", decimationFactor);
+				lastSample = 0;
+				//Serial.println("adcTask: Queue reset");
+				//xStreamBufferReset(batchStream);
+				//xQueueReset(batchQueue);  
+				//batchQueue.resetCharBuffer();		
+				//queue.begin(55, DATALEN);
+				Serial.println("adcTask: Queue reset");
+				if (!gc.streaming) {
+				  // Alla fine dello streaming
+				  delay(50);
+				  adc.stopStreaming();
+				  //adc1.stopStreaming();
+				  Serial.print("adcTask: stopStreaming ");
+				  Serial.println(gc.streaming);
+				  adc.set_channel(static_cast<ads1256_channels_t>(gc.adcPort), static_cast<ads1256_channels_t>(gc.adcPort + 1));
+				  Serial.print("adcTask: gain: ");
+				  Serial.println(gc.gain);
+				  adc.set_gain(static_cast<ads1256_gain_t>(gc.gain));
+				  Serial.print("adcTask: ch1: ");
+				  Serial.println(gc.adcPort);
+				  Serial.print("adcTask: ch2: ");
+				  Serial.println(gc.adcPort + 1);
+				  adc.printDeviceStatus(adc.getDeviceStatus());
+				  timerCmd = 0;
+				} else {
+				  //overcount = 0;
+				  overflow = false;
+				  enable1 = 127;
+				  if (gc.mode == 2) {
+					Serial.println("adcTask: start Tone");
+					freq = gc.toneFreq;
+					timerCmd = 1;
+					Serial.println("adcTask: enableTestSignal");
+					adc.enableTestSignal(false);
+					Serial.println("adcTask: dopo enableTestSignal");
+				  } else if (gc.mode == 1) {
+					timerCmd = 0;
+					adc.setTestSignalParams(gc.toneFreq, 8388608.0f, 0.1f);
+					adc.enableTestSignal(true);
+					Serial.println("adcTask: Segnale di test abilitato");
+				  } else {
+					//timerCmd = 0;
+					timerCmd = 0;
+					Serial.println("adcTask: stop Tone");
+					adc.enableTestSignal(false);
+					Serial.println("adcTask: Segnale di test disabilitato");
+				  }
+				  // azzera batch
+				  Serial.print("adcTask: startStreaming: ");
+				  memset(batch.v, 0, MAX_SAMPLES_PER_BATCH * 3);
+				  delay(50);
+				  adc.startStreaming();
+				  //adc1.startStreaming();
+				}
+			    last = curr;
+		    }
 
-    while (true) {
-      //Serial.println("curr: "+String(curr)+" last: "+String(last));
-      if (last != curr) {
-        if (xSemaphoreTake(configMutex, pdMS_TO_TICKS(1000)) == pdTRUE) {
-          gc = globalConfig;
-          xSemaphoreGive(configMutex);
-        } else {
-          Serial.println("ADC task: Timeout nel prendere il secondo semaforo");
-        }
-        Serial.println("adcTask: Cambio stato stream");
-        samplesPerBatch = (uint16_t)((gc.sampleRate * BATCH_PERIOD_US) / 1000000);
-        samplesPerBatch = min(samplesPerBatch, (uint16_t)MAX_SAMPLES_PER_BATCH);
-        adc.setEMAalfa(emaAlpha);
-        decimationFactor = getDecimationFactor(gc.sampleRate);
-        Serial.printf("adcTask: Blocco task: %d Hz\n", gc.sampleRate);
-        Serial.printf("adcTask: targetInterval: %d\n", targetInterval);
-        Serial.printf("adcTask: samplesPerBatch: %d\n", samplesPerBatch);
-        Serial.printf("adcTask: decimationFactor: %d\n", decimationFactor);
-        lastSample = 0;
-        //xQueueReset(batchQueue);
-        //Serial.println("adcTask: Queue reset");
-        xStreamBufferReset(batchStream);
-        Serial.println("adcTask: Stream buffer reset");
-        if (!gc.streaming) {
-          // Alla fine dello streaming
-          delay(50);
-          adc.stopStreaming();
-		  //adc1.stopStreaming();
-          Serial.print("adcTask: stopStreaming ");
-          Serial.println(gc.streaming);
-          adc.set_channel(static_cast<ads1256_channels_t>(gc.adcPort), static_cast<ads1256_channels_t>(gc.adcPort + 1));
-          Serial.print("adcTask: gain: ");
-          Serial.println(gc.gain);
-          adc.set_gain(static_cast<ads1256_gain_t>(gc.gain));
-          Serial.print("adcTask: ch1: ");
-          Serial.println(gc.adcPort);
-          Serial.print("adcTask: ch2: ");
-          Serial.println(gc.adcPort + 1);
-          adc.printDeviceStatus(adc.getDeviceStatus());
-          timerCmd = 0;
-        } else {
-          //overcount = 0;
-          overflow = false;
-          enable1 = 127;
-          if (gc.mode == 2) {
-            Serial.println("adcTask: start Tone");
-            freq = gc.toneFreq;
-            timerCmd = 1;
-            Serial.println("adcTask: enableTestSignal");
-            adc.enableTestSignal(false);
-            Serial.println("adcTask: dopo enableTestSignal");
-          } else if (gc.mode == 1) {
-            timerCmd = 0;
-            adc.setTestSignalParams(gc.toneFreq, 8388608.0f, 0.1f);
-            adc.enableTestSignal(true);
-            Serial.println("adcTask: Segnale di test abilitato");
-          } else {
-            //timerCmd = 0;
-            timerCmd = 0;
-            Serial.println("adcTask: stop Tone");
-            adc.enableTestSignal(false);
-            Serial.println("adcTask: Segnale di test disabilitato");
-          }
-          // azzera batch
-          Serial.print("adcTask: startStreaming: ");
-          memset(batch.values, 0, MAX_SAMPLES_PER_BATCH * 3);
-          delay(50);
-          adc.startStreaming();
-		  //adc1.startStreaming();
-        }
-        last = curr;
-      }
-
-      //uint32_t now = micros();
-      //if ((now - lastSample) >= targetInterval) {
-        //lastSample = now;
-		
-        monitor->heartbeat();
-        //Serial.print(0);
-        if (gc.streaming) {
-          if (timerCmd) updateDAC();
-			
-		  adc.read_data_batch_fast(batch, samplesPerBatch, decimationFactor);
-          //adc1.read_data_batch(batch, samplesPerBatch, decimationFactor);
-		  //lastSample = now;
-          if (batch.count > 0) {
-            // VECCHIO: if (xQueueSend(batchQueue, &batch, 0) != pdTRUE) {
-            // NUOVO:
-            size_t sent = xStreamBufferSend(batchStream, &batch, sizeof(BatchData), 0);
-            //if (sent != sizeof(BatchData)) {
-              // Con Stream Buffer questo caso è molto raro
-              //Serial.println("adcTask: Stream buffer invio parziale");
-            //}
-
-            // Stream Buffer NON va mai in overflow - sovrascrive automaticamente
-            overflow = false;
-
-            //memset(batch.values, 0, MAX_SAMPLES_PER_BATCH * 3);
-          }
-        }
-      //}
-      // Piccola pausa per evitare di saturare la CPU
-      //portYIELD();
-      // Yield come prima
-      if (gc.streaming) {
-        //taskYIELD();
-      } else {
-        vTaskDelay(1);
-      }
-    }
+			monitor->heartbeat();
+		    if (gc.streaming) {
+				if (timerCmd) updateDAC();
+				
+				char *buf = NULL;  // Puntatore che riceverà l'indirizzo
+				if (batch.count > 0) {
+					BaseType_t result = xRingbufferSendAcquire(batchQueue,(void**) &buf, (size_t) DATALEN, pdMS_TO_TICKS(0));
+					if (result == pdTRUE && buf != NULL) {
+						adc.read_data_batch_fast(batch, samplesPerBatch, decimationFactor);
+						//uint32_t delta = batch.t - last_t;
+						//last_t += delta;
+						//Serial.print("delta: ");Serial.println(delta);
+						//ADS1256_SERIALIZE_TO(batch, buffer);
+						int len = serialize_fast(buf, batch, DATALEN);
+						//Serial.println(buffer);
+						xRingbufferSendComplete(batchQueue, (void*)buf);
+						//ESP_LOGI(TAG, "Data sent immediately");
+						overflow = false;
+					} else {
+						ESP_LOGW(TAGBUF, "Buffer full - dropping data");
+						overflow = true; 
+					}
+				}
+				
+		    }
+		    if (gc.streaming) {
+			  taskYIELD();
+		    } else {
+			  vTaskDelay(1);
+		    }
+		}
   } catch (const std::exception& e) {
     Serial.printf("ADC task: eccezione - %s\n", e.what());
   } catch (...) {
@@ -618,113 +632,129 @@ void adcTask(void* pvParameters) {
   Serial.println("ADC task: terminato");  // Non dovrebbe mai arrivare qui
 }
 
+int serialize(char*buf, BatchData &batch, int maxLen){
+	int len = snprintf(buf, maxLen, "{\"t\":%u,\"v\":[", batch.t);
+
+	// Serializza come hex strings
+	const uint16_t maxValues = std::min<uint16_t>(batch.count, MAX_SAMPLES_PER_BATCH);
+	for (int i = 0; i < maxValues && len < (maxLen - 16); i++) {  // 16 bytes di margine
+		int added = snprintf(buf + len, maxLen - len,
+							 "\"%02x%02x%02x\"%s",
+							 batch.v[i][0], batch.v[i][1], batch.v[i][2],
+							 (i < maxValues - 1) ? "," : "");
+		len += added;
+	}
+
+	// Chiudi JSON
+	int final = snprintf(buf + len, maxLen - len, "]}");
+	len += final;	
+	return len;
+}
+
+int serialize_fast(char* buf, BatchData &batch, int maxLen){
+    static const char hex[] = "0123456789abcdef";
+    
+    if (!buf) return -1;
+    
+    // Header - usando %llx per timestamp a 64-bit
+    int len = snprintf(buf, maxLen, "{\"t\":\"%llx\",\"v\":[", 
+                       (unsigned long long)batch.t);
+       
+    char* p = buf + len;
+    char* buf_end = buf + maxLen - 3;
+    
+    // Processa tutti i campioni disponibili, limitati dal buffer
+    uint16_t processed = 0;
+    const uint16_t total = std::min<uint16_t>(batch.count, MAX_SAMPLES_PER_BATCH);
+    
+    for (int i = 0; i < total && processed < total; i++) {
+        // Controllo spazio: ogni valore richiede 8 char ("xxxxxx",)
+        
+        *p++ = '"';
+        uint8_t* v = batch.v[i];
+        
+        // Unroll completo per massima velocità
+        uint8_t b0 = v[0], b1 = v[1], b2 = v[2];
+        *p++ = hex[b0 >> 4]; *p++ = hex[b0 & 0x0F];
+        *p++ = hex[b1 >> 4]; *p++ = hex[b1 & 0x0F];  
+        *p++ = hex[b2 >> 4]; *p++ = hex[b2 & 0x0F];
+        
+        *p++ = '"';
+        if (i < total - 1) *p++ = ',';
+        
+        processed++;
+    }
+    
+    *p++ = ']'; 
+    *p++ = '}'; 
+    *p = '\0';
+    
+    return p - buf;
+}
+
 void wsTask(void* pvParameters) {
-  BatchData batch;
-  char buffer[2800];
-  uint32_t startTime = 0;
-  const uint32_t timeout = 8000;
-  uint32_t batchCount = 0;
-
-  const int MAX_LEN = sizeof(buffer);
-
-  while (true) {
-    size_t received = xStreamBufferReceive(batchStream, &batch, sizeof(BatchData), pdMS_TO_TICKS(10));
-    // invia se ci tsa qualcosa in coda
-    if (received == sizeof(BatchData)) {
-      batchCount++;
-      //if (ws.count() > 0) {
-      // Inizia JSON
-      int len = snprintf(buffer, MAX_LEN,
-                         "{\"t\":%u,\"v\":[", batch.timestamp);
-
-      //int len = snprintf(buffer, MAX_LEN,
-      //    "{\"t\":%u,\"first\":%u,\"v\":[", batch.timestamp, batch.first);
-
-      // Controlla overflow
-      if (len < 0 || len >= MAX_LEN) {
-        Serial.println("Buffer overflow nel header");
-        continue;
-      }
-
-      // Serializza come hex strings
-      const uint16_t maxValues = std::min<uint16_t>(batch.count, MAX_SAMPLES_PER_BATCH);
-      for (int i = 0; i < maxValues && len < (MAX_LEN - 16); i++) {  // 16 bytes di margine
-        int added = snprintf(buffer + len, MAX_LEN - len,
-                             "\"%02x%02x%02x\"%s",
-                             batch.values[i][0], batch.values[i][1], batch.values[i][2],
-                             (i < maxValues - 1) ? "," : "");
-
-        if (added < 0 || added >= (MAX_LEN - len)) {
-          Serial.println("Buffer overflow nei valori");
-          break;
-        }
-        len += added;
-      }
-
-      // Chiudi JSON
-      int final = snprintf(buffer + len, MAX_LEN - len, "]}");
-      if (final > 0 && (len + final) < MAX_LEN) {
-        len += final;
-        //ws.sendDataSync(buffer, len);
-        ws.sendDataSync(buffer, len);
-		//ws.sendDataAsync(buffer, len);
-        //Serial.println("Buffer");
-      } else {
-        Serial.println("send syn error\n");
-      }
-
-      // GESTIONE OVERFLOW SEMPLIFICATA:
-      // Con Stream Buffer, controlla se il buffer è troppo pieno
-      size_t available = xStreamBufferBytesAvailable(batchStream);
-      size_t spaceLeft = xStreamBufferSpacesAvailable(batchStream);
-
-      // overflow signalling management
-      if (spaceLeft < (sizeof(BatchData) * 3)) {  // Meno di 3 batch di spazio
-        if (enable1 > 127) {
-          enable1 = 127;  // A single batch in overflow condition indicates an overflow status
-          Serial.println("wsTask: Stream buffer quasi pieno");
-          sendOverflowStatus(true);
-		  xStreamBufferReset(batchStream);
-        }
-      } else {
-        if (enable1 < 128) {
-          enable1--;
-          if (enable1 < 97) {  // 20 consecutive batches in normal condition are required to confirm normal status
-            Serial.println("wsTask: Stream buffer normale");
-            sendOverflowStatus(false);
-            enable1 = 128;
-          }
-        }
-      }
-    } else {
-      // se non riceve dati il loop adc potrebbe essere fermo
-      //Serial.println("wsTask: non ci sono dati");
-      vTaskDelay(1);  // delay solo se non ci sono dati
-    }
-
-    if (millis() - startTime > timeout) {
-      startTime += timeout;
-      if (adcMonitor != nullptr) {  // verifica che adcMonitor sia valido
-        if (!adcMonitor->isAlive()) {
-          Serial.println("ADC non risponde!");
-          adcMonitor->restartTask();
-        } else {
-          Serial.print("ADC OK! - ");
-        }
-      } else {
-        Serial.println("ADC monitor non inizializzato!");
-      }
-      batchCount = batchCount * 1000 / timeout;
-      Serial.printf("Batch per sec: %d", batchCount);
-
-      // Debug Stream Buffer
-      size_t available = xStreamBufferBytesAvailable(batchStream);
-      size_t spaceLeft = xStreamBufferSpacesAvailable(batchStream);
-      Serial.printf(" - Stream: %d bytes used, %d bytes free\n", available, spaceLeft);
-
-      batchCount = 0;
-    }
-  }
+	//BatchData batch;
+	char* buf;
+	//char buffer[1500];
+	uint32_t startTime = 0;
+	const uint32_t timeout = 8000;
+	uint32_t batchCount = 0;
+	//BinaryPacker bp;
+	size_t length;
+		
+	while (true) {
+		// Aspetta fino a 10 secondi per i dati
+		void *buf = xRingbufferReceive(batchQueue, &length, pdMS_TO_TICKS(0)); //non bloccante
+		if (buf) {
+			batchCount++;
+            //Serial.println((char*)buf);
+			ws.sendDataSync((uint8_t*)buf, (size_t) DATALEN);
+            vRingbufferReturnItem(batchQueue, (void*)buf);
+			
+			// overflow signalling management
+			if(overflow){
+				if(enable1 > 127){
+					enable1 = 127;// A single batch in overflow condition indicates an overflow status
+					Serial.println("wsTask: sendOverflow true - reset buffer");
+					sendOverflowStatus(true);
+					//xQueueReset(batchQueue);
+					//batchQueue.resetCharBuffer();
+					//batchQueue.reset();
+				}  
+			}else{
+				if(enable1 < 128){
+					enable1--;
+					if(enable1 < 97){// 20 consecutive batches in normal condition are required to confirm normal status
+						Serial.println("wsTask: sendOverflow false");
+						sendOverflowStatus(false);
+						enable1 = 128;
+					}     
+				}  
+			}               
+		}else {  
+			vTaskDelay(1);  // delay solo se non ci sono dati
+		}
+		// se non riceve dati il loop adc potrebbe essere fermo
+			//Serial.println("wsTask: non ci sono dati"); 
+		if(millis() - startTime > timeout) {
+			startTime += timeout;        
+			if (adcMonitor != nullptr) {  // verifica che adcMonitor sia valido
+				if (!adcMonitor->isAlive()) {
+					Serial.println("ADC non risponde!");
+					adcMonitor->restartTask();
+				}else{
+					Serial.print("ADC OK! - ");
+				}                
+			} else {
+				Serial.println("ADC monitor non inizializzato!");
+			}
+			batchCount = batchCount * 1000 / timeout;
+			Serial.print(" Batch per sec: "); Serial.println(batchCount);
+			//if(batchCount < 20) 
+			//    xQueueReset(batchQueue);
+			batchCount = 0;
+		}			
+	} 
 }
 
 void setup() {
@@ -740,6 +770,7 @@ void setup() {
   Serial.println("\nInizializzazione ADC");
   //adc.start();
   configMutex = xSemaphoreCreateMutex();
+  // Verifica memoria e stato buffer
   /*
   // Inizializzazione WiFi
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
@@ -755,7 +786,15 @@ void setup() {
   //      "RedmiSeb", "pippo2503"       // Backup
   //  );
   
-  OPTIMIZE_WEBSOCKET_UNIVERSAL(
+  //SAVE_WIFI_CREDENTIALS("RedmiSeb", "pippo2503", "sensori", "sensori2019");
+  
+  // Esegui diagnostica completa
+    //DIAGNOSE_NETWORK("RedmiSeb");
+    
+    // Inizializza con debug
+    WiFiManager::optimizeEverything();
+  
+  SETUP_INTEGRATED_WIFI_FALLBACK(
 		"RedmiSeb", "pippo2503",      
         "sensori", "sensori2019"    
    );
@@ -769,15 +808,15 @@ void setup() {
   MDNS.begin(hostname.c_str());
   //setupDAC();
   delay(1000);
-
+  // Inizializza la coda con 10 stringhe da 64 byte ciascuna
   //startDAC();
   // Crea la coda per i batch
-  //batchQueue = xQueueCreate(QUEUE_SIZE, sizeof(BatchData));
+  //batchQueue = xQueueCreate(QUEUE_SIZE, (uint8_t) DATALEN);
   //if (batchQueue == NULL) {
   //    Serial.println("Errore creazione coda batch");
   //    while(1);
   //}
-
+/*
   batchStream = xStreamBufferCreate(STREAM_BUFFER_SIZE, TRIGGER_LEVEL);
   if (batchStream == NULL) {
     Serial.println("Errore creazione stream buffer");
@@ -785,6 +824,8 @@ void setup() {
       ;
   }
   Serial.printf("Batch stream buffer creato: %d bytes\n", STREAM_BUFFER_SIZE);
+  */
+  
   delay(1000);
   // Configurazione di default (porta 80)
   // Oppure con configurazione personalizzata
@@ -795,6 +836,12 @@ void setup() {
     Serial.println("Server failed to start");
     ESP.restart();
   }
+  
+  // loaders pagine statiche da file
+  server.loadFile("/","index.html");
+  server.loadFile("/wifi","wifi.html");
+  // loaders API 
+  setupWiFiAPIHandlers(server);
 
   delay(100);  // Breve pausa per stabilizzazione
 
@@ -808,7 +855,9 @@ void setup() {
   delay(100);
   adc.begin();
   delay(100);
-
+  
+  check_heap_usage(1371*40);
+  
   // Task WebSocket su core 0
   xTaskCreatePinnedToCore(
     wsTask,
@@ -833,7 +882,7 @@ void setup() {
   delay(1000);
   adcMonitor = new TaskMonitor(
     "ADC_Task",
-    8000,  // timeout 2 secondi
+    4096,  // timeout 2 secondi
     adcTask,
     nullptr,
     1,                         // core 1
@@ -902,12 +951,52 @@ void loop() {
     } */
   // Ora possiamo controllare isAlive() dal loop
   // Controllo ogni 2 minuti per switch intelligente
-  static uint32_t lastCheck = 0;
-  if (millis() - lastCheck > 120000) {
-    //CHECK_NETWORK_SWITCH();  // Controlla se c'è un AP migliore
-	FIX_WIFI_UNIVERSAL();
-    lastCheck = millis();
-  }
-  vTaskDelay(pdMS_TO_TICKS(100));
+    static uint32_t lastCheck = 0;
+    if (millis() - lastCheck > 120000) {
+		CHECK_NETWORK_SWITCH();  // Controlla se c'è un AP migliore
+		FIX_WIFI_UNIVERSAL();
+		lastCheck = millis();
+	}
+  //vTaskDelay(pdMS_TO_TICKS(100));
   //vTaskDelay(10);
 }
+
+void setupWiFiAPIHandlers(ESP32WebServer& webServer) {
+    // Configurazione WiFi (GET, POST, DELETE + OPTIONS per CORS)
+    webServer.addHandler("/api/wifi/config", HTTP_GET, apiWiFiConfigGet);
+    webServer.addHandler("/api/wifi/config", HTTP_POST, apiWiFiConfigPost);
+    webServer.addHandler("/api/wifi/config", HTTP_DELETE, apiWiFiConfigDelete);  // ← MANCAVA
+    webServer.addHandler("/api/wifi/config", HTTP_OPTIONS, apiWiFiConfigPost);   // ← MANCAVA (CORS)
+    
+    // Test WiFi
+    webServer.addHandler("/api/wifi/test", HTTP_POST, apiWiFiTest);
+    webServer.addHandler("/api/wifi/test", HTTP_OPTIONS, apiWiFiTest);           // ← MANCAVA (CORS)
+    
+    // Scan reti WiFi
+    webServer.addHandler("/api/wifi/scan", HTTP_GET, apiWiFiScan);
+    
+    // Status sistema  
+    webServer.addHandler("/api/system/status", HTTP_GET, apiSystemStatus);      // ← MANCAVA
+}
+
+void check_heap_usage(int dim) {
+    // Memoria heap prima della creazione
+    size_t heap_before = esp_get_free_heap_size();
+    ESP_LOGI(TAG, "Heap libero prima: %d bytes", heap_before);
+    
+    // Crea ring buffer
+    batchQueue = xRingbufferCreate(dim, RINGBUF_TYPE_NOSPLIT);
+    
+    // Memoria heap dopo la creazione
+    size_t heap_after = esp_get_free_heap_size();
+    ESP_LOGI(TAG, "Heap libero dopo: %d bytes", heap_after);
+    
+    size_t used = heap_before - heap_after;
+    ESP_LOGI(TAG, "Memoria utilizzata: %d bytes", used);
+    // Risultato: ~2048 + overhead (strutture interne)
+    
+    if (batchQueue != NULL) {
+        ESP_LOGI(TAG, "✅ Ring buffer allocato con successo sull'heap");
+    }
+}
+

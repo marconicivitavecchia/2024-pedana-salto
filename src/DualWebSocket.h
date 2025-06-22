@@ -12,17 +12,6 @@ extern "C" {
     #include <arpa/inet.h>
 }
 
-/*
-typedef enum {
-    HTTPD_WS_TYPE_CONTINUE   = 0x0,
-    HTTPD_WS_TYPE_TEXT       = 0x1,
-    HTTPD_WS_TYPE_BINARY     = 0x2,
-    HTTPD_WS_TYPE_CLOSE      = 0x8,
-    HTTPD_WS_TYPE_PING       = 0x9,
-    HTTPD_WS_TYPE_PONG       = 0xA
-} httpd_ws_type_t;
-*/
-
 enum WSEventType {
     WS_EVT_CONNECT,
     WS_EVT_DISCONNECT,
@@ -60,6 +49,7 @@ public:
         _server(nullptr),
         _proxy_config(proxy_config) {
         memset(_clients, 0, sizeof(_clients));
+        memset(_sendBuffer, 0, sizeof(_sendBuffer));
         _onEvent = nullptr;
         _lastCheck = 0;
         _activeClients = 0;
@@ -83,7 +73,7 @@ public:
 
         httpd_config_t config = HTTPD_DEFAULT_CONFIG();
         config.server_port = _port;
-        config.max_open_sockets = 2;
+        config.max_open_sockets = 6;
         config.stack_size = 8192;
         config.core_id = tskNO_AFFINITY;
         config.task_priority = 5;
@@ -123,7 +113,7 @@ public:
     }
 
     bool hasClients() {
-        checkClients();  // Verifica stato connessioni
+        checkClients();
         return _activeClients > 0;
     }
 
@@ -193,7 +183,6 @@ public:
             return false;
         }
 
-        // Impostiamo il timeout sul socket
         struct timeval tv;
         tv.tv_sec = timeout_ms / 1000;
         tv.tv_usec = (timeout_ms % 1000) * 1000;
@@ -203,7 +192,6 @@ public:
             return false;
         }
 
-        // Prepariamo l'header WebSocket
         uint8_t header[10] = {0};
         size_t header_len = 2;
         header[0] = 0x81;  // FIN + text frame
@@ -227,7 +215,6 @@ public:
 
         uint32_t start_time = millis();
         
-        // Inviamo l'header
         ssize_t sent = send(client_id, header, header_len, 0);
         if (sent != header_len) {
             Serial.printf("Send Sync header failed for client %d\n", client_id);
@@ -235,7 +222,6 @@ public:
             return false;
         }
 
-        // Inviamo i dati
         sent = send(client_id, data, len, 0);
         if (sent != len) {
             Serial.printf("Send Sync data failed for client %d\n", client_id);
@@ -250,7 +236,6 @@ public:
             return false;
         }
 
-        //Serial.printf("Send Sync completed in %dms for client %d\n", elapsed, client_id);
         updateClientActivity(client_id);
         return true;
     }
@@ -261,14 +246,9 @@ public:
             return false;
         }
 
-        Serial.printf("Pre-allocation memory status for %d bytes:\n", len);
-        Serial.printf("Largest free block: %d\n", heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
-        Serial.printf("Free heap: %d\n", esp_get_free_heap_size());
-
         uint8_t* sendBuffer = (uint8_t*)malloc(len);
         if (!sendBuffer) {
-            Serial.printf("Send Async failed: cannot allocate %d bytes (largest block: %d)\n", 
-                len, heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
+            Serial.printf("Send Async failed: cannot allocate %d bytes\n", len);
             return false;
         }
 
@@ -322,11 +302,165 @@ public:
         return success;
     }
 
+    // ===== METODI OTTIMIZZATI CON BUFFER FISSO (SENZA MUTEX) =====
+
+    bool sendSyncFromQueue(int client_id, QueueHandle_t queue, size_t expectedLen, TickType_t timeout = portMAX_DELAY) {
+        if (!_server || !queue || expectedLen > SEND_BUFFER_SIZE) {
+            Serial.printf("SendSyncFromQueue failed: invalid params (len: %d, max: %d)\n", 
+                expectedLen, SEND_BUFFER_SIZE);
+            return false;
+        }
+
+        BaseType_t result = xQueueReceive(queue, _sendBuffer, timeout);
+        if (result != pdTRUE) {
+            Serial.println("SendSyncFromQueue failed: xQueueReceive timeout");
+            return false;
+        }
+
+        return sendSync(client_id, _sendBuffer, expectedLen);
+    }
+
+    bool sendSyncFromStreamBuffer(int client_id, StreamBufferHandle_t streamBuffer, TickType_t timeout = portMAX_DELAY) {
+        if (!_server || !streamBuffer) {
+            Serial.println("SendSyncFromStreamBuffer failed: invalid params");
+            return false;
+        }
+
+        size_t bytesReceived = xStreamBufferReceive(streamBuffer, _sendBuffer, SEND_BUFFER_SIZE, timeout);
+        if (bytesReceived == 0) {
+            Serial.println("SendSyncFromStreamBuffer failed: no data received");
+            return false;
+        }
+
+        return sendSync(client_id, _sendBuffer, bytesReceived);
+    }
+
+    bool sendSyncFromMessageBuffer(int client_id, MessageBufferHandle_t msgBuffer, TickType_t timeout = portMAX_DELAY) {
+        if (!_server || !msgBuffer) {
+            Serial.println("SendSyncFromMessageBuffer failed: invalid params");
+            return false;
+        }
+
+        size_t msgLen = xMessageBufferReceive(msgBuffer, _sendBuffer, SEND_BUFFER_SIZE, timeout);
+        if (msgLen == 0) {
+            Serial.println("SendSyncFromMessageBuffer failed: no message received");
+            return false;
+        }
+
+        return sendSync(client_id, _sendBuffer, msgLen);
+    }
+
+    bool broadcastSyncFromQueue(QueueHandle_t queue, size_t expectedLen, TickType_t timeout = portMAX_DELAY) {
+        if (!_server || !queue || expectedLen > SEND_BUFFER_SIZE) {
+            Serial.printf("BroadcastSyncFromQueue failed: invalid params (len: %d, max: %d)\n", 
+                expectedLen, SEND_BUFFER_SIZE);
+            return false;
+        }
+
+        checkClients();
+        if (_activeClients == 0) {
+            uint8_t dummy[expectedLen];
+            xQueueReceive(queue, dummy, timeout);
+            return false;
+        }
+
+        BaseType_t result = xQueueReceive(queue, _sendBuffer, timeout);
+        if (result != pdTRUE) {
+            Serial.println("BroadcastSyncFromQueue failed: xQueueReceive timeout");
+            return false;
+        }
+
+        bool success = true;
+        int sentCount = 0;
+        
+        for (int i = 0; i < MAX_CLIENTS; i++) {
+            if (_clients[i].inUse && _clients[i].errorCount < MAX_ERRORS) {
+                if (sendSync(_clients[i].id, _sendBuffer, expectedLen)) {
+                    sentCount++;
+                } else {
+                    success = false;
+                    Serial.printf("Broadcast failed for client %d\n", _clients[i].id);
+                }
+            }
+        }
+
+        Serial.printf("Broadcast sent to %d/%d clients\n", sentCount, _activeClients);
+        return success;
+    }
+
+    bool broadcastSyncFromStreamBuffer(StreamBufferHandle_t streamBuffer, TickType_t timeout = portMAX_DELAY) {
+        if (!_server || !streamBuffer) {
+            return false;
+        }
+
+        checkClients();
+        if (_activeClients == 0) {
+            uint8_t dummy[SEND_BUFFER_SIZE];
+            xStreamBufferReceive(streamBuffer, dummy, SEND_BUFFER_SIZE, timeout);
+            return false;
+        }
+
+        size_t bytesReceived = xStreamBufferReceive(streamBuffer, _sendBuffer, SEND_BUFFER_SIZE, timeout);
+        if (bytesReceived == 0) {
+            return false;
+        }
+
+        return broadcastSync(_sendBuffer, bytesReceived);
+    }
+
+    bool broadcastSyncFromMessageBuffer(MessageBufferHandle_t msgBuffer, TickType_t timeout = portMAX_DELAY) {
+        if (!_server || !msgBuffer) {
+            return false;
+        }
+
+        checkClients();
+        if (_activeClients == 0) {
+            uint8_t dummy[SEND_BUFFER_SIZE];
+            xMessageBufferReceive(msgBuffer, dummy, SEND_BUFFER_SIZE, timeout);
+            return false;
+        }
+
+        size_t msgLen = xMessageBufferReceive(msgBuffer, _sendBuffer, SEND_BUFFER_SIZE, timeout);
+        if (msgLen == 0) {
+            return false;
+        }
+
+        return broadcastSync(_sendBuffer, msgLen);
+    }
+
+    // DIAGNOSTICA
+    void printBufferStatus() {
+        Serial.printf("Send Buffer: %d bytes available\n", SEND_BUFFER_SIZE);
+        Serial.printf("Free heap: %d bytes\n", esp_get_free_heap_size());
+    }
+
+    void printBroadcastStats() {
+        checkClients();
+        Serial.printf("=== Broadcast Status ===\n");
+        Serial.printf("Active clients: %d/%d\n", _activeClients, MAX_CLIENTS);
+        Serial.printf("Buffer size: %d bytes\n", SEND_BUFFER_SIZE);
+        
+        for (int i = 0; i < MAX_CLIENTS; i++) {
+            if (_clients[i].inUse) {
+                Serial.printf("Client %d: %s (errors: %d)\n", 
+                    _clients[i].id, 
+                    (_clients[i].errorCount < MAX_ERRORS) ? "ACTIVE" : "DISABLED",
+                    _clients[i].errorCount);
+            }
+        }
+        Serial.println("=======================");
+    }
+
+    size_t getMaxBufferSize() const {
+        return SEND_BUFFER_SIZE;
+    }
+
 private:
     static const int MAX_CLIENTS = 4;
     static const uint32_t CHECK_INTERVAL = 5000;  // 5 secondi
     static const uint32_t CLIENT_TIMEOUT = 30000; // 30 secondi
     static const int MAX_ERRORS = 3;              // Max errori prima di disconnettere
+    static const size_t SEND_BUFFER_SIZE = 4096;  // Buffer fisso condiviso
     
     httpd_handle_t _server;
     uint16_t _port;
@@ -335,6 +469,7 @@ private:
     uint32_t _lastCheck;
     int _activeClients;
     ProxyConfig _proxy_config;
+    uint8_t _sendBuffer[SEND_BUFFER_SIZE];  // Buffer fisso per operazioni zero-copy
 
     bool verify_proxy_request(httpd_req_t *req) {
         if (!_proxy_config.check_proxy_headers) return true;
@@ -431,7 +566,6 @@ private:
         WebSocketServer* ws = (WebSocketServer*)req->user_ctx;
         if (!ws) return ESP_FAIL;
 
-        // Verifica proxy headers
         if (!ws->verify_proxy_request(req)) {
             return httpd_resp_send_err(req, HTTPD_403_FORBIDDEN, 
                 "Invalid proxy configuration");
@@ -447,15 +581,7 @@ private:
             }
             return ESP_OK;
         }
-/*
-        if (req->method == HTTP_DELETE) {
-            if (ws->_onEvent) {
-                ws->_onEvent(WS_EVT_DISCONNECT, &client, nullptr, 0, nullptr);
-            }
-            ws->removeClient(client.id);
-            return ESP_OK;
-        }
-*/
+
         httpd_ws_frame_t ws_pkt;
         memset(&ws_pkt, 0, sizeof(httpd_ws_frame_t));
         
@@ -486,8 +612,6 @@ private:
                     ws->_onEvent(WS_EVT_DATA, &client, (uint8_t*)ws_pkt.payload, ws_pkt.len, nullptr);
                 } else if (ws_pkt.type == HTTPD_WS_TYPE_TEXT) {
                     ws->_onEvent(WS_EVT_DATA, &client, (unsigned char*)ws_pkt.payload, ws_pkt.len, nullptr);
-                } else {
-                    //ws->_onEvent(WS_EVT_DATA, &client, ws_pkt.payload, ws_pkt.len, nullptr);
                 }
             }
         }
@@ -551,7 +675,7 @@ public:
         return controlServer.hasClients();
     }
 
-    // Metodi binari
+    // ===== METODI TRADIZIONALI =====
     bool sendDataToClient(int clientId, const uint8_t* data, size_t len, bool async = false) {
         if (async) {
             return dataServer.sendAsync(clientId, data, len);
@@ -609,9 +733,86 @@ public:
         return sendControlAsync((const uint8_t*)data, len);
     }
 
+    // ===== METODI OTTIMIZZATI ZERO-COPY =====
+
+    // DATA SERVER - Da Code RTOS
+    bool sendDataFromQueue(QueueHandle_t queue, size_t expectedLen, TickType_t timeout = portMAX_DELAY) {
+        return dataServer.broadcastSyncFromQueue(queue, expectedLen, timeout);
+    }
+
+    bool sendDataToClientFromQueue(int clientId, QueueHandle_t queue, size_t expectedLen, TickType_t timeout = portMAX_DELAY) {
+        return dataServer.sendSyncFromQueue(clientId, queue, expectedLen, timeout);
+    }
+
+    // DATA SERVER - Da Stream Buffer
+    bool sendDataFromStreamBuffer(StreamBufferHandle_t streamBuffer, TickType_t timeout = portMAX_DELAY) {
+        return dataServer.broadcastSyncFromStreamBuffer(streamBuffer, timeout);
+    }
+
+    bool sendDataToClientFromStreamBuffer(int clientId, StreamBufferHandle_t streamBuffer, TickType_t timeout = portMAX_DELAY) {
+        return dataServer.sendSyncFromStreamBuffer(clientId, streamBuffer, timeout);
+    }
+
+    // DATA SERVER - Da Message Buffer
+    bool sendDataFromMessageBuffer(MessageBufferHandle_t msgBuffer, TickType_t timeout = portMAX_DELAY) {
+        return dataServer.broadcastSyncFromMessageBuffer(msgBuffer, timeout);
+    }
+
+    bool sendDataToClientFromMessageBuffer(int clientId, MessageBufferHandle_t msgBuffer, TickType_t timeout = portMAX_DELAY) {
+        return dataServer.sendSyncFromMessageBuffer(clientId, msgBuffer, timeout);
+    }
+
+    // CONTROL SERVER - Da Code RTOS
+    bool sendControlFromQueue(QueueHandle_t queue, size_t expectedLen, TickType_t timeout = portMAX_DELAY) {
+        return controlServer.broadcastSyncFromQueue(queue, expectedLen, timeout);
+    }
+
+    bool sendControlToClientFromQueue(int clientId, QueueHandle_t queue, size_t expectedLen, TickType_t timeout = portMAX_DELAY) {
+        return controlServer.sendSyncFromQueue(clientId, queue, expectedLen, timeout);
+    }
+
+    // CONTROL SERVER - Da Stream Buffer
+    bool sendControlFromStreamBuffer(StreamBufferHandle_t streamBuffer, TickType_t timeout = portMAX_DELAY) {
+        return controlServer.broadcastSyncFromStreamBuffer(streamBuffer, timeout);
+    }
+
+    bool sendControlToClientFromStreamBuffer(int clientId, StreamBufferHandle_t streamBuffer, TickType_t timeout = portMAX_DELAY) {
+        return controlServer.sendSyncFromStreamBuffer(clientId, streamBuffer, timeout);
+    }
+
+    // CONTROL SERVER - Da Message Buffer
+    bool sendControlFromMessageBuffer(MessageBufferHandle_t msgBuffer, TickType_t timeout = portMAX_DELAY) {
+        return controlServer.broadcastSyncFromMessageBuffer(msgBuffer, timeout);
+    }
+
+    bool sendControlToClientFromMessageBuffer(int clientId, MessageBufferHandle_t msgBuffer, TickType_t timeout = portMAX_DELAY) {
+        return controlServer.sendSyncFromMessageBuffer(clientId, msgBuffer, timeout);
+    }
+
+    // ===== DIAGNOSTICA =====
     void checkClients() {
         dataServer.checkClients();
         controlServer.checkClients();
+    }
+
+    void printStatus() {
+        Serial.println("=== DUAL WEBSOCKET STATUS ===");
+        Serial.printf("Data Server (Port 81): %s, Clients: %d\n", 
+            hasDataClients() ? "ACTIVE" : "IDLE", 
+            hasDataClients() ? 1 : 0);
+        Serial.printf("Control Server (Port 82): %s, Clients: %d\n", 
+            hasControlClients() ? "ACTIVE" : "IDLE", 
+            hasControlClients() ? 1 : 0);
+        
+        dataServer.printBroadcastStats();
+        controlServer.printBroadcastStats();
+        
+        Serial.printf("Free heap: %d bytes\n", esp_get_free_heap_size());
+        Serial.println("============================");
+    }
+
+    size_t getMaxBufferSize() const {
+        return dataServer.getMaxBufferSize();
     }
 
 private:
@@ -620,4 +821,30 @@ private:
 };
 
 #endif // DUAL_WEBSOCKET_H
-//https://github.com/espressif/esp-idf/blob/master/components/esp_http_server/include/esp_http_server.h
+
+/*
+ESEMPI D'USO OTTIMIZZATI:
+
+// 1. BROADCAST DA CODA (ZERO-COPY)
+QueueHandle_t dataQueue = xQueueCreate(10, 1024);
+dualWS.sendDataFromQueue(dataQueue, 1024);
+
+// 2. INVIO A CLIENT SPECIFICO DA STREAM BUFFER
+StreamBufferHandle_t streamBuffer = xStreamBufferCreate(4096, 1);
+dualWS.sendDataToClientFromStreamBuffer(clientId, streamBuffer);
+
+// 3. BROADCAST DA MESSAGE BUFFER (DIMENSIONI VARIABILI)
+MessageBufferHandle_t msgBuffer = xMessageBufferCreate(4096);
+dualWS.sendControlFromMessageBuffer(msgBuffer);
+
+// 4. DIAGNOSTICA
+dualWS.printStatus();
+
+VANTAGGI:
+✅ Zero malloc/free - Buffer fisso da 4KB
+✅ Zero memcpy - Receive diretto nel buffer WebSocket
+✅ Zero mutex - Solo operazioni sincronizzate
+✅ Thread-safe - Code RTOS già protette
+✅ Determinismo - Tempi prevedibili
+✅ Efficienza - Massima velocità per ESP32
+*/

@@ -116,4 +116,11 @@ inline void delay500ns() {
     }
 }
 
+void delay_3_5us() {
+  // Circa 3.5 µs a 240 MHz
+  for (volatile int i = 0; i < 30; i++) {
+    __asm__ __volatile__("nop");
+  }
+}
+// A 240 MHz, ogni nop dura circa 4.17 ns.
 #endif // ADS1256_DELAYS_H
