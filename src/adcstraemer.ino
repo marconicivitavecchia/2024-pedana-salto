@@ -8,10 +8,8 @@
 #include "TaskMonitor.h"
 #include <driver/spi_master.h>
 #include "ESP32WebServer.h"
-//#include "freertos/stream_buffer.h"  // per streambuffer
 #include "WiFiManager.h"
 #include "Handlers.h"
-#include "VirtualStringQueue.h"
 //#include "ADS1256ZeroCopySerializer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -37,8 +35,8 @@
 //#define QUEUE_SIZE 20              // Dimensione coda batch
 //#define STREAM_BUFFER_SIZE (8192)          // 8KB per BatchData structures
 //#define TRIGGER_LEVEL (sizeof(BatchData))  // Sveglia dopo 1 BatchData
-#define QUEUE_SIZE 200              // Dimensione coda batch
-#define DATALEN 1371
+//#define QUEUE_SIZE 200              // Dimensione coda batch
+#define DATALEN 1372
 
 //#define MAX_SAMPLES_PER_BATCH 160u  // Aggiunto 'u' per unsigned
 
@@ -109,24 +107,32 @@ ADS1256_DMA adc;
 ESP32WebServer server;
 //BinaryPacker packer;
 
-void updateDAC() {
-  //Serial.println("updateDAC");
+//100, 100
+//25, 12
+void updateDAC(uint8_t offset, uint8_t amplitude) {
   // Calcola il valore della sinusoide
   float sinValue = sin(2 * PI * angle / SAMPLES_PER_CYCLE);
-
-  // DAC1: normale
-  //int value1 = 150 + 50 * sinValue;
-  // DAC2: invertito (controfase)
-  //int value2 = 150 - 50 * sinValue;
-  // 200
-  // Aumenta l'ampiezza al massimo (0-255)
-  int value1 = 200 * (sinValue + 1) / 2;   // Onda sinusoidale 0-255V
-  int value2 = 200 * (-sinValue + 1) / 2;  // Controfase
-
+  
+  // Per 640mV picco-picco con media 320mV:
+  // Media: 320mV = ~25 unità DAC (320/12.94)
+  // Ampiezza: ±160mV = ~12 unità DAC (160/12.94)
+  //int offset = 25;    // 320mV di offset
+  //int amplitude = 12; // ±160mV di ampiezza
+  
+  // DAC1: sinusoide normale
+  int value1 = offset + amplitude * sinValue;
+  
+  // DAC2: controfase
+  int value2 = offset - amplitude * sinValue;
+  
+  // Limita i valori tra 0 e 255 per sicurezza
+  value1 = constrain(value1, 0, 255);
+  value2 = constrain(value2, 0, 255);
+  
   // Aggiorna entrambi i DAC
   dacWrite(DAC1_PIN, value1);
   dacWrite(DAC2_PIN, value2);
-
+  
   angle++;
   if (angle >= SAMPLES_PER_CYCLE) {
     angle = 0;
@@ -349,9 +355,12 @@ void onControlEvent(WSEventType type, WebSocketServer::WSClient* client, uint8_t
       if (gc1.mode == 2) {
         gc1.gain = 1;
         gc1.adcPort = 6;
-      }
-      Serial.printf("Modo: %u attivato\n", gc1.mode);
-      configChanged = true;
+      }else if (gc1.mode == 3) {
+        gc1.gain = 6;
+        gc1.adcPort = 6;
+        Serial.printf("Modo: %u attivato\n", gc1.mode);
+        configChanged = true;
+	  }
     }
 
     if (doc.containsKey("streaming")) {
@@ -517,6 +526,8 @@ void adcTask(void* pvParameters) {
 		delay(100);
 		Serial.println("ADC task: Start task tracking");
 	    uint32_t last_t = 0;
+		uint8_t amp = 0;
+		uint8_t ofst = 0;
 		while (true) {
 		    //Serial.println("curr: "+String(curr)+" last: "+String(last));
 		    if (last != curr) {
@@ -541,6 +552,8 @@ void adcTask(void* pvParameters) {
 				//xQueueReset(batchQueue);  
 				//batchQueue.resetCharBuffer();		
 				//queue.begin(55, DATALEN);
+				reset_ringbuffer(batchQueue);
+				recreate_ringbuffer(batchQueue, DATALEN*40);
 				Serial.println("adcTask: Queue reset");
 				if (!gc.streaming) {
 				  // Alla fine dello streaming
@@ -563,10 +576,21 @@ void adcTask(void* pvParameters) {
 				  //overcount = 0;
 				  overflow = false;
 				  enable1 = 127;
-				  if (gc.mode == 2) {
+				  if (gc.mode == 3) {
 					Serial.println("adcTask: start Tone");
 					freq = gc.toneFreq;
 					timerCmd = 1;
+					ofst = 25;
+					amp = 12;
+					Serial.println("adcTask: enableTestSignal");
+					adc.enableTestSignal(false);
+					Serial.println("adcTask: dopo enableTestSignal");
+				  }else if (gc.mode == 2) {
+					Serial.println("adcTask: start Tone");
+					freq = gc.toneFreq;
+					timerCmd = 1;
+					ofst = 100;
+					amp = 100;
 					Serial.println("adcTask: enableTestSignal");
 					adc.enableTestSignal(false);
 					Serial.println("adcTask: dopo enableTestSignal");
@@ -594,7 +618,7 @@ void adcTask(void* pvParameters) {
 
 			monitor->heartbeat();
 		    if (gc.streaming) {
-				if (timerCmd) updateDAC();
+				if (timerCmd) updateDAC(ofst, amp);
 				
 				char *buf = NULL;  // Puntatore che riceverà l'indirizzo
 				if (batch.count > 0) {
@@ -633,7 +657,7 @@ void adcTask(void* pvParameters) {
 }
 
 int serialize(char*buf, BatchData &batch, int maxLen){
-	int len = snprintf(buf, maxLen, "{\"t\":%u,\"v\":[", batch.t);
+	int len = snprintf(buf, maxLen, "{\"t\":\"%llx\",\"v\":[", batch.t);
 
 	// Serializza come hex strings
 	const uint16_t maxValues = std::min<uint16_t>(batch.count, MAX_SAMPLES_PER_BATCH);
@@ -708,7 +732,7 @@ void wsTask(void* pvParameters) {
 		if (buf) {
 			batchCount++;
             //Serial.println((char*)buf);
-			ws.sendDataSync((uint8_t*)buf, (size_t) DATALEN);
+			ws.sendDataSync((uint8_t*)buf, (size_t) strlen((char*)buf));
             vRingbufferReturnItem(batchQueue, (void*)buf);
 			
 			// overflow signalling management
@@ -720,6 +744,7 @@ void wsTask(void* pvParameters) {
 					//xQueueReset(batchQueue);
 					//batchQueue.resetCharBuffer();
 					//batchQueue.reset();
+					reset_ringbuffer(batchQueue);
 				}  
 			}else{
 				if(enable1 < 128){
@@ -735,7 +760,7 @@ void wsTask(void* pvParameters) {
 			vTaskDelay(1);  // delay solo se non ci sono dati
 		}
 		// se non riceve dati il loop adc potrebbe essere fermo
-			//Serial.println("wsTask: non ci sono dati"); 
+		//Serial.println("wsTask: non ci sono dati"); 
 		if(millis() - startTime > timeout) {
 			startTime += timeout;        
 			if (adcMonitor != nullptr) {  // verifica che adcMonitor sia valido
@@ -755,6 +780,37 @@ void wsTask(void* pvParameters) {
 			batchCount = 0;
 		}			
 	} 
+}
+
+void reset_ringbuffer(RingbufHandle_t ring_buf) {
+    size_t item_size;
+    void *item;
+    
+    ESP_LOGI(TAG, "Svuotando ring buffer...");
+    
+    // Leggi tutto senza timeout fino a quando è vuoto
+    while ((item = xRingbufferReceive(ring_buf, &item_size, 0)) != NULL) {
+        vRingbufferReturnItem(ring_buf, item);
+        ESP_LOGD(TAG, "Rimosso elemento di %d bytes", item_size);
+    }
+    
+    ESP_LOGI(TAG, "Ring buffer svuotato completamente");
+}
+
+RingbufHandle_t recreate_ringbuffer(RingbufHandle_t old_ring_buf, size_t size) {
+    // Elimina il vecchio buffer
+    if (old_ring_buf != NULL) {
+        vRingbufferDelete(old_ring_buf);
+        ESP_LOGI(TAG, "Buffer precedente eliminato");
+    }
+
+    // Crea nuovo buffer
+    RingbufHandle_t new_ring_buf = xRingbufferCreate(size, RINGBUF_TYPE_NOSPLIT);
+    if (new_ring_buf != NULL) {
+        ESP_LOGI(TAG, "Nuovo buffer creato - effettivamente resettato");
+    }
+    
+    return new_ring_buf;
 }
 
 void setup() {
@@ -856,7 +912,7 @@ void setup() {
   adc.begin();
   delay(100);
   
-  check_heap_usage(1371*40);
+  check_heap_usage(DATALEN*40);
   
   // Task WebSocket su core 0
   xTaskCreatePinnedToCore(
