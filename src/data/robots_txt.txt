@@ -1,0 +1,27 @@
+# Robots.txt for ESP32 WiFi Configuration SPA
+# This is a private device configuration interface
+
+User-agent: *
+Disallow: /
+
+# Block all search engines and web crawlers
+# This device interface should not be indexed
+
+# Security endpoints
+Disallow: /api/
+Disallow: /login
+Disallow: /logout
+Disallow: /ws/
+Disallow: /config
+Disallow: /reset
+
+# Static files are also private
+Disallow: /cert.pem
+Disallow: /key.pem
+Disallow: *.log
+
+# Allow health check for monitoring (optional)
+# Allow: /health
+
+# No sitemap for private device interfaces
+# Sitemap:
