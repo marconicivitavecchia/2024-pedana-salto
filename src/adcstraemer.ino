@@ -37,7 +37,7 @@
 //#define TRIGGER_LEVEL (sizeof(BatchData))  // Sveglia dopo 1 BatchData
 //#define QUEUE_SIZE 200              // Dimensione coda batch
 #define DATALEN 1372
-
+#define MAXBATCH 20
 //#define MAX_SAMPLES_PER_BATCH 160u  // Aggiunto 'u' per unsigned
 
 //const char* WIFI_SSID = "D-Link-6A30CC";
@@ -528,6 +528,7 @@ void adcTask(void* pvParameters) {
 	    uint32_t last_t = 0;
 		uint8_t amp = 0;
 		uint8_t ofst = 0;
+		int json_size = DATALEN;
 		while (true) {
 		    //Serial.println("curr: "+String(curr)+" last: "+String(last));
 		    if (last != curr) {
@@ -552,8 +553,9 @@ void adcTask(void* pvParameters) {
 				//xQueueReset(batchQueue);  
 				//batchQueue.resetCharBuffer();		
 				//queue.begin(55, DATALEN);
-				reset_ringbuffer(batchQueue);
-				recreate_ringbuffer(batchQueue, DATALEN*40);
+				//reset_ringbuffer(batchQueue);
+				json_size = calculate_json_size(samplesPerBatch) + 4;
+				recreate_ringbuffer(batchQueue, json_size*MAXBATCH);
 				Serial.println("adcTask: Queue reset");
 				if (!gc.streaming) {
 				  // Alla fine dello streaming
@@ -622,7 +624,7 @@ void adcTask(void* pvParameters) {
 				
 				char *buf = NULL;  // Puntatore che riceverà l'indirizzo
 				if (batch.count > 0) {
-					BaseType_t result = xRingbufferSendAcquire(batchQueue,(void**) &buf, (size_t) DATALEN, pdMS_TO_TICKS(0));
+					BaseType_t result = xRingbufferSendAcquire(batchQueue,(void**) &buf, (size_t) json_size, pdMS_TO_TICKS(0));
 					if (result == pdTRUE && buf != NULL) {
 						adc.read_data_batch_fast(batch, samplesPerBatch, decimationFactor);
 						//uint32_t delta = batch.t - last_t;
@@ -654,6 +656,24 @@ void adcTask(void* pvParameters) {
   }
 
   Serial.println("ADC task: terminato");  // Non dovrebbe mai arrivare qui
+}
+
+size_t calculate_json_size(int num_samples) {
+    // Parti fisse
+    size_t fixed_parts = 15;        // {"t":"","v":[]}
+    size_t timestamp = 13;          // "62ad7af907880"
+    
+    // Array valori
+    size_t values_size;
+    if (num_samples == 0) {
+        values_size = 0;
+    } else if (num_samples == 1) {
+        values_size = 8;            // Solo "000000"
+    } else {
+        values_size = (num_samples - 1) * 9 + 8;  // (n-1) valori con virgola + ultimo senza
+    }
+    
+    return fixed_parts + timestamp + values_size;
 }
 
 int serialize(char*buf, BatchData &batch, int maxLen){
@@ -755,7 +775,9 @@ void wsTask(void* pvParameters) {
 						enable1 = 128;
 					}     
 				}  
-			}               
+			}    
+			//taskYIELD();	
+			vTaskDelay(1);  // delay solo se non ci sono dati
 		}else {  
 			vTaskDelay(1);  // delay solo se non ci sono dati
 		}
@@ -846,9 +868,10 @@ void setup() {
   
   // Esegui diagnostica completa
     //DIAGNOSE_NETWORK("RedmiSeb");
-    
-    // Inizializza con debug
-    WiFiManager::optimizeEverything();
+  
+  readWiFiFile();  
+  // Inizializza con debug
+  WiFiManager::optimizeEverything();
   
   SETUP_INTEGRATED_WIFI_FALLBACK(
 		"RedmiSeb", "pippo2503",      
@@ -894,11 +917,12 @@ void setup() {
   }
   
   // loaders pagine statiche da file
+  setupWiFiAPI(server);
   server.loadFile("/","index.html");
   server.loadFile("/wifi","wifi.html");
+  server.enableFileHandler();
   // loaders API 
-  setupWiFiAPIHandlers(server);
-
+  
   delay(100);  // Breve pausa per stabilizzazione
 
   // Configura e avvia il WebSocket server
@@ -912,7 +936,7 @@ void setup() {
   adc.begin();
   delay(100);
   
-  check_heap_usage(DATALEN*40);
+  check_heap_usage(DATALEN*MAXBATCH);
   
   // Task WebSocket su core 0
   xTaskCreatePinnedToCore(
@@ -951,6 +975,7 @@ void setup() {
   adcMonitor->startTask();
 
   Serial.println("Setup completato");
+  //readWiFiFile();
 }
 
 void loop() {
@@ -1017,24 +1042,6 @@ void loop() {
   //vTaskDelay(10);
 }
 
-void setupWiFiAPIHandlers(ESP32WebServer& webServer) {
-    // Configurazione WiFi (GET, POST, DELETE + OPTIONS per CORS)
-    webServer.addHandler("/api/wifi/config", HTTP_GET, apiWiFiConfigGet);
-    webServer.addHandler("/api/wifi/config", HTTP_POST, apiWiFiConfigPost);
-    webServer.addHandler("/api/wifi/config", HTTP_DELETE, apiWiFiConfigDelete);  // ← MANCAVA
-    webServer.addHandler("/api/wifi/config", HTTP_OPTIONS, apiWiFiConfigPost);   // ← MANCAVA (CORS)
-    
-    // Test WiFi
-    webServer.addHandler("/api/wifi/test", HTTP_POST, apiWiFiTest);
-    webServer.addHandler("/api/wifi/test", HTTP_OPTIONS, apiWiFiTest);           // ← MANCAVA (CORS)
-    
-    // Scan reti WiFi
-    webServer.addHandler("/api/wifi/scan", HTTP_GET, apiWiFiScan);
-    
-    // Status sistema  
-    webServer.addHandler("/api/system/status", HTTP_GET, apiSystemStatus);      // ← MANCAVA
-}
-
 void check_heap_usage(int dim) {
     // Memoria heap prima della creazione
     size_t heap_before = esp_get_free_heap_size();
@@ -1053,6 +1060,24 @@ void check_heap_usage(int dim) {
     
     if (batchQueue != NULL) {
         ESP_LOGI(TAG, "✅ Ring buffer allocato con successo sull'heap");
+    }
+}
+
+void readWiFiFile() {
+    if (LittleFS.exists("/wifi_credentials.txt")) {
+        File file = LittleFS.open("/wifi_credentials.txt", "r");
+        if (file) {
+            Serial.println("File trovato:");
+            while (file.available()) {
+                Serial.print((char)file.read());
+            }
+            file.close();
+            Serial.println("\n=== FINE FILE ===");
+        } else {
+            Serial.println("Errore apertura file");
+        }
+    } else {
+        Serial.println("File wifi_credentials.txt non esiste");
     }
 }
 

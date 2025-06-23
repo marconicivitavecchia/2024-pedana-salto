@@ -50,7 +50,7 @@ esp_err_t apiWiFiConfigPost(httpd_req_t *req) {
         return ESP_OK;
     }
     
-    JsonDocument doc;  // Fix: Use JsonDocument instead of DynamicJsonDocument
+    JsonDocument doc;
     if (deserializeJson(doc, json)) {
         server->sendJSONError("Invalid JSON");
         server->currentRequest = nullptr;
@@ -62,6 +62,46 @@ esp_err_t apiWiFiConfigPost(httpd_req_t *req) {
     String backupSSID = doc["backupSSID"] | "";
     String backupPassword = doc["backupPassword"] | "";
     bool autoConnect = doc["autoConnect"] | true;
+    
+    // NUOVA LOGICA: Gestione password intelligente
+    bool keepExistingPrimary = doc["keepExistingPrimaryPassword"] | false;
+    bool keepExistingBackup = doc["keepExistingBackupPassword"] | false;
+    bool forceEmptyPrimary = doc["forceEmptyPrimaryPassword"] | false;
+    bool forceEmptyBackup = doc["forceEmptyBackupPassword"] | false;
+    
+    // Gestione "force empty" (priorità massima)
+    if (forceEmptyPrimary) {
+        primaryPassword = "";
+        Serial.println("🔓 Forcing primary network to OPEN");
+    }
+    if (forceEmptyBackup) {
+        backupPassword = "";
+        Serial.println("🔓 Forcing backup network to OPEN");
+    }
+    
+    // Carica password esistenti se necessario
+    if ((keepExistingPrimary && !forceEmptyPrimary) || (keepExistingBackup && !forceEmptyBackup)) {
+        String existingConfig = WiFiManager::getCredentialsAsJson();
+        JsonDocument existingDoc;
+        
+        if (deserializeJson(existingDoc, existingConfig) == DeserializationError::Ok) {
+            if (keepExistingPrimary && !forceEmptyPrimary) {
+                String existingPrimary = existingDoc["primaryPassword"] | "";
+                primaryPassword = existingPrimary;
+                Serial.print("🔒 Kept existing primary: ");
+                Serial.println(existingPrimary.length() > 0 ? "[PROTECTED]" : "[EMPTY]");
+            }
+            
+            if (keepExistingBackup && !forceEmptyBackup) {
+                String existingBackup = existingDoc["backupPassword"] | "";
+                backupPassword = existingBackup;
+                Serial.print("🔒 Kept existing backup: ");
+                Serial.println(existingBackup.length() > 0 ? "[PROTECTED]" : "[EMPTY]");
+            }
+        } else {
+            Serial.println("⚠️ Failed to parse existing config");
+        }
+    }
     
     if (primarySSID.length() == 0) {
         server->sendJSONError("Primary SSID required");
@@ -75,10 +115,21 @@ esp_err_t apiWiFiConfigPost(httpd_req_t *req) {
         return ESP_OK;
     }
     
-    // Fix: Use the correct method names from WiFiManager
+    // Debug: Mostra cosa verrà salvato
+    Serial.println("=== SAVING WIFI CONFIG ===");
+    Serial.println("Primary SSID: " + primarySSID);
+    Serial.print("Primary Password: ");
+    Serial.println(primaryPassword.length() > 0 ? "[PROTECTED]" : "[EMPTY/OPEN]");
+    Serial.println("Backup SSID: " + backupSSID);
+    Serial.print("Backup Password: ");
+    Serial.println(backupPassword.length() > 0 ? "[PROTECTED]" : "[EMPTY/OPEN]");
+    Serial.print("Auto Connect: ");
+    Serial.println(autoConnect ? "Yes" : "No");
+    
+    // Salva credenziali
     bool success = WiFiManager::saveCredentialsToFileSystem(primarySSID, primaryPassword, backupSSID, backupPassword);
     
-    // If you want to connect immediately after saving:
+    // Connetti se il salvataggio è riuscito
     if (success) {
         success = WiFiManager::connectIntelligent();
     }
@@ -247,24 +298,23 @@ esp_err_t apiWiFiScan(httpd_req_t *req) {
     return ESP_OK;
 }
 
-// ===============================
-// SETUP FINALE
-// ===============================
-void setupWiFiAPI(ESP32WebServer& webServer) {
-    Serial.println("[WiFi API] Registering endpoints...");
+esp_err_t test_handler(httpd_req_t *req) {
+	Serial.println("*** TEST HANDLER CALLED - THIS SHOULD APPEAR ***");
     
-    webServer.addHandler("/api/wifi/config", HTTP_GET, apiWiFiConfigGet);
-    webServer.addHandler("/api/wifi/config", HTTP_POST, apiWiFiConfigPost);
-    webServer.addHandler("/api/wifi/config", HTTP_DELETE, apiWiFiConfigDelete);
-    webServer.addHandler("/api/wifi/config", HTTP_OPTIONS, apiWiFiConfigPost);
+    const char* resp = "Test handler works!";
+    httpd_resp_send(req, resp, strlen(resp));
     
-    webServer.addHandler("/api/wifi/test", HTTP_POST, apiWiFiTest);
-    webServer.addHandler("/api/wifi/test", HTTP_OPTIONS, apiWiFiTest);
-    webServer.addHandler("/api/wifi/scan", HTTP_GET, apiWiFiScan);
+    return ESP_OK;
+}
+
+esp_err_t simpleTestHandler(httpd_req_t *req) {
+    Serial.println("Handler chiamato!");
     
-    webServer.addHandler("/api/system/status", HTTP_GET, apiSystemStatus);
+    // Risposta minima possibile
+    httpd_resp_send(req, "OK", 2);
     
-    Serial.println("[WiFi API] Ready - 6 endpoints registered");
+    Serial.println("Risposta inviata");
+    return ESP_OK;
 }
 
 // ===============================
@@ -287,6 +337,55 @@ esp_err_t mySimpleAPI(httpd_req_t *req) {
     server->sendJSONSuccess("Done!");        // Helper inline!
     server->currentRequest = nullptr;
     return ESP_OK;
+}
+
+// Aggiungi questo handler nel tuo Handlers.h
+esp_err_t apiDebugFile(httpd_req_t *req) {
+    ESP32WebServer* server = (ESP32WebServer*)req->user_ctx;
+    server->currentRequest = req;
+    
+    if (LittleFS.exists("/wifi_credentials.txt")) {
+        File file = LittleFS.open("/wifi_credentials.txt", "r");
+        if (file) {
+            String content = file.readString();
+            file.close();
+            
+            // Risposta in plain text per vedere il contenuto raw
+            httpd_resp_set_type(req, "text/plain");
+            httpd_resp_send(req, content.c_str(), content.length());
+        } else {
+            httpd_resp_send(req, "Errore lettura file", 19);
+        }
+    } else {
+        httpd_resp_send(req, "File non trovato", 16);
+    }
+    
+    server->currentRequest = nullptr;
+    return ESP_OK;
+}
+
+// ===================================
+// SETUP FINALE da caricare in .ino
+// ===================================
+void setupWiFiAPI(ESP32WebServer& webServer) {
+    Serial.println("[WiFi API] Registering endpoints...");
+ 
+    webServer.addHandler("/api/wifi/config", HTTP_GET, apiWiFiConfigGet);
+    webServer.addHandler("/api/wifi/config", HTTP_POST, apiWiFiConfigPost);
+    webServer.addHandler("/api/wifi/config", HTTP_DELETE, apiWiFiConfigDelete);
+    webServer.addHandler("/api/wifi/config", HTTP_OPTIONS, apiWiFiConfigPost);
+    
+    webServer.addHandler("/api/wifi/test", HTTP_POST, apiWiFiTest);
+    webServer.addHandler("/api/wifi/test", HTTP_OPTIONS, apiWiFiTest);
+    webServer.addHandler("/api/wifi/scan", HTTP_GET, apiWiFiScan);
+    
+    webServer.addHandler("/api/system/status", HTTP_GET, apiSystemStatus);
+    
+    Serial.println("[WiFi API] Ready - 6 endpoints registered");
+	// Registra il test
+	webServer.addHandler("/test", HTTP_GET, test_handler);
+	webServer.addHandler("/simple", HTTP_GET, simpleTestHandler);
+	//webServer.addHandler("/api/wificredentials", HTTP_GET, simpleTestHandler);
 }
 
 #endif
