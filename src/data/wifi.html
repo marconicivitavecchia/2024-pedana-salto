@@ -6,6 +6,148 @@
     <title>WiFi Configuration - SPA Control</title>
     <link rel="stylesheet" href="/style.css">
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📶</text></svg>">
+    <style>
+        /* Additional styles for new elements */
+        .network-item {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 8px;
+            transition: all 0.2s ease;
+        }
+        
+        .network-item.current {
+            background: #d4edda;
+            border-color: #28a745;
+            box-shadow: 0 2px 4px rgba(40, 167, 69, 0.1);
+        }
+        
+        .network-name {
+            font-weight: 500;
+            margin-bottom: 4px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .network-details {
+            font-size: 0.875rem;
+            color: #6c757d;
+        }
+        
+        .current-badge {
+            background: #28a745;
+            color: white;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+        
+        .hidden-badge {
+            background: #6c757d;
+            color: white;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+        
+        .preferred-badge {
+            background: #ffc107;
+            color: #212529;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+        
+        .no-networks {
+            text-align: center;
+            color: #6c757d;
+            font-style: italic;
+            padding: 24px;
+        }
+        
+        .connection-status {
+            padding: 16px;
+            border-radius: 8px;
+            margin-top: 12px;
+        }
+        
+        .connection-status.connected {
+            background: #d4edda;
+            border: 1px solid #28a745;
+            color: #155724;
+        }
+        
+        .connection-status.connecting {
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            color: #856404;
+        }
+        
+        .connection-status.disconnected {
+            background: #f8d7da;
+            border: 1px solid #dc3545;
+            color: #721c24;
+        }
+        
+        .system-info {
+            display: flex;
+            gap: 24px;
+            flex-wrap: wrap;
+        }
+        
+        .info-item {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        
+        .info-item .label {
+            font-size: 0.875rem;
+            color: #6c757d;
+            font-weight: 500;
+        }
+        
+        .info-item .value {
+            font-size: 1.125rem;
+            font-weight: 600;
+            color: #212529;
+        }
+        
+        .loading {
+            text-align: center;
+            color: #6c757d;
+            font-style: italic;
+            padding: 16px;
+        }
+        
+        .checkbox-group {
+            margin-top: 8px;
+        }
+        
+        .form-text {
+            font-size: 0.875rem;
+            color: #6c757d;
+            margin-top: 4px;
+        }
+        
+        @media (max-width: 768px) {
+            .system-info {
+                flex-direction: column;
+                gap: 12px;
+            }
+            
+            .info-item {
+                flex-direction: row;
+                justify-content: space-between;
+                align-items: center;
+            }
+        }
+    </style>
 </head>
 <body>
     <div id="app">
@@ -36,6 +178,18 @@
                         </div>
                         <div id="connectionStatus" class="connection-status">
                             <div class="loading">Loading connection status...</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Configured Networks Card -->
+                <div class="card">
+                    <div class="card-header">
+                        <h2>📋 Configured Networks</h2>
+                    </div>
+                    <div class="card-body">
+                        <div id="configuredNetworks">
+                            <div class="loading">Loading configured networks...</div>
                         </div>
                     </div>
                 </div>
@@ -81,6 +235,7 @@
                                                maxlength="32" 
                                                required
                                                placeholder="Enter WiFi network name">
+                                        <small class="form-text">Select from scanned networks or enter manually</small>
                                     </div>
                                     <div class="form-group">
                                         <label for="primaryPassword">Password</label>
@@ -90,6 +245,14 @@
                                                class="form-control" 
                                                maxlength="63"
                                                placeholder="Enter WiFi password">
+                                        <div class="checkbox-group">
+                                            <label class="checkbox-label">
+                                                <input type="checkbox" id="primaryOpenNetwork" name="primaryOpenNetwork">
+                                                <span class="checkmark"></span>
+                                                Open network (no password)
+                                            </label>
+                                        </div>
+                                        <small class="form-text">Leave empty to keep existing password, or check "Open network" to remove password</small>
                                     </div>
                                 </div>
                             </fieldset>
@@ -106,6 +269,7 @@
                                                class="form-control" 
                                                maxlength="32"
                                                placeholder="Enter backup WiFi network name">
+                                        <small class="form-text">Fallback network if primary fails</small>
                                     </div>
                                     <div class="form-group">
                                         <label for="backupPassword">Backup Password</label>
@@ -115,6 +279,14 @@
                                                class="form-control" 
                                                maxlength="63"
                                                placeholder="Enter backup WiFi password">
+                                        <div class="checkbox-group">
+                                            <label class="checkbox-label">
+                                                <input type="checkbox" id="backupOpenNetwork" name="backupOpenNetwork">
+                                                <span class="checkmark"></span>
+                                                Open network (no password)
+                                            </label>
+                                        </div>
+                                        <small class="form-text">Leave empty to keep existing password, or check "Open network" to remove password</small>
                                     </div>
                                 </div>
                             </fieldset>
@@ -128,6 +300,7 @@
                                         <span class="checkmark"></span>
                                         Auto-connect on startup
                                     </label>
+                                    <small class="form-text">Automatically connect to configured networks when device starts</small>
                                 </div>
                             </fieldset>
 
@@ -141,10 +314,11 @@
                     </div>
                 </div>
 
-                <!-- Debug Info Card (Hidden by default) -->
+                <!-- Debug Info Card -->
                 <div class="card debug-card" style="display: none;">
                     <div class="card-header">
                         <h2>🐛 Debug Information</h2>
+                        <button onclick="document.querySelector('.debug-card').style.display='none'" class="btn btn-sm btn-outline">✕ Close</button>
                     </div>
                     <div class="card-body">
                         <pre id="debugInfo"></pre>
@@ -172,5 +346,21 @@
 
     <!-- JavaScript -->
     <script src="/modern_spa_wifi_config.js"></script>
+    
+    <!-- Debug Toggle (rimuovi in produzione) -->
+    <script>
+        // Mostra debug info se presente il parametro ?debug=1
+        if (window.location.search.includes('debug=1')) {
+            document.querySelector('.debug-card').style.display = 'block';
+        }
+        
+        // Aggiungi debug info su errori
+        window.addEventListener('error', (e) => {
+            const debugElement = document.getElementById('debugInfo');
+            if (debugElement) {
+                debugElement.textContent += `\n[${new Date().toISOString()}] ERROR: ${e.message}\n${e.stack}`;
+            }
+        });
+    </script>
 </body>
 </html>
