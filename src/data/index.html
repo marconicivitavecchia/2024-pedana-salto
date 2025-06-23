@@ -196,12 +196,12 @@
                 Local emulated jump
             </label>
             <label>
-                <input type="radio" id="remoteTest" name="testSignal">
-                Remote Emulated Ramp signal
+                <input type="radio" id="enableADCToneL" name="testSignal">
+                ADC real tone Low
             </label>
             <label>
-                <input type="radio" id="enableADCTone" name="testSignal">
-                ADC real tone
+                <input type="radio" id="enableADCToneH" name="testSignal">
+                ADC real tone High
             </label>
             <label>Sine wave params:</label>
             <label>Frequency (Hz):
@@ -417,8 +417,8 @@
             const radio1 = document.getElementById('enableADCSignal');
             const radio2 = document.getElementById('enableTestSignal0');
             const radio3 = document.getElementById('enableTestSignal1');
-            const radio4 = document.getElementById('remoteTest');
-            const radio5 = document.getElementById('enableADCTone');
+            const radio4 = document.getElementById('enableADCToneL');
+            const radio5 = document.getElementById('enableADCToneH');
 
             if (radio1.checked) {
                 console.log('Opzione adc input selezionata');
@@ -465,11 +465,11 @@
             }
 
             if (radio4.checked) {
-                console.log('Opzione remote ramp wave selezionata');
+                console.log('Opzione enableADCToneL');
                 remoteTestEnabled = true;
                 inputMode = true;
                 resetView();
-                if(send) updateConfig("mode", 1);
+                if(send) updateConfig("mode", 3);
                 const batch = {
                     t: 0,
                     v: [0]
@@ -477,11 +477,11 @@
                 onmessageEvent({ data: JSON.stringify(batch) });
             } else {
                 remoteTestEnabled = false;
-                console.log('Opzione remote ramp wave deselezionata');
+                console.log('Opzione ADCToneL deselezionata');
             }
 
             if (radio5.checked) {
-                console.log('Opzione tono adc selezionata');
+                console.log('Opzione tono enableADCToneH');
                 remoteTestTone = true;
                 adcSignalEnabled = true;
                 inputMode = true;
@@ -495,7 +495,7 @@
                 };
                 onmessageEvent({ data: JSON.stringify(batch) });
             } else {
-                console.log('Opzione tono adc deselezionata');
+                console.log('Opzione ADCToneH deselezionata');
             }
         }
         // Aggiungi il gestore dell'evento "change" a ogni radio button
@@ -1597,6 +1597,8 @@
             //if(!(adcSignalEnabled || remoteTestEnabled)) return;
             //console.log(`event.data: ${event.data}`);
             // All'arrivo di un batch
+			// Evidenzia caratteri speciali
+			//console.log('Con caratteri speciali visibili:', JSON.stringify(event.data));
             let batch = JSON.parse(event.data);
             //console.log("first: "+batch.first);
 			//console.log("p");
@@ -1681,8 +1683,8 @@
                 document.getElementById('streamToggle').innerHTML = status.streaming == "true" ? 'Stop Streaming' : 'Start Streaming';   
                 document.getElementById('sampleRate').value = status.samplerate;
                 document.getElementById('emaAlpha').value = status.alfaema;
-                document.getElementById('remoteTest').checked = (status.mode == 1);
-                document.getElementById('enableADCTone').checked = (status.mode == 2);
+                document.getElementById('enableADCToneL').checked = (status.mode == 3);
+                document.getElementById('enableADCToneH').checked = (status.mode == 2);
                 document.getElementById('enableADCSignal').checked = (status.mode == 0);
                 document.getElementById('testFrequency').value = status.freq;
 				
