@@ -1712,151 +1712,38 @@
 		var dataAttempt = 0;
 		var maxAttempts = 3;
 
-        function connectWebSocket(ip, port, path, name, onMessageCallback) {
-			// Variabili "statiche" per questa connessione
+        // ✅ VERSIONE ULTRA-SEMPLIFICATA
+		function connectWebSocket(ip, port, path, name, onMessageCallback) {
 			let wsh = null;
 			let reconnectAttempts = 0;
-			let maxAttempts = 10;
-			let baseDelay = 1000;
-			let isConnected = false;
 			let shouldReconnect = true;
-			let reconnectTimer = null;  // ✅ AGGIUNTO: per poter cancellare il timer
 			
 			function init() {
-				console.log(`🔄 Connessione ${name} - tentativo ${reconnectAttempts + 1}/${maxAttempts}`);
+				wsh = new WebSocket(`ws://${ip}:${port}/${path}`);
 				
-				try {
-					wsh = new WebSocket(`ws://${ip}:${port}/${path}`);
+				wsh.onopen = () => {
+					console.log(`✅ ${name} connesso - browser fa ping automatico`);
+					reconnectAttempts = 0;
+				};
+				
+				wsh.onclose = () => {
+					console.log(`❌ ${name} disconnesso - ping automatico fallito`);
 					
-					wsh.onopen = () => {
-						console.log(`✅ WebSocket ${name} connesso`);
-						isConnected = true;
-						reconnectAttempts = 0; // Reset su successo
-						
-						// ✅ AGGIUNTO: Cancella timer se connessione riuscita
-						if (reconnectTimer) {
-							clearTimeout(reconnectTimer);
-							reconnectTimer = null;
-						}
-					};
-					
-					wsh.onclose = (event) => {  // ✅ AGGIUNTO: parametro event per debug
-						console.log(`❌ WebSocket ${name} disconnesso (code: ${event.code}), tentativo ${reconnectAttempts + 1}/${maxAttempts}`);
-						isConnected = false;
-						
-						if (shouldReconnect && reconnectAttempts < maxAttempts) {
-							reconnectAttempts++;
-							const delay = Math.min(baseDelay * Math.pow(1.5, reconnectAttempts), 30000);
-							
-							console.log(`⏰ ${name}: riconnessione in ${delay}ms`);  // ✅ AGGIUNTO: log del delay
-							
-							// ✅ MIGLIORATO: Salva il timer per poterlo cancellare
-							reconnectTimer = setTimeout(() => {
-								reconnectTimer = null;
-								init();
-							}, delay);
-						} else if (reconnectAttempts >= maxAttempts) {
-							console.error(`💀 ${name}: Max tentativi raggiunto (${maxAttempts})`);  // ✅ AGGIUNTO: log fine tentativi
-						}
-					};
-					
-					wsh.onerror = (error) => {
-						console.log(`💥 Errore WebSocket ${name}:`, error);
-					};
-					
-					if (typeof onMessageCallback === "function") {
-						wsh.onmessage = onMessageCallback;
-					}
-					
-				} catch (error) {  // ✅ AGGIUNTO: gestione errori nella creazione WebSocket
-					console.error(`❌ Errore creazione WebSocket ${name}:`, error);
-					
-					// Riprova se possibile
-					if (shouldReconnect && reconnectAttempts < maxAttempts) {
+					if (shouldReconnect && reconnectAttempts < 10) {
 						reconnectAttempts++;
-						const delay = Math.min(baseDelay * Math.pow(1.5, reconnectAttempts), 30000);
-						
-						reconnectTimer = setTimeout(() => {
-							reconnectTimer = null;
-							init();
-						}, delay);
+						setTimeout(init, 1000 * reconnectAttempts);
+					} else {
+						window.location.reload(); // Ultimo resort
 					}
-				}
+				};
+				
+				wsh.onmessage = onMessageCallback; // ✅ Nessun ping applicativo!
+				wsh.onerror = (e) => console.log(`💥 ${name} errore:`, e);
 			}
 			
 			init();
-			
-			// Ritorna oggetto con metodi utili
-			return {
-				get socket() { return wsh; },
-				get connected() { return isConnected; },
-				get attempts() { return reconnectAttempts; },  // ✅ AGGIUNTO: getter per tentativi
-				get readyState() { return wsh ? wsh.readyState : WebSocket.CLOSED; },  // ✅ AGGIUNTO: getter per readyState
-				
-				send(data) {
-					if (isConnected && wsh?.readyState === WebSocket.OPEN) {
-						wsh.send(data);
-						return true;
-					} else {
-						console.warn(`⚠️ Impossibile inviare su ${name}: non connesso`);  // ✅ MIGLIORATO: log più chiaro
-						return false;
-					}
-				},
-				
-				// ✅ MIGLIORATO: forceReconnect più robusto
-				forceReconnect() {
-					console.log(`🔄 Riconnessione forzata per ${name}`);
-					
-					// Ferma riconnessioni automatiche
-					shouldReconnect = false;
-					
-					// Cancella timer esistente
-					if (reconnectTimer) {
-						clearTimeout(reconnectTimer);
-						reconnectTimer = null;
-					}
-					
-					// Chiudi connessione esistente
-					if (wsh) {
-						wsh.close();
-					}
-					
-					// Reset e riabilita riconnessione
-					reconnectAttempts = 0;
-					shouldReconnect = true;
-					
-					// Piccolo delay prima di riconnettersi
-					setTimeout(() => init(), 100);
-				},
-				
-				// ✅ AGGIUNTO: metodo per disconnettere definitivamente
-				disconnect() {
-					console.log(`🛑 Disconnessione ${name}`);
-					shouldReconnect = false;
-					
-					if (reconnectTimer) {
-						clearTimeout(reconnectTimer);
-						reconnectTimer = null;
-					}
-					
-					if (wsh) {
-						wsh.close();
-					}
-				},
-				
-				// ✅ AGGIUNTO: metodo per debug/statistiche
-				getStats() {
-					return {
-						name,
-						connected: isConnected,
-						attempts: reconnectAttempts,
-						maxAttempts,
-						readyState: wsh ? wsh.readyState : 'CLOSED',
-						shouldReconnect
-					};
-				}
-			};
-		}
+			return wsh;
+		}		
 		
         function updateConfig(param, value) {
             if(wsControl && wsControl.readyState === WebSocket.OPEN) {
