@@ -236,17 +236,28 @@ void sendOverflowStatus(bool status, WebSocketServer::WSClient* client = nullptr
 // Handler eventi per il canale dati
 void onDataEvent(WSEventType type, WebSocketServer::WSClient* client,
                  uint8_t* data, size_t len, void* arg) {
-  if (type == WS_EVT_CONNECT) {
-    Serial.printf("Data client #%d connected from %s\n",
-                  client->id, client->remoteIP);
-  } else if (type == WS_EVT_DISCONNECT) {
-    Serial.printf("Data client #%u disconnected\n", client->id);
-  } else if (type == WS_EVT_ERROR) {
-    Serial.printf("WebSocket client #%u error %u: %s\n", client->id, *((uint16_t*)arg), (char*)data);
-  } else if (type == WS_EVT_PONG) {
-    // Il client ha risposto al ping
-    Serial.printf("[WS] Client #%u ha risposto al ping\n", client->id);
-  }
+ switch (type) {
+    case WS_EVT_CONNECT:
+	  Serial.printf("✅ Data client %d connected from %s\n", 
+                         client->id, client->remoteIP);
+      break;
+    case WS_EVT_DISCONNECT:
+	  Serial.printf("❌ Data client %d disconnected\n", client->id);
+      break;
+    case WS_EVT_DATA:
+      Serial.println("DATA");
+      break;
+    case WS_EVT_ERROR:
+      Serial.println("ERROR");
+      break;
+    case WS_EVT_PONG:
+        // ✅ Client ha risposto al ping - connessione viva!
+        Serial.printf("Heartbeat OK from data client %d\n", client->id);
+        // La libreria aggiorna automaticamente client->lastSeen
+        break;
+      break;
+    default:
+      Serial.printf("UNKNOWN (%d)", type);
 }
 
 // Handler eventi per il canale di controllo
@@ -259,19 +270,23 @@ void onControlEvent(WSEventType type, WebSocketServer::WSClient* client, uint8_t
   Serial.printf("\nControl Event Type: ");
   switch (type) {
     case WS_EVT_CONNECT:
-      Serial.println("CONNECT");
+	  Serial.printf("✅ Control client %d connected from %s\n", 
+                         client->id, client->remoteIP);
       break;
     case WS_EVT_DISCONNECT:
-      Serial.println("DISCONNECT");
+	  Serial.printf("❌ Control client %d disconnected\n", client->id);
       break;
     case WS_EVT_DATA:
-      Serial.println("DATA");
+      Serial.println("Control MESSAGE");
       break;
     case WS_EVT_ERROR:
       Serial.println("ERROR");
       break;
     case WS_EVT_PONG:
-      Serial.println("PONG");
+      // ✅ Client ha risposto al ping - connessione viva!
+      Serial.printf("Heartbeat OK from control client %d\n", client->id);
+      // La libreria aggiorna automaticamente client->lastSeen
+      break;
       break;
     default:
       Serial.printf("UNKNOWN (%d)", type);
