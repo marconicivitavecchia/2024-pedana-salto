@@ -1468,69 +1468,69 @@
         }*/        
         
         function generateTestSignal1() {
-        const baseAmplitude = parseFloat(document.getElementById('testAmplitude').value);
-        const batchSize = Math.floor(SAMPLE_RATE / EXPECTED_BATCH_RATE);
-        const samples = [];
-        
-        const offset = 8; // 40ms = 8 batch da 5ms
+			const baseAmplitude = parseFloat(document.getElementById('testAmplitude').value);
+			const batchSize = Math.floor(SAMPLE_RATE / EXPECTED_BATCH_RATE);
+			const samples = [];
+			
+			const offset = 8; // 40ms = 8 batch da 5ms
 
-        // genero tutti i campioni del batch immediatamente
-        for (let i = 0; i < batchSize; i++) {
-            // Ricalcola batchProgress e batchPhase per ogni campione
-            const batchProgress = Math.floor(testSignalTime / 0.005);
-            const batchPhase = (testSignalTime % 0.005) / 0.005;
-            
-            let value;
-            
-            if (batchProgress < offset) {
-                value = baseAmplitude;
-            } else if (batchProgress < 6 + offset) {
-                value = baseAmplitude;
-            } else if (batchProgress < 12 + offset) {
-                const t = (batchProgress - (6 + offset) + batchPhase) / 6;
-                value = baseAmplitude * (1 - 0.3 * Math.sin(Math.PI * t));
-            } else if (batchProgress < 16 + offset) {
-                const t = (batchProgress - (12 + offset) + batchPhase) / 4;
-                value = baseAmplitude * (1 + Math.sin(Math.PI * t));
-            } else if (batchProgress < 24 + offset) {
-                value = 0;
-            } else if (batchProgress < 28 + offset) {
-                const t = (batchProgress - (24 + offset) + batchPhase) / 4;
-                value = baseAmplitude * 2.5 * Math.exp(-t * 2);
-            } else if (batchProgress < 36 + offset) {
-                const t = (batchProgress - (28 + offset) + batchPhase) / 8;
-                value = baseAmplitude * (1 + 0.4 * Math.exp(-t * 3) * Math.cos(2 * Math.PI * t));
-            } else {
-                testSignalTime = 0;
-                return;
-            }
-            
-            if(value > 8388607) value = 8388607;
-            value = Math.round(value); // Arrotonda il valore
-            value = value & 0xFFFFFF;  // Tronca a 24 bit
-            if (value < 0) {
-                value += 0x1000000;
-            }
-            
-            let sample = value.toString(16).padStart(6, '0');
-            samples.push(sample);
-            
-            testSignalTime += 1 / SAMPLE_RATE;
-        }
-        
-        const batch = {
-            t: Date.now() * 1000,
-            v: samples
-        };
-        
-        processBatch(batch);
-        
-        if (testSignalEnabled1) {
-            timers[1] = setTimeout(generateTestSignal1, 1000 / EXPECTED_BATCH_RATE);
-        } else {
-            clearTimeout(timers[1]);
-        }
-    }
+			// genero tutti i campioni del batch immediatamente
+			for (let i = 0; i < batchSize; i++) {
+				// Ricalcola batchProgress e batchPhase per ogni campione
+				const batchProgress = Math.floor(testSignalTime / 0.005);
+				const batchPhase = (testSignalTime % 0.005) / 0.005;
+				
+				let value;
+				
+				if (batchProgress < offset) {
+					value = baseAmplitude;
+				} else if (batchProgress < 6 + offset) {
+					value = baseAmplitude;
+				} else if (batchProgress < 12 + offset) {
+					const t = (batchProgress - (6 + offset) + batchPhase) / 6;
+					value = baseAmplitude * (1 - 0.3 * Math.sin(Math.PI * t));
+				} else if (batchProgress < 16 + offset) {
+					const t = (batchProgress - (12 + offset) + batchPhase) / 4;
+					value = baseAmplitude * (1 + Math.sin(Math.PI * t));
+				} else if (batchProgress < 24 + offset) {
+					value = 0;
+				} else if (batchProgress < 28 + offset) {
+					const t = (batchProgress - (24 + offset) + batchPhase) / 4;
+					value = baseAmplitude * 2.5 * Math.exp(-t * 2);
+				} else if (batchProgress < 36 + offset) {
+					const t = (batchProgress - (28 + offset) + batchPhase) / 8;
+					value = baseAmplitude * (1 + 0.4 * Math.exp(-t * 3) * Math.cos(2 * Math.PI * t));
+				} else {
+					testSignalTime = 0;
+					return;
+				}
+				
+				if(value > 8388607) value = 8388607;
+				value = Math.round(value); // Arrotonda il valore
+				value = value & 0xFFFFFF;  // Tronca a 24 bit
+				if (value < 0) {
+					value += 0x1000000;
+				}
+				
+				let sample = value.toString(16).padStart(6, '0');
+				samples.push(sample);
+				
+				testSignalTime += 1 / SAMPLE_RATE;
+			}
+			
+			const batch = {
+				t: Date.now() * 1000,
+				v: samples
+			};
+			
+			processBatch(batch);
+			
+			if (testSignalEnabled1) {
+				timers[1] = setTimeout(generateTestSignal1, 1000 / EXPECTED_BATCH_RATE);
+			} else {
+				clearTimeout(timers[1]);
+			}
+		}
 
         function generateTestSignal0() {
             /*
@@ -1707,35 +1707,157 @@
                 }
             }
         }
+		
+		var cntrAttempt = 0;
+		var dataAttempt = 0;
+		var maxAttempts = 3;
 
         function connectWebSocket(ip, port, path, name, onMessageCallback) {
-            let wsh = null;
-
-            function init() {
-                wsh = new WebSocket(`ws://${ip}:${port}/${path}`);
-                
-                wsh.onopen = () => {
-                    console.log(`WebSocket ${name} connesso`);
-                    isConnected = true;
-                };
-
-                wsh.onclose = () => {
-                    console.log(`WebSocket ${name} disconnesso, riconnessione...`);
-                    isConnected = false;
-                };
-
-                wsh.onerror = (error) => {
-                    console.log(`Errore WebSocket ${name}:`, error);
-                };
-
-                if (typeof onMessageCallback === "function") {
-                    wsh.onmessage = onMessageCallback;
-                }
-            }
-            init();
-            return wsh;
-        }
-
+			// Variabili "statiche" per questa connessione
+			let wsh = null;
+			let reconnectAttempts = 0;
+			let maxAttempts = 10;
+			let baseDelay = 1000;
+			let isConnected = false;
+			let shouldReconnect = true;
+			let reconnectTimer = null;  // ✅ AGGIUNTO: per poter cancellare il timer
+			
+			function init() {
+				console.log(`🔄 Connessione ${name} - tentativo ${reconnectAttempts + 1}/${maxAttempts}`);
+				
+				try {
+					wsh = new WebSocket(`ws://${ip}:${port}/${path}`);
+					
+					wsh.onopen = () => {
+						console.log(`✅ WebSocket ${name} connesso`);
+						isConnected = true;
+						reconnectAttempts = 0; // Reset su successo
+						
+						// ✅ AGGIUNTO: Cancella timer se connessione riuscita
+						if (reconnectTimer) {
+							clearTimeout(reconnectTimer);
+							reconnectTimer = null;
+						}
+					};
+					
+					wsh.onclose = (event) => {  // ✅ AGGIUNTO: parametro event per debug
+						console.log(`❌ WebSocket ${name} disconnesso (code: ${event.code}), tentativo ${reconnectAttempts + 1}/${maxAttempts}`);
+						isConnected = false;
+						
+						if (shouldReconnect && reconnectAttempts < maxAttempts) {
+							reconnectAttempts++;
+							const delay = Math.min(baseDelay * Math.pow(1.5, reconnectAttempts), 30000);
+							
+							console.log(`⏰ ${name}: riconnessione in ${delay}ms`);  // ✅ AGGIUNTO: log del delay
+							
+							// ✅ MIGLIORATO: Salva il timer per poterlo cancellare
+							reconnectTimer = setTimeout(() => {
+								reconnectTimer = null;
+								init();
+							}, delay);
+						} else if (reconnectAttempts >= maxAttempts) {
+							console.error(`💀 ${name}: Max tentativi raggiunto (${maxAttempts})`);  // ✅ AGGIUNTO: log fine tentativi
+						}
+					};
+					
+					wsh.onerror = (error) => {
+						console.log(`💥 Errore WebSocket ${name}:`, error);
+					};
+					
+					if (typeof onMessageCallback === "function") {
+						wsh.onmessage = onMessageCallback;
+					}
+					
+				} catch (error) {  // ✅ AGGIUNTO: gestione errori nella creazione WebSocket
+					console.error(`❌ Errore creazione WebSocket ${name}:`, error);
+					
+					// Riprova se possibile
+					if (shouldReconnect && reconnectAttempts < maxAttempts) {
+						reconnectAttempts++;
+						const delay = Math.min(baseDelay * Math.pow(1.5, reconnectAttempts), 30000);
+						
+						reconnectTimer = setTimeout(() => {
+							reconnectTimer = null;
+							init();
+						}, delay);
+					}
+				}
+			}
+			
+			init();
+			
+			// Ritorna oggetto con metodi utili
+			return {
+				get socket() { return wsh; },
+				get connected() { return isConnected; },
+				get attempts() { return reconnectAttempts; },  // ✅ AGGIUNTO: getter per tentativi
+				get readyState() { return wsh ? wsh.readyState : WebSocket.CLOSED; },  // ✅ AGGIUNTO: getter per readyState
+				
+				send(data) {
+					if (isConnected && wsh?.readyState === WebSocket.OPEN) {
+						wsh.send(data);
+						return true;
+					} else {
+						console.warn(`⚠️ Impossibile inviare su ${name}: non connesso`);  // ✅ MIGLIORATO: log più chiaro
+						return false;
+					}
+				},
+				
+				// ✅ MIGLIORATO: forceReconnect più robusto
+				forceReconnect() {
+					console.log(`🔄 Riconnessione forzata per ${name}`);
+					
+					// Ferma riconnessioni automatiche
+					shouldReconnect = false;
+					
+					// Cancella timer esistente
+					if (reconnectTimer) {
+						clearTimeout(reconnectTimer);
+						reconnectTimer = null;
+					}
+					
+					// Chiudi connessione esistente
+					if (wsh) {
+						wsh.close();
+					}
+					
+					// Reset e riabilita riconnessione
+					reconnectAttempts = 0;
+					shouldReconnect = true;
+					
+					// Piccolo delay prima di riconnettersi
+					setTimeout(() => init(), 100);
+				},
+				
+				// ✅ AGGIUNTO: metodo per disconnettere definitivamente
+				disconnect() {
+					console.log(`🛑 Disconnessione ${name}`);
+					shouldReconnect = false;
+					
+					if (reconnectTimer) {
+						clearTimeout(reconnectTimer);
+						reconnectTimer = null;
+					}
+					
+					if (wsh) {
+						wsh.close();
+					}
+				},
+				
+				// ✅ AGGIUNTO: metodo per debug/statistiche
+				getStats() {
+					return {
+						name,
+						connected: isConnected,
+						attempts: reconnectAttempts,
+						maxAttempts,
+						readyState: wsh ? wsh.readyState : 'CLOSED',
+						shouldReconnect
+					};
+				}
+			};
+		}
+		
         function updateConfig(param, value) {
             if(wsControl && wsControl.readyState === WebSocket.OPEN) {
                 const config = {};
