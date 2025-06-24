@@ -1,6 +1,8 @@
 #ifndef ADS1256_DMA_H
 #define ADS1256_DMA_H
 
+#include "AdaptiveFIRFilter.h"
+
 #include <driver/spi_master.h>
 #include <driver/gpio.h>
 #include <Arduino.h>
@@ -48,6 +50,9 @@
 #define ADS1256_CMD_RESET   0xFE
 
 #define MAX_SAMPLES_PER_BATCH 150u  // Aggiunto 'u' per unsigned
+
+// Istanza globale del filtro
+AdaptiveFIRFilter firFilter;
 
 // Fuori dalla classe, nel file .cpp
 static bool g_spi_native_configured = false;
@@ -184,7 +189,7 @@ public:
         pinMode(ADS1256_PIN_SCK, OUTPUT);       // SCLK (clock generato da ESP32)  
 		//targetInterval = 5000;
     }
-
+	
     bool begin(){
         // Setup SPI configuration
         spi_bus_config_t buscfg;
@@ -521,6 +526,55 @@ public:
 		}
 	}
 	
+	void resetFIRFilter() {
+		firFilter.reset();
+	}
+	
+	void setDecimationFactor(uint16_t decimationFactor) {
+		firFilter.reset();
+		firFilter.setDecimationFactor(decimationFactor);
+	}	
+	
+	void read_data_batch_fir(BatchData& batch, uint16_t samplesPerBatch, uint16_t decimationFactor = 1) {
+		if (!isStreaming) return;
+		
+		// Configura il filtro per il decimation factor passato come parametro
+		//firFilter.setDecimationFactor(decimationFactor);
+		
+		batch.count = 0;
+		batch.t = esp_timer_get_time();
+		
+		spi_dev_t* SPI_DEV = &SPI2;
+		
+		while (batch.count < samplesPerBatch && batch.count < MAX_SAMPLES_PER_BATCH) {
+			// Leggi un campione dall'ADC (il tuo codice esistente)
+			while (gpio_get_level((gpio_num_t)ADS1256_PIN_DRDY));
+			delayMicroseconds(1);
+			
+			SPI_DEV->data_buf[0] = 0;
+			SPI_DEV->cmd.usr = 1;
+			while (SPI_DEV->cmd.usr);
+			
+			uint8_t rx_buffer[4];
+			memcpy(rx_buffer, (const void*)SPI_DEV->data_buf, 3);
+			
+			uint32_t result = (rx_buffer[0] << 16) | (rx_buffer[1] << 8) | rx_buffer[2];
+			result &= 0x00FFFFFF;  // Maschera bit spuri
+			
+			// Elabora attraverso il filtro FIR
+			uint32_t filteredSample;
+			if (firFilter.processSample(result, filteredSample)) {
+				// Il filtro ha prodotto un output decimato
+				batch.v[batch.count][0] = (filteredSample >> 16) & 0xFF;
+				batch.v[batch.count][1] = (filteredSample >> 8) & 0xFF;
+				batch.v[batch.count][2] = filteredSample & 0xFF;
+				
+				batch.count++;
+			}
+			// Se il filtro non produce output, continua a campionare
+		}
+	}
+	
 	void read_data_batch_fast(BatchData& batch, uint16_t samplesPerBatch, uint16_t decimationFactor = 1) {
 		if (!isStreaming) return;
 		
@@ -529,9 +583,11 @@ public:
 		
 		spi_dev_t* SPI_DEV = &SPI2;
 		
+		
 		while (batch.count < samplesPerBatch && batch.count < MAX_SAMPLES_PER_BATCH) {
-			int32_t accumulator = 0;
+			uint64_t accumulator = 0;
 			
+			//float min_sample = 99999999, max_sample = 0;
 			for(uint16_t i = 0; i < decimationFactor; i++) {
 				while (gpio_get_level((gpio_num_t)ADS1256_PIN_DRDY));
 				delayMicroseconds(1);
@@ -545,16 +601,16 @@ public:
 				memcpy(rx_buffer, (const void*)SPI_DEV->data_buf, 3);
 				
 				uint32_t result = (rx_buffer[0] << 16) | (rx_buffer[1] << 8) | rx_buffer[2];
+				result &= 0x00FFFFFF;  // Sicurezza aggiuntiva
+				accumulator += (uint64_t) result;
 				
-				if (result != 0 && result != 0xFFFFFF) {
-					if (result & 0x800000) result |= 0xFF000000;
-			    }	
-				accumulator += result;
 			}
 			
-			accumulator = accumulator / decimationFactor;
-			emaFilteredValue = emaAlpha * (float)accumulator + (1.0f - emaAlpha) * emaFilteredValue;
-			uint32_t output = (uint32_t)emaFilteredValue;
+			accumulator = (uint64_t) accumulator / decimationFactor;
+						
+			emaFilteredValue = emaAlpha * (uint64_t)accumulator + (1 - emaAlpha) * emaFilteredValue;
+			
+			uint32_t output = (uint64_t)accumulator;
 			
 			batch.v[batch.count][0] = (output >> 16) & 0xFF;
 			batch.v[batch.count][1] = (output >> 8) & 0xFF;
@@ -1304,7 +1360,7 @@ public:
 private:
     static spi_device_handle_t spi;  // handle SPI statico
     //static spi_transaction_t tr;       // Variabile globale per le transazioni
-    float emaFilteredValue;
+    uint64_t emaFilteredValue;
     float emaAlpha = 0.1f;
     static bool isStreaming;  //  // flag statico per tracciare lo stato dello streaming
     static bool spi_initialized;  // flag statico

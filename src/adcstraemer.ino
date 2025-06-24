@@ -37,7 +37,8 @@
 //#define TRIGGER_LEVEL (sizeof(BatchData))  // Sveglia dopo 1 BatchData
 //#define QUEUE_SIZE 200              // Dimensione coda batch
 #define DATALEN 1372
-#define MAXBATCH 20
+#define RINGALLOC 137200
+#define MAXBATCH RINGALLOC / DATALEN
 //#define MAX_SAMPLES_PER_BATCH 160u  // Aggiunto 'u' per unsigned
 
 //const char* WIFI_SSID = "D-Link-6A30CC";
@@ -74,6 +75,7 @@ struct BatchData {
 // Variabili globali
 TaskMonitor* adcMonitor = nullptr;
 //ADS1256_DMA* adc = nullptr;
+// Variabile globale
 
 DualWebSocket ws;
 Config globalConfig = { DEFAULT_SAMPLE_RATE, 1, false, 0, 1, 1 };
@@ -209,7 +211,7 @@ void sendSystemStatus(Config gc, WebSocketServer::WSClient* client = nullptr) {
   snprintf(statusBuffer, sizeof(statusBuffer),
            "{\"type\":\"status\",\"samplerate\":%u,\"alfaema\":%.3f,\"streaming\":\"%s\",\"mode\":\"%u\",\"freq\":\"%u\"}",
            gc.sampleRate, emaAlpha, gc.streaming ? "true" : "false", gc.mode, gc.toneFreq);
-
+  Serial.println(statusBuffer);
   if (client) {
     // Rispondi solo al client che ha inviato i dati
     ws.sendControlToClient(client->id, statusBuffer, strlen(statusBuffer));
@@ -359,8 +361,8 @@ void onControlEvent(WSEventType type, WebSocketServer::WSClient* client, uint8_t
         gc1.gain = 6;
         gc1.adcPort = 6;
         Serial.printf("Modo: %u attivato\n", gc1.mode);
-        configChanged = true;
 	  }
+	  configChanged = true;
     }
 
     if (doc.containsKey("streaming")) {
@@ -553,9 +555,11 @@ void adcTask(void* pvParameters) {
 				//xQueueReset(batchQueue);  
 				//batchQueue.resetCharBuffer();		
 				//queue.begin(55, DATALEN);
-				//reset_ringbuffer(batchQueue);
 				json_size = calculate_json_size(samplesPerBatch) + 4;
-				recreate_ringbuffer(batchQueue, json_size*MAXBATCH);
+				reset_ringbuffer(batchQueue);
+				adc.setDecimationFactor(decimationFactor);
+				//batchQueue = recreate_ringbuffer(batchQueue, (uint32_t) RINGALLOC);
+				delay(100);
 				Serial.println("adcTask: Queue reset");
 				if (!gc.streaming) {
 				  // Alla fine dello streaming
@@ -626,7 +630,7 @@ void adcTask(void* pvParameters) {
 				if (batch.count > 0) {
 					BaseType_t result = xRingbufferSendAcquire(batchQueue,(void**) &buf, (size_t) json_size, pdMS_TO_TICKS(0));
 					if (result == pdTRUE && buf != NULL) {
-						adc.read_data_batch_fast(batch, samplesPerBatch, decimationFactor);
+						adc.read_data_batch_fir(batch, samplesPerBatch, decimationFactor);
 						//uint32_t delta = batch.t - last_t;
 						//last_t += delta;
 						//Serial.print("delta: ");Serial.println(delta);
@@ -738,48 +742,50 @@ int serialize_fast(char* buf, BatchData &batch, int maxLen){
 
 void wsTask(void* pvParameters) {
 	//BatchData batch;
-	char* buf;
 	//char buffer[1500];
 	uint32_t startTime = 0;
 	const uint32_t timeout = 8000;
 	uint32_t batchCount = 0;
 	//BinaryPacker bp;
 	size_t length;
+	void *buf;
 		
 	while (true) {
 		// Aspetta fino a 10 secondi per i dati
-		void *buf = xRingbufferReceive(batchQueue, &length, pdMS_TO_TICKS(0)); //non bloccante
-		if (buf) {
-			batchCount++;
-            //Serial.println((char*)buf);
-			ws.sendDataSync((uint8_t*)buf, (size_t) strlen((char*)buf));
-            vRingbufferReturnItem(batchQueue, (void*)buf);
-			
-			// overflow signalling management
-			if(overflow){
-				if(enable1 > 127){
-					enable1 = 127;// A single batch in overflow condition indicates an overflow status
-					Serial.println("wsTask: sendOverflow true - reset buffer");
-					sendOverflowStatus(true);
-					//xQueueReset(batchQueue);
-					//batchQueue.resetCharBuffer();
-					//batchQueue.reset();
-					reset_ringbuffer(batchQueue);
-				}  
-			}else{
-				if(enable1 < 128){
-					enable1--;
-					if(enable1 < 97){// 20 consecutive batches in normal condition are required to confirm normal status
-						Serial.println("wsTask: sendOverflow false");
-						sendOverflowStatus(false);
-						enable1 = 128;
-					}     
-				}  
-			}    
-			//taskYIELD();	
-			vTaskDelay(1);  // delay solo se non ci sono dati
-		}else {  
-			vTaskDelay(1);  // delay solo se non ci sono dati
+		if(batchQueue){
+			buf = xRingbufferReceive(batchQueue, &length, pdMS_TO_TICKS(0)); //non bloccante
+			if (buf) {
+				batchCount++;
+				//Serial.println((char*)buf);
+				ws.sendDataSync((uint8_t*)buf, (size_t) strlen((char*)buf));
+				vRingbufferReturnItem(batchQueue, (void*)buf);
+				
+				// overflow signalling management
+				if(overflow){
+					if(enable1 > 127){
+						enable1 = 127;// A single batch in overflow condition indicates an overflow status
+						Serial.println("wsTask: sendOverflow true - reset buffer");
+						sendOverflowStatus(true);
+						//xQueueReset(batchQueue);
+						//batchQueue.resetCharBuffer();
+						//batchQueue.reset();
+						reset_ringbuffer(batchQueue);
+					}  
+				}else{
+					if(enable1 < 128){
+						enable1--;
+						if(enable1 < 97){// 20 consecutive batches in normal condition are required to confirm normal status
+							Serial.println("wsTask: sendOverflow false");
+							sendOverflowStatus(false);
+							enable1 = 128;
+						}     
+					}  
+				}    
+				//taskYIELD();	
+				//vTaskDelay(1);  // delay solo se non ci sono dati
+			}else {  
+				//vTaskDelay(1);  // delay solo se non ci sono dati
+			}
 		}
 		// se non riceve dati il loop adc potrebbe essere fermo
 		//Serial.println("wsTask: non ci sono dati"); 
@@ -800,7 +806,8 @@ void wsTask(void* pvParameters) {
 			//if(batchCount < 20) 
 			//    xQueueReset(batchQueue);
 			batchCount = 0;
-		}			
+		}	
+		vTaskDelay(2); 
 	} 
 }
 
@@ -808,30 +815,54 @@ void reset_ringbuffer(RingbufHandle_t ring_buf) {
     size_t item_size;
     void *item;
     
-    ESP_LOGI(TAG, "Svuotando ring buffer...");
+    Serial.println("Svuotando ring buffer...");
     
     // Leggi tutto senza timeout fino a quando è vuoto
     while ((item = xRingbufferReceive(ring_buf, &item_size, 0)) != NULL) {
         vRingbufferReturnItem(ring_buf, item);
-        ESP_LOGD(TAG, "Rimosso elemento di %d bytes", item_size);
+        Serial.printf("Rimosso elemento di %d bytes", item_size);
     }
     
-    ESP_LOGI(TAG, "Ring buffer svuotato completamente");
+   Serial.println("Ring buffer svuotato completamente");
 }
 
 RingbufHandle_t recreate_ringbuffer(RingbufHandle_t old_ring_buf, size_t size) {
+	Serial.println("=========================== RING CREATE ===========================================");
+	Serial.printf("Richiesta allocazione ring di %d bytes\n", size);
+	
     // Elimina il vecchio buffer
     if (old_ring_buf != NULL) {
         vRingbufferDelete(old_ring_buf);
-        ESP_LOGI(TAG, "Buffer precedente eliminato");
+        Serial.println("Buffer precedente eliminato");
     }
-
+	delay(10);
+	size_t heap_before = esp_get_free_heap_size();
+	
+	size_t maxAllocatable = heap_caps_get_largest_free_block(MALLOC_CAP_8BIT);
+	
+    Serial.printf("Heap libero prima: %d bytes\n", heap_before);	
+	Serial.printf("Heap allocabile adesso: %d bytes\n", maxAllocatable);	
+	
+    if(maxAllocatable < size) size = maxAllocatable * 0.85;
+	
+	Serial.printf("Allocazione tentata: %d bytes\n", size);	
+	
     // Crea nuovo buffer
     RingbufHandle_t new_ring_buf = xRingbufferCreate(size, RINGBUF_TYPE_NOSPLIT);
     if (new_ring_buf != NULL) {
-        ESP_LOGI(TAG, "Nuovo buffer creato - effettivamente resettato");
-    }
-    
+         Serial.println("Nuovo buffer creato - effettivamente resettato");
+    }else{
+		Serial.println("Allocazione ring non riuscita");
+	}
+	delay(10);
+	// Memoria heap dopo la creazione
+    size_t heap_after = esp_get_free_heap_size();
+    Serial.printf("Heap libero dopo: %d bytes\n", heap_after);
+	
+	size_t used = heap_before - heap_after;
+    Serial.printf("Memoria utilizzata: %d bytes\n", used);
+    // Risultato: ~2048 + overhead (strutture interne)
+    Serial.println("=========================== END RING CREATE ===========================================");
     return new_ring_buf;
 }
 
@@ -936,7 +967,7 @@ void setup() {
   adc.begin();
   delay(100);
   
-  check_heap_usage(DATALEN*MAXBATCH);
+  check_heap_usage(RINGALLOC);
   
   // Task WebSocket su core 0
   xTaskCreatePinnedToCore(
@@ -979,59 +1010,8 @@ void setup() {
 }
 
 void loop() {
-  /*
-    eTaskState taskState = eTaskGetState(adcTaskHandle);
-    Serial.print("Stato task ADC: ");
-    switch(taskState) {
-        case eRunning:
-            Serial.println("RUNNING");
-            break;
-        case eBlocked:
-            Serial.println("BLOCKED");
-            break;
-        case eSuspended:
-            Serial.println("SUSPENDED");
-            break;
-        case eDeleted:
-            Serial.println("DELETED");
-            break;
-        case eReady:
-            Serial.println("READY");
-            break;
-        default:
-            Serial.println("STATO SCONOSCIUTO");
-    }
-
-    // Aggiungi anche info sullo stack
-    UBaseType_t stackHighWaterMark = uxTaskGetStackHighWaterMark(adcTaskHandle);
-    Serial.printf("Stack libero: %d bytes\n", stackHighWaterMark);
-   
-    
-    static uint32_t lastTime = 0;
-    uint32_t now = millis();
-
-    // Stampa stato ogni secondo
-    if (now - lastTime >= 1000) {
-        Serial.println("Loop running...");
-        Serial.print(", "+timerCmd);
-        lastTime = now;
-    }
-
-    if(timerCmd != lastTimerCmd){
-        switch(timerCmd) {
-            case 1:
-                Serial.println("loop: startDAC");
-                startDAC();
-            break;
-            case 0:
-                Serial.println("loop: stopDAC");
-                stopDAC();
-            break;
-        }
-        lastTimerCmd = timerCmd;
-    } */
-  // Ora possiamo controllare isAlive() dal loop
-  // Controllo ogni 2 minuti per switch intelligente
+    // Ora possiamo controllare isAlive() dal loop
+    // Controllo ogni 2 minuti per switch intelligente
     static uint32_t lastCheck = 0;
     if (millis() - lastCheck > 120000) {
 		CHECK_NETWORK_SWITCH();  // Controlla se c'è un AP migliore
@@ -1039,28 +1019,42 @@ void loop() {
 		lastCheck = millis();
 	}
   //vTaskDelay(pdMS_TO_TICKS(100));
-  //vTaskDelay(10);
+  vTaskDelay(10);
 }
 
-void check_heap_usage(int dim) {
+void check_heap_usage(uint32_t dim) {
+	Serial.println("=========================== FIRST RING CREATE ===========================================");
+	Serial.printf("Richiesta allocazione ring di %d bytes\n", dim);
     // Memoria heap prima della creazione
     size_t heap_before = esp_get_free_heap_size();
-    ESP_LOGI(TAG, "Heap libero prima: %d bytes", heap_before);
-    
+    Serial.printf("Heap libero prima: %d bytes\n", heap_before);
+		
+	size_t maxAllocatable = heap_caps_get_largest_free_block(MALLOC_CAP_8BIT);
+	Serial.printf("Heap allocabile adesso: %d bytes\n", maxAllocatable);
+	if(maxAllocatable < dim) dim = maxAllocatable * 0.85;
+        
+	Serial.printf("Allocazione tentata: %d bytes\n", dim);	
+	
     // Crea ring buffer
     batchQueue = xRingbufferCreate(dim, RINGBUF_TYPE_NOSPLIT);
+    if (batchQueue != NULL) {
+         Serial.println("Nuovo buffer creato");
+    }else{
+		Serial.println("Allocazione ring non riuscita");
+	}
     
     // Memoria heap dopo la creazione
     size_t heap_after = esp_get_free_heap_size();
-    ESP_LOGI(TAG, "Heap libero dopo: %d bytes", heap_after);
+    Serial.printf("Heap libero dopo: %d bytes\n", heap_after);
     
     size_t used = heap_before - heap_after;
-    ESP_LOGI(TAG, "Memoria utilizzata: %d bytes", used);
+    Serial.printf("Memoria utilizzata: %d bytes\n", used);
     // Risultato: ~2048 + overhead (strutture interne)
     
     if (batchQueue != NULL) {
-        ESP_LOGI(TAG, "✅ Ring buffer allocato con successo sull'heap");
+        Serial.println("✅ Ring buffer allocato con successo sull'heap");
     }
+	Serial.println("=========================== END FIRST RING CREATE ===========================================");
 }
 
 void readWiFiFile() {
