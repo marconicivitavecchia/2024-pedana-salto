@@ -114,3 +114,4 @@
 - https://github.com/rlabbe/Kalman-and-Bayesian-Filters-in-Python
 - https://www.dmi.unict.it/santoro/teaching/psr/slides/KalmanFiltering.pdf
 - https://www.dmi.unict.it/santoro/teaching/psr/slides/
+- https://github.com/rfetick/Kalman
