@@ -117,3 +117,4 @@
 - https://github.com/rfetick/Kalman
 - http://t-filter.engineerjs.com/
 - https://thekalmanfilter.com/interactive-kalman-filter/
+- https://www.bzarg.com/p/how-a-kalman-filter-works-in-pictures/
