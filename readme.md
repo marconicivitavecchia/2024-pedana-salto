@@ -116,3 +116,4 @@
 - https://www.dmi.unict.it/santoro/teaching/psr/slides/
 - https://github.com/rfetick/Kalman
 - http://t-filter.engineerjs.com/
+- https://thekalmanfilter.com/interactive-kalman-filter/
