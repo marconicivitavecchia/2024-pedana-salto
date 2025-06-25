@@ -1607,6 +1607,10 @@
 				console.log("counter: "+counter);
                 counter = 0;
             }
+			if(Object.hasOwn(batch, 'bps')){
+				console.log("bps: "+batch.bps);
+				return;
+			}
             processBatch(batch);
         }
 
