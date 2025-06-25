@@ -220,6 +220,14 @@ void sendSystemStatus(Config gc, WebSocketServer::WSClient* client = nullptr) {
   }
 }
 
+void sendDataKeepAlive(uint8_t bps) {
+  Serial.print("sendKeepAlive");
+  char bye[15];
+  snprintf(bye, sizeof(bye), "{\"bps\":%u\}", bps);
+  Serial.println(bye);
+  ws.sendDataSync(bye, strlen(bye));
+}
+
 void sendOverflowStatus(bool status, WebSocketServer::WSClient* client = nullptr) {
   char statusBuffer[50];
   snprintf(statusBuffer, sizeof(statusBuffer),
@@ -255,9 +263,9 @@ void onDataEvent(WSEventType type, WebSocketServer::WSClient* client,
         Serial.printf("Heartbeat OK from data client %d\n", client->id);
         // La libreria aggiorna automaticamente client->lastSeen
         break;
-      break;
     default:
       Serial.printf("UNKNOWN (%d)", type);
+ }
 }
 
 // Handler eventi per il canale di controllo
@@ -287,10 +295,10 @@ void onControlEvent(WSEventType type, WebSocketServer::WSClient* client, uint8_t
       Serial.printf("Heartbeat OK from control client %d\n", client->id);
       // La libreria aggiorna automaticamente client->lastSeen
       break;
-      break;
     default:
       Serial.printf("UNKNOWN (%d)", type);
   }
+
   /*
     int32_t targetInterval = 1000000 / globalConfig.sampleRate;
     
@@ -766,7 +774,6 @@ void wsTask(void* pvParameters) {
 	void *buf;
 		
 	while (true) {
-		// Aspetta fino a 10 secondi per i dati
 		if(batchQueue){
 			buf = xRingbufferReceive(batchQueue, &length, pdMS_TO_TICKS(0)); //non bloccante
 			if (buf) {
@@ -818,6 +825,9 @@ void wsTask(void* pvParameters) {
 			}
 			batchCount = batchCount * 1000 / timeout;
 			Serial.print(" Batch per sec: "); Serial.println(batchCount);
+			if(!globalConfig.streaming){
+				sendDataKeepAlive(batchCount);
+			}
 			//if(batchCount < 20) 
 			//    xQueueReset(batchQueue);
 			batchCount = 0;
