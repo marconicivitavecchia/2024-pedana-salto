@@ -494,6 +494,13 @@ uint16_t getDecimationFactor(uint32_t desiredRate) {
 }
 
 void adcTask(void* pvParameters) {
+  // Aspetta che il ring buffer sia creato
+  while (batchQueue == NULL) {
+    Serial.println("ADC task: Aspettando creazione ring buffer...");
+    vTaskDelay(pdMS_TO_TICKS(100));
+  }
+  
+  Serial.println("ADC task: Ring buffer trovato, continuo...");
   TaskMonitor* monitor = (TaskMonitor*)pvParameters;
   monitor->startTracking();
   Serial.println("ADC task: monitor acquisito");
@@ -745,6 +752,12 @@ void wsTask(void* pvParameters) {
 	//BinaryPacker bp;
 	size_t length;
 	void *buf;
+	
+	// Aspetta che il ring buffer sia creato
+    while (batchQueue == NULL) {
+      Serial.println("ADC task: Aspettando creazione ring buffer...");
+      vTaskDelay(pdMS_TO_TICKS(100));
+    }
 		
 	while (true) {
 		if(batchQueue){
@@ -859,157 +872,182 @@ RingbufHandle_t recreate_ringbuffer(RingbufHandle_t old_ring_buf, size_t size) {
 }
 
 void setup() {
-  //optimizeESP32();
-  Serial.begin(115200);	
-  //adc1.set_ema_alpha(0.05f);
-  // Inizializza il filesystem
-  Serial.println("\nInizializzazione filesystem");
+  // ==================== FASE 1: INIZIALIZZAZIONE BASE ====================
+  Serial.begin(115200);
+  Serial.println("\n=== AVVIO SISTEMA ADC STREAMER ===");
+  
+  // Inizializza il filesystem (necessario per WiFi credentials)
+  Serial.println("1. Inizializzazione filesystem...");
   if (!LittleFS.begin(true)) {
-    Serial.println("LittleFS Mount Failed");
+    Serial.println("❌ LittleFS Mount Failed");
     return;
   }
-  Serial.println("\nInizializzazione ADC");
-  //adc.start();
+  Serial.println("✅ LittleFS inizializzato");
+
+  // Crea il mutex per la configurazione (necessario per i task)
+  Serial.println("2. Creazione mutex configurazione...");
   configMutex = xSemaphoreCreateMutex();
-  // Verifica memoria e stato buffer
-  /*
-  // Inizializzazione WiFi
-  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
-  while (WiFi.status() != WL_CONNECTED) {
+  if (configMutex == NULL) {
+    Serial.println("❌ Errore creazione mutex configurazione");
+    return;
+  }
+  Serial.println("✅ Mutex configurazione creato");
+
+  // ==================== FASE 2: INIZIALIZZAZIONE HARDWARE ====================
+  Serial.println("3. Inizializzazione hardware ADC...");
+  adc.begin();
+  delay(100);
+  Serial.println("✅ ADC inizializzato");
+
+  // ==================== FASE 3: MEMORIA E STRUTTURE DATI ====================
+  Serial.println("4. Allocazione ring buffer...");
+  check_heap_usage(RINGALLOC);
+  if (batchQueue == NULL) {
+    Serial.println("❌ Errore creazione ring buffer - sistema non utilizzabile");
+    return;
+  }
+  Serial.println("✅ Ring buffer allocato con successo");
+
+  // ==================== FASE 4: CONNETTIVITÀ DI RETE ====================
+  Serial.println("5. Inizializzazione WiFi...");
+  
+  // Leggi credenziali salvate
+  readWiFiFile();  
+  
+  // Inizializza WiFi con fallback e timeout
+  WiFiManager::optimizeEverything();
+  SETUP_INTEGRATED_WIFI_FALLBACK(
+    "RedmiSeb", "pippo2503",      
+    "sensori", "sensori2019"    
+  );
+  
+  // Aspetta connessione con timeout di 10 secondi
+  int wifiAttempts = 0;
+  const int maxWifiAttempts = 20; // 10 secondi
+  while (WiFi.status() != WL_CONNECTED && wifiAttempts < maxWifiAttempts) {
     delay(500);
+    wifiAttempts++;
     Serial.print(".");
   }
-  delay(1000);
-  */
-  // *** OTTIMIZZAZIONE CON DUAL SSID ***
-  //OPTIMIZE_WEBSOCKET_UNIVERSAL(
-  //      "sensori", "sensori2019",     // Principale
-  //      "RedmiSeb", "pippo2503"       // Backup
-  //  );
   
-  //SAVE_WIFI_CREDENTIALS("RedmiSeb", "pippo2503", "sensori", "sensori2019");
-  
-  // Esegui diagnostica completa
-    //DIAGNOSE_NETWORK("RedmiSeb");
-  
-  readWiFiFile();  
-  // Inizializza con debug
-  WiFiManager::optimizeEverything();
-  
-  SETUP_INTEGRATED_WIFI_FALLBACK(
-		"RedmiSeb", "pippo2503",      
-        "sensori", "sensori2019"    
-   );
-  
-  Serial.println("\nConnesso al WiFi");
-  Serial.print("IP: ");
-  Serial.println(WiFi.localIP());
-
-  String hostname = "adcstreamer-" + String((uint32_t)ESP.getEfuseMac(), HEX);
-  Serial.println("\nhostname: " + hostname);
-  MDNS.begin(hostname.c_str());
-  //setupDAC();
-  delay(1000);
-  // Inizializza la coda con 10 stringhe da 64 byte ciascuna
-  //startDAC();
-  // Crea la coda per i batch
-  //batchQueue = xQueueCreate(QUEUE_SIZE, (uint8_t) DATALEN);
-  //if (batchQueue == NULL) {
-  //    Serial.println("Errore creazione coda batch");
-  //    while(1);
-  //}
-/*
-  batchStream = xStreamBufferCreate(STREAM_BUFFER_SIZE, TRIGGER_LEVEL);
-  if (batchStream == NULL) {
-    Serial.println("Errore creazione stream buffer");
-    while (1)
-      ;
+  if (WiFi.status() == WL_CONNECTED) {
+    Serial.println("\n✅ Connesso al WiFi");
+    Serial.print("IP: ");
+    Serial.println(WiFi.localIP());
+    
+    // Configura mDNS solo se WiFi connesso
+    String hostname = "adcstreamer-" + String((uint32_t)ESP.getEfuseMac(), HEX);
+    Serial.println("Hostname: " + hostname);
+    MDNS.begin(hostname.c_str());
+    Serial.println("✅ mDNS configurato");
+  } else {
+    Serial.println("\n⚠️ WiFi timeout - continuo in modalità offline");
   }
-  Serial.printf("Batch stream buffer creato: %d bytes\n", STREAM_BUFFER_SIZE);
-  */
+
+  // ==================== FASE 5: SERVIZI WEB ====================
+  Serial.println("6. Inizializzazione server web...");
   
-  delay(1000);
-  // Configurazione di default (porta 80)
-  // Oppure con configurazione personalizzata
-  // ESP32WebServer::Config config;
-  // config.port = 8080;
-  // config.check_proxy_headers = true;
   if (!server.begin()) {
-    Serial.println("Server failed to start");
+    Serial.println("❌ Server failed to start");
     ESP.restart();
   }
   
-  // loaders pagine statiche da file
+  // Configura routes e file handlers
   setupWiFiAPI(server);
-  server.loadFile("/","index.html");
-  server.loadFile("/wifi","wifi.html");
+  server.loadFile("/", "index.html");
+  server.loadFile("/wifi", "wifi.html");
   server.enableFileHandler();
-  // loaders API 
-  
-  delay(100);  // Breve pausa per stabilizzazione
+  Serial.println("✅ Server web avviato");
 
-  // Configura e avvia il WebSocket server
+  // ==================== FASE 6: WEBSOCKET ====================
+  Serial.println("7. Inizializzazione WebSocket...");
+  
   ws.onDataEvent(onDataEvent);
   ws.onControlEvent(onControlEvent);
   if (!ws.begin()) {
-    ESP_LOGE("MAIN", "Failed to start WebSocket servers");
+    Serial.println("❌ Failed to start WebSocket servers");
     ESP.restart();
   }
-  delay(100);
-  adc.begin();
-  delay(100);
+  delay(100); // Stabilizzazione WebSocket
+  Serial.println("✅ WebSocket servers avviati");
+
+  // ==================== FASE 7: TASK WORKERS ====================
+  Serial.println("8. Avvio task WebSocket...");
   
-  check_heap_usage(RINGALLOC);
-  
-  // Task WebSocket su core 0
-  xTaskCreatePinnedToCore(
+  // Task WebSocket su core 0 (networking)
+  BaseType_t wsTaskResult = xTaskCreatePinnedToCore(
     wsTask,
     "WS Task",
-    8192,  // Stack aumentato
+    8192,
     NULL,
     1,
     NULL,
-    0);
-  /*
-    // Task ads su core 1
-    xTaskCreatePinnedToCore(
-        adcTask, 
-        "ADC Task", 
-        5000,  // Stack aumentato
-        NULL, 
-        configMAX_PRIORITIES - 1,
-        &adcTaskHandle, 
-        1
-    );
-     */
-  delay(1000);
+    0
+  );
+  
+  if (wsTaskResult != pdPASS) {
+    Serial.println("❌ Errore creazione WS Task");
+    return;
+  }
+  Serial.println("✅ WS Task avviato su core 0");
+
+  // Breve pausa per stabilizzazione
+  delay(500);
+
+  Serial.println("9. Avvio task ADC monitor...");
+  
+  // Task ADC su core 1 (processing) con monitor
   adcMonitor = new TaskMonitor(
     "ADC_Task",
-    4096,  // timeout 2 secondi
+    4096,                      // timeout 4 secondi
     adcTask,
     nullptr,
     1,                         // core 1
     6000,                      // stack
-    configMAX_PRIORITIES - 1,  // priority
+    configMAX_PRIORITIES - 1,  // priority alta
     adcMonitor                 // il monitor stesso
   );
-  // Settiamo il parametro dopo la creazione
+  
+  if (adcMonitor == nullptr) {
+    Serial.println("❌ Errore creazione ADC Monitor");
+    return;
+  }
+  
+  // Configura parametri e avvia
   adcMonitor->setTaskParams(adcMonitor);
   adcMonitor->startTask();
+  Serial.println("✅ ADC Task avviato su core 1");
 
-  Serial.println("Setup completato");
-  //readWiFiFile();
+  // ==================== FASE 8: FINALIZZAZIONE ====================
+  Serial.println("10. Finalizzazione setup...");
+  
+  // Piccola pausa per permettere ai task di stabilizzarsi
+  delay(1000);
+  
+  // Stampa stato finale
+  Serial.println("\n=== STATO FINALE SISTEMA ===");
+  Serial.printf("Free heap: %u bytes\n", esp_get_free_heap_size());
+  Serial.printf("Min free heap: %u bytes\n", esp_get_minimum_free_heap_size());
+  Serial.printf("WiFi status: %s\n", WiFi.status() == WL_CONNECTED ? "Connesso" : "Disconnesso");
+  Serial.printf("Ring buffer: %s\n", batchQueue != NULL ? "Allocato" : "Errore");
+  Serial.printf("ADC Monitor: %s\n", adcMonitor != nullptr ? "Attivo" : "Errore");
+  Serial.println("============================");
+  
+  Serial.println("✅ Setup completato con successo!");
+  Serial.println("Sistema pronto per operazioni di streaming ADC");
 }
 
 void loop() {
+    // Ora possiamo controllare isAlive() dal loop
     // Controllo ogni 2 minuti per switch intelligente
-	static uint32_t lastCheck = 0;
-	if (millis() - lastCheck > 120000) {
+    static uint32_t lastCheck = 0;
+    if (millis() - lastCheck > 120000) {
 		CHECK_NETWORK_SWITCH();  // Controlla se c'è un AP migliore
 		FIX_WIFI_UNIVERSAL();
 		lastCheck = millis();
 	}
-	delay(100);
+  //vTaskDelay(pdMS_TO_TICKS(100));
+  vTaskDelay(10);
 }
 
 void check_heap_usage(uint32_t dim) {
@@ -1064,4 +1102,5 @@ void readWiFiFile() {
         Serial.println("File wifi_credentials.txt non esiste");
     }
 }
+
 
