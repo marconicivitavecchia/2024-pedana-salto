@@ -98,10 +98,12 @@ TaskHandle_t adcTaskHandle = NULL;
 //portMUX_TYPE timerMux = portMUX_INITIALIZER_UNLOCKED;
 volatile float freq = 1;
 volatile uint16_t amp = 200;
+volatile uint16_t ofst = 200;
 volatile uint32_t angle = 0;
 volatile uint8_t timerCmd = 0;
 volatile uint8_t lastTimerCmd = 0;
 const uint32_t SAMPLES_PER_CYCLE = 200;  // 1000ms/5ms = 200 campioni per ciclo
+//const uint32_t SAMPLES_PER_CYCLE = 30303;  // 1000ms/5ms = 200 campioni per ciclo
 //ADS1256_DMA adc;
 ADS1256_DMA adc;
 //ADS1256_BitBang adc1;
@@ -488,22 +490,7 @@ size_t findMaxAllocation() {
 }
 
 uint16_t getDecimationFactor(uint32_t desiredRate) {
-  switch (desiredRate) {
-    case 200:
-      return 150;  // 30000/150 = 200Hz
-    case 600:
-      return 50;  // 30000/50 = 600Hz
-    case 1000:
-      return 30;  // 30000/30 = 1000Hz
-    case 10000:
-      return 3;  // 30000/3 = 10000Hz
-    case 15000:
-      return 2;  // 30000/2 = 15000Hz
-    case 30000:
-      return 1;  // 30000/1 = 30000Hz (no decimation)
-    default:
-      return 1;  // Default: nessuna decimazione
-  }
+	return 30000 / desiredRate;
 }
 
 void adcTask(void* pvParameters) {
@@ -518,7 +505,7 @@ void adcTask(void* pvParameters) {
 		// Verifichiamo lo stato prima della creazione
 		//ADS1256_DMA adc;
 		Serial.println("ADC task: dopo ADS1256_DMA");
-		BatchData batch;
+		//BatchData batch;
 		Config gc;
 		uint32_t lastSample = 0;
 		//uint32_t overcount = 0;
@@ -551,8 +538,6 @@ void adcTask(void* pvParameters) {
 		delay(100);
 		Serial.println("ADC task: Start task tracking");
 	    uint32_t last_t = 0;
-		uint8_t amp = 0;
-		uint8_t ofst = 0;
 		int json_size = DATALEN;
 		while (true) {
 		    //Serial.println("curr: "+String(curr)+" last: "+String(last));
@@ -625,11 +610,10 @@ void adcTask(void* pvParameters) {
 					Serial.println("adcTask: dopo enableTestSignal");
 				  } else if (gc.mode == 1) {
 					timerCmd = 0;
-					adc.setTestSignalParams(gc.toneFreq, 8388608.0f, 0.1f);
+					//adc.setTestSignalParams(gc.toneFreq, 8388608.0f, 0.1f);
 					adc.enableTestSignal(true);
 					Serial.println("adcTask: Segnale di test abilitato");
 				  } else {
-					//timerCmd = 0;
 					timerCmd = 0;
 					Serial.println("adcTask: stop Tone");
 					adc.enableTestSignal(false);
@@ -637,7 +621,7 @@ void adcTask(void* pvParameters) {
 				  }
 				  // azzera batch
 				  Serial.print("adcTask: startStreaming: ");
-				  memset(batch.v, 0, MAX_SAMPLES_PER_BATCH * 3);
+				  //memset(batch.v, 0, MAX_SAMPLES_PER_BATCH * 3);
 				  delay(50);
 				  adc.startStreaming();
 				  //adc1.startStreaming();
@@ -645,34 +629,23 @@ void adcTask(void* pvParameters) {
 			    last = curr;
 		    }
 
-			monitor->heartbeat();
-		    if (gc.streaming) {
+			monitor->heartbeat();	
+			if (gc.streaming) {
 				if (timerCmd) updateDAC(ofst, amp);
-				
-				char *buf = NULL;  // Puntatore che riceverà l'indirizzo
-				if (batch.count > 0) {
-					BaseType_t result = xRingbufferSendAcquire(batchQueue,(void**) &buf, (size_t) json_size, pdMS_TO_TICKS(0));
-					if (result == pdTRUE && buf != NULL) {
-						adc.read_data_batch_fir(batch, samplesPerBatch, decimationFactor);
-						//uint32_t delta = batch.t - last_t;
-						//last_t += delta;
-						//Serial.print("delta: ");Serial.println(delta);
-						//ADS1256_SERIALIZE_TO(batch, buffer);
-						int len = serialize_fast(buf, batch, DATALEN);
+
+				char *buf = NULL;  // Puntatore che riceverà l'indirizzo{
+				BaseType_t result = xRingbufferSendAcquire(batchQueue,(void**) &buf, (size_t) json_size, pdMS_TO_TICKS(0));
+				if (result == pdTRUE && buf != NULL) {
+					//adc.read_data_batch_fir(batch, samplesPerBatch, decimationFactor);
+					int jsonLen = adc.read_data_json_fir(buf, DATALEN, samplesPerBatch, decimationFactor);
 						//Serial.println(buffer);
 						xRingbufferSendComplete(batchQueue, (void*)buf);
-						//ESP_LOGI(TAG, "Data sent immediately");
 						overflow = false;
-					} else {
-						ESP_LOGW(TAGBUF, "Buffer full - dropping data");
-						overflow = true; 
-					}
-				}
-				
-		    }
-		    if (gc.streaming) {
-			  taskYIELD();
-		    } else {
+				} else {
+					overflow = true; 
+				}	
+				taskYIELD();
+ 		    } else {
 			  vTaskDelay(1);
 		    }
 		}
@@ -788,9 +761,6 @@ void wsTask(void* pvParameters) {
 						enable1 = 127;// A single batch in overflow condition indicates an overflow status
 						Serial.println("wsTask: sendOverflow true - reset buffer");
 						sendOverflowStatus(true);
-						//xQueueReset(batchQueue);
-						//batchQueue.resetCharBuffer();
-						//batchQueue.reset();
 						reset_ringbuffer(batchQueue);
 					}  
 				}else{
@@ -803,10 +773,10 @@ void wsTask(void* pvParameters) {
 						}     
 					}  
 				}    
-				//taskYIELD();	
+				taskYIELD();	
 				//vTaskDelay(1);  // delay solo se non ci sono dati
 			}else {  
-				//vTaskDelay(1);  // delay solo se non ci sono dati
+				vTaskDelay(1);  // delay solo se non ci sono dati
 			}
 		}
 		// se non riceve dati il loop adc potrebbe essere fermo
@@ -828,11 +798,8 @@ void wsTask(void* pvParameters) {
 			if(!globalConfig.streaming){
 				sendDataKeepAlive(batchCount);
 			}
-			//if(batchCount < 20) 
-			//    xQueueReset(batchQueue);
 			batchCount = 0;
 		}	
-		vTaskDelay(2); 
 	} 
 }
 
@@ -845,7 +812,7 @@ void reset_ringbuffer(RingbufHandle_t ring_buf) {
     // Leggi tutto senza timeout fino a quando è vuoto
     while ((item = xRingbufferReceive(ring_buf, &item_size, 0)) != NULL) {
         vRingbufferReturnItem(ring_buf, item);
-        Serial.printf("Rimosso elemento di %d bytes", item_size);
+        //Serial.printf("Rimosso elemento di %d bytes\n", item_size);
     }
     
    Serial.println("Ring buffer svuotato completamente");
@@ -1035,16 +1002,14 @@ void setup() {
 }
 
 void loop() {
-    // Ora possiamo controllare isAlive() dal loop
     // Controllo ogni 2 minuti per switch intelligente
-    static uint32_t lastCheck = 0;
-    if (millis() - lastCheck > 120000) {
+	static uint32_t lastCheck = 0;
+	if (millis() - lastCheck > 120000) {
 		CHECK_NETWORK_SWITCH();  // Controlla se c'è un AP migliore
 		FIX_WIFI_UNIVERSAL();
 		lastCheck = millis();
 	}
-  //vTaskDelay(pdMS_TO_TICKS(100));
-  vTaskDelay(10);
+	delay(100);
 }
 
 void check_heap_usage(uint32_t dim) {
