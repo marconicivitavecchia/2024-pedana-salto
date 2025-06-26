@@ -761,7 +761,7 @@ void wsTask(void* pvParameters) {
 						enable1 = 127;// A single batch in overflow condition indicates an overflow status
 						Serial.println("wsTask: sendOverflow true - reset buffer");
 						sendOverflowStatus(true);
-						reset_ringbuffer(batchQueue);
+						//reset_ringbuffer(batchQueue);
 					}  
 				}else{
 					if(enable1 < 128){
