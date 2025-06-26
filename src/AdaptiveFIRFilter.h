@@ -118,26 +118,79 @@ private:
     }
 
     uint16_t calculateOptimalTaps(uint16_t decimationFactor) {
-        // Più alta la decimazione, più tap servono per anti-aliasing efficace
-        uint16_t taps;
-        
-        if (decimationFactor <= 2) {
-            taps = 11;   // Decimazione bassa, filtro leggero
-        } else if (decimationFactor <= 10) {
-            taps = 31;   // Decimazione media
-        } else if (decimationFactor == 30) {
-            taps = 61;   // Solo più tap per il caso problematico, senza cambio frequenza
-        } else if (decimationFactor <= 50) {
-            taps = 51;   // Decimazione alta normale
-        } else {
-            taps = 81;   // Decimazione molto alta
-        }
-        
-        // Assicurati che sia dispari per simmetria
-        if (taps % 2 == 0) taps++;
-        
-        return std::min(taps, MAX_TAPS);
-    }
+		// Tap base teoricamente corretti (crescita monotonica)
+		uint16_t baseTaps;
+		
+		switch (decimationFactor) {
+			case 1:
+				baseTaps = 1;   // Pass-through
+				break;
+			case 2:
+				baseTaps = 11;  // 30kSps → 15kSps (pari, facile)
+				break;
+			case 3:
+				baseTaps = 21;  // 30kSps → 10kSps (dispari, problematico)
+				break;
+			case 5:
+				baseTaps = 31;  // 30kSps → 6kSps (dispari, problematico)
+				break;
+			case 10:
+				baseTaps = 41;  // 30kSps → 3kSps (pari, più facile)
+				break;
+			case 15:
+				baseTaps = 51;  // 30kSps → 2kSps (dispari, problematico)
+				break;
+			case 30:
+				baseTaps = 71;  // 30kSps → 1kSps (pari, ma alta decimazione)
+				break;
+			case 50:
+				baseTaps = 81;  // 30kSps → 600Hz (pari, estremo)
+				break;
+			case 100:
+				baseTaps = 91;  // 30kSps → 300Hz (pari, estremo)
+				break;
+			case 150:
+				baseTaps = 101; // 30kSps → 200Hz (pari, massimo)
+				break;
+			default:
+				// Formula empirica per decimazioni non previste
+				if (decimationFactor <= 2) {
+					baseTaps = 11;
+				} else if (decimationFactor <= 5) {
+					baseTaps = 21 + (decimationFactor - 3) * 5;
+				} else if (decimationFactor <= 20) {
+					baseTaps = 31 + (decimationFactor - 5) * 2;
+				} else if (decimationFactor <= 60) {
+					baseTaps = 51 + (decimationFactor - 20);
+				} else {
+					baseTaps = std::min(101, 71 + (decimationFactor - 60) / 2);
+				}
+				break;
+		}
+		
+		// PENALITÀ PER DECIMAZIONI DISPARI
+		// Le decimazioni dispari causano aliasing asimmetrico e spike
+		if (decimationFactor > 1 && decimationFactor % 2 == 1) {
+			uint16_t penalty;
+			
+			if (decimationFactor <= 5) {
+				penalty = 20;  // Penalità alta per dispari piccoli (3x, 5x)
+			} else if (decimationFactor <= 15) {
+				penalty = 15;  // Penalità media per dispari medi
+			} else {
+				penalty = 10;  // Penalità ridotta per dispari alti
+			}
+			
+			baseTaps += penalty;
+			printf("Odd decimation %d: added %d penalty taps (total: %d)\n", 
+				   decimationFactor, penalty, baseTaps);
+		}
+		
+		// Assicura che sia dispari per simmetria
+		if (baseTaps % 2 == 0) baseTaps++;
+		
+		return std::min(baseTaps, (uint16_t)MAX_TAPS);
+	}
 
     void generateLowpassCoefficients(float cutoffFreq, uint16_t taps) {
         float omega_c = 2.0f * M_PI * cutoffFreq / SAMPLE_RATE;  // Frequenza normalizzata
@@ -238,17 +291,8 @@ public:
         float cutoffFreq = calculateCutoffFrequency(decimationFactor);
         numTaps = calculateOptimalTaps(decimationFactor);
         
-        // DEBUG: Stampa parametri
-        printf("=== FILTER SETUP ===\n");
-        printf("Decimation: %d\n", decimationFactor);
-        printf("Cutoff: %.1f Hz\n", cutoffFreq);
-        printf("NumTaps: %d\n", numTaps);
-        printf("Output rate: %.1f Hz\n", (float)SAMPLE_RATE / decimationFactor);
-        
         // Genera nuovi coefficienti
         generateLowpassCoefficients(cutoffFreq, numTaps);
-        
-        printf("==================\n");
     }
 
     // Elabora un campione e restituisce true se c'è output (dopo decimazione)
