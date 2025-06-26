@@ -534,45 +534,95 @@ public:
 		firFilter.reset();
 		firFilter.setDecimationFactor(decimationFactor);
 	}	
-	
-	void read_data_batch_fir(BatchData& batch, uint16_t samplesPerBatch, uint16_t decimationFactor = 1) {
-		if (!isStreaming) return;
 		
-		// Configura il filtro per il decimation factor passato come parametro
+	int read_data_json_fir(char* jsonBuf, int maxJsonLen, uint16_t samplesPerBatch, uint16_t decimationFactor = 1) {
+		if (!isStreaming || !jsonBuf) return -1;
+			
+		// Calcola frequenza di taglio basata sulla decimazione finale
+		float targetSampleRate = 30000.0f / decimationFactor;
+		float targetNyquist = targetSampleRate / 2.0f;
+		float cutoffFreq = targetNyquist * 0.8f;  // Margine sicurezza
+		
 		//firFilter.setDecimationFactor(decimationFactor);
 		
-		batch.count = 0;
-		batch.t = esp_timer_get_time();
+		uint64_t timestamp = esp_timer_get_time();
+		uint16_t sampleCount = 0;
+		
+		// Serializzazione JSON veloce - stessa tecnica di serialize_fast
+		static const char hex[] = "0123456789abcdef";
+		
+		// Header JSON - usando %llx per timestamp a 64-bit
+		int len = snprintf(jsonBuf, maxJsonLen, "{\"t\":\"%llx\",\"v\":[", 
+						   (unsigned long long)timestamp);
+		
+		char* p = jsonBuf + len;
+		char* buf_end = jsonBuf + maxJsonLen - 10; // Margine per chiusura ]}
 		
 		spi_dev_t* SPI_DEV = &SPI2;
 		
-		while (batch.count < samplesPerBatch && batch.count < MAX_SAMPLES_PER_BATCH) {
-			// Leggi un campione dall'ADC (il tuo codice esistente)
-			while (gpio_get_level((gpio_num_t)ADS1256_PIN_DRDY));
-			delayMicroseconds(1);
+		while (sampleCount < samplesPerBatch && 
+			   sampleCount < MAX_SAMPLES_PER_BATCH && 
+			   p < buf_end) {
 			
-			SPI_DEV->data_buf[0] = 0;
-			SPI_DEV->cmd.usr = 1;
-			while (SPI_DEV->cmd.usr);
+			uint64_t accumulator = 0;
 			
-			uint8_t rx_buffer[4];
-			memcpy(rx_buffer, (const void*)SPI_DEV->data_buf, 3);
-			
-			uint32_t result = (rx_buffer[0] << 16) | (rx_buffer[1] << 8) | rx_buffer[2];
-			result &= 0x00FFFFFF;  // Maschera bit spuri
-			
-			// Elabora attraverso il filtro FIR
-			uint32_t filteredSample;
-			if (firFilter.processSample(result, filteredSample)) {
-				// Il filtro ha prodotto un output decimato
-				batch.v[batch.count][0] = (filteredSample >> 16) & 0xFF;
-				batch.v[batch.count][1] = (filteredSample >> 8) & 0xFF;
-				batch.v[batch.count][2] = filteredSample & 0xFF;
+			// Fase 1: Raccolta e filtraggio di decimationFactor campioni
+			for(uint16_t i = 0; i < decimationFactor; i++) {
+				// Leggi campione ADC
+				while (gpio_get_level((gpio_num_t)ADS1256_PIN_DRDY));
+				delayMicroseconds(1);
 				
-				batch.count++;
+				SPI_DEV->data_buf[0] = 0;
+				SPI_DEV->cmd.usr = 1;
+				while (SPI_DEV->cmd.usr);
+				
+				uint8_t rx_buffer[4];
+				memcpy(rx_buffer, (const void*)SPI_DEV->data_buf, 3);
+				
+				uint32_t rawSample = (rx_buffer[0] << 16) | (rx_buffer[1] << 8) | rx_buffer[2];
+				rawSample &= 0x00FFFFFF;
+				
+				// Filtra attraverso FIR (anti-aliasing)
+				uint32_t filteredSample;
+				firFilter.processSample(rawSample, filteredSample);
+				//filteredSample = rawSample;
+				
+				// Accumula per media
+				accumulator += (uint64_t)filteredSample;
 			}
-			// Se il filtro non produce output, continua a campionare
+			
+			// Fase 2: Decimazione con media
+			uint32_t decimatedSample = (uint32_t)(accumulator / decimationFactor);
+			
+			// Fase 3: Serializza direttamente nel JSON usando la tecnica veloce
+			// Controllo spazio: ogni valore richiede 8 char: " + 6 hex + " + ,
+			if (p + 8 >= buf_end) break;
+			
+			// Aggiungi virgola se non è il primo elemento
+			if (sampleCount > 0) *p++ = ',';
+			
+			*p++ = '"';
+			
+			// Unroll completo per massima velocità
+			uint8_t b0 = (decimatedSample >> 16) & 0xFF;
+			uint8_t b1 = (decimatedSample >> 8) & 0xFF;
+			uint8_t b2 = decimatedSample & 0xFF;
+			
+			*p++ = hex[b0 >> 4]; *p++ = hex[b0 & 0x0F];
+			*p++ = hex[b1 >> 4]; *p++ = hex[b1 & 0x0F];  
+			*p++ = hex[b2 >> 4]; *p++ = hex[b2 & 0x0F];
+			
+			*p++ = '"';
+			
+			sampleCount++;
 		}
+		
+		// Chiudi il JSON
+		*p++ = ']'; 
+		*p++ = '}'; 
+		*p = '\0';
+		
+		return p - jsonBuf;  // Restituisce la lunghezza del JSON
 	}
 	
 	void read_data_batch_fast(BatchData& batch, uint16_t samplesPerBatch, uint16_t decimationFactor = 1) {
