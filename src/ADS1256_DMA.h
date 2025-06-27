@@ -556,7 +556,7 @@ public:
 						   (unsigned long long)timestamp);
 		
 		char* p = jsonBuf + len;
-		char* buf_end = jsonBuf + maxJsonLen - 10; // Margine per chiusura ]}
+		char* buf_end = jsonBuf + maxJsonLen; 
 		
 		spi_dev_t* SPI_DEV = &SPI2;
 		
