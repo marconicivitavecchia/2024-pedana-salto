@@ -36,7 +36,7 @@
 //#define STREAM_BUFFER_SIZE (8192)          // 8KB per BatchData structures
 //#define TRIGGER_LEVEL (sizeof(BatchData))  // Sveglia dopo 1 BatchData
 //#define QUEUE_SIZE 200              // Dimensione coda batch
-#define DATALEN 1372
+#define DATALEN 1380
 #define RINGALLOC 137200
 #define MAXBATCH RINGALLOC / DATALEN
 //#define MAX_SAMPLES_PER_BATCH 160u  // Aggiunto 'u' per unsigned
@@ -645,7 +645,7 @@ void adcTask(void* pvParameters) {
 				if (result == pdTRUE && buf != NULL) {
 					//adc.read_data_batch_fir(batch, samplesPerBatch, decimationFactor);
 					int jsonLen = adc.read_data_json_fir(buf, DATALEN, samplesPerBatch, decimationFactor);
-						//Serial.println(buffer);
+						//Serial.println(buf);
 						xRingbufferSendComplete(batchQueue, (void*)buf);
 						overflow = false;
 				} else {
@@ -668,7 +668,7 @@ void adcTask(void* pvParameters) {
 size_t calculate_json_size(int num_samples) {
     // Parti fisse
     size_t fixed_parts = 15;        // {"t":"","v":[]}
-    size_t timestamp = 13;          // "62ad7af907880"
+    size_t timestamp = 16;          // "62ad7af907880"
     
     // Array valori
     size_t values_size;

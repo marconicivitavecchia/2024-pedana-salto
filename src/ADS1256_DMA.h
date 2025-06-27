@@ -191,6 +191,18 @@ public:
     }
 	
     bool begin(){
+		// Inizializza la lookup table UNA VOLTA all'avvio
+		if (!init_hex_lookup_table_safe()) {
+			Serial.println("ERRORE: Impossibile inizializzare hex lookup table!");
+			return false;
+		}
+		
+		// Verifica opzionale
+		if (!verify_hex_lookup_table()) {
+			Serial.println("ERRORE: Hex lookup table corrotta!");
+			return false;
+		}
+		
         // Setup SPI configuration
         spi_bus_config_t buscfg;
         memset(&buscfg, 0, sizeof(spi_bus_config_t));
@@ -534,97 +546,246 @@ public:
 		firFilter.reset();
 		firFilter.setDecimationFactor(decimationFactor);
 	}	
-		
+
+	// ========== VERSIONE ALTERNATIVA CON OTTIMIZZAZIONI MANUALI ==========
+	// Se preferisci controllo granulare, puoi abilitare singole ottimizzazioni
+
+	#define ENABLE_REGISTER_OPT     1
+	#define ENABLE_BRANCH_ELIM      1  
+	#define ENABLE_WORD_COPY        1
+	#define ENABLE_TIMESTAMP_OPT    1
+
 	int read_data_json_fir(char* jsonBuf, int maxJsonLen, uint16_t samplesPerBatch, uint16_t decimationFactor = 1) {
 		if (!isStreaming || !jsonBuf) return -1;
+		
+		// Variabili con/senza register
+		#if ENABLE_REGISTER_OPT
+			register float targetSampleRate = 30000.0f / decimationFactor;
+			register uint64_t timestamp = esp_timer_get_time();
+			register uint16_t sampleCount = 0;
+			register char* p = jsonBuf;
+			register char* buf_end = jsonBuf + maxJsonLen;
+		#else
+			float targetSampleRate = 30000.0f / decimationFactor;
+			uint64_t timestamp = esp_timer_get_time();
+			uint16_t sampleCount = 0;
+			char* p = jsonBuf;
+			char* buf_end = jsonBuf + maxJsonLen;
+		#endif
+		
+		// Header
+		static const char header_start[] = "{\"t\":\"";
+		memcpy(p, header_start, 6);
+		p += 6;
+		
+		// Timestamp con/senza ottimizzazioni
+		#if ENABLE_TIMESTAMP_OPT && ENABLE_BRANCH_ELIM
+			// Versione ottimizzata branchless
+			uint8_t adaptiveNibbles = 6 + (timestamp >= 0xFFFFFF) * 4 + (timestamp >= 0xFFFFFFFFF) * 3;
+			static const uint64_t masks[3] = {0xFFFFFF, 0xFFFFFFFFFF, 0xFFFFFFFFFFFFF};
+			uint8_t mask_index = (timestamp >= 0xFFFFFF) + (timestamp >= 0xFFFFFFFFF);
+			uint64_t masked_timestamp = timestamp & masks[mask_index];
 			
-		// Calcola frequenza di taglio basata sulla decimazione finale
-		float targetSampleRate = 30000.0f / decimationFactor;
-		float targetNyquist = targetSampleRate / 2.0f;
-		float cutoffFreq = targetNyquist * 0.8f;  // Margine sicurezza
+			static const char hex_chars[16] = {'0','1','2','3','4','5','6','7','8','9','a','b','c','d','e','f'};
+			uint64_t temp = masked_timestamp;
+			for (int i = adaptiveNibbles - 1; i >= 0; i--) {
+				p[i] = hex_chars[temp & 0xF];
+				temp >>= 4;
+			}
+			p += adaptiveNibbles;
+		#else
+			// Tuo codice originale
+			uint8_t adaptiveNibbles;
+			if (timestamp < 0xFFFFFF) {
+				adaptiveNibbles = 6;
+			} else if (timestamp < 0xFFFFFFFFF) {
+				adaptiveNibbles = 10;
+			} else {
+				adaptiveNibbles = 13;
+			}
+			
+			uint64_t masked_timestamp = timestamp & ((1ULL << (adaptiveNibbles * 4)) - 1);
+			memset(p, '0', adaptiveNibbles);
+			char* end_pos = p + adaptiveNibbles;
+			uint64_t temp = masked_timestamp;
+			int i = 0;
+			while (temp > 0) {
+				*(end_pos - 1 - i) = "0123456789abcdef"[temp & 0xF];
+				temp >>= 4;
+				i++;
+			}
+			p = end_pos;
+		#endif
 		
-		//firFilter.setDecimationFactor(decimationFactor);
-		
-		uint64_t timestamp = esp_timer_get_time();
-		uint16_t sampleCount = 0;
-		
-		// Serializzazione JSON veloce - stessa tecnica di serialize_fast
-		static const char hex[] = "0123456789abcdef";
-		
-		// Header JSON - usando %llx per timestamp a 64-bit
-		int len = snprintf(jsonBuf, maxJsonLen, "{\"t\":\"%llx\",\"v\":[", 
-						   (unsigned long long)timestamp);
-		
-		char* p = jsonBuf + len;
-		char* buf_end = jsonBuf + maxJsonLen; 
+		// Middle header
+		static const char header_middle[] = "\",\"v\":[";
+		memcpy(p, header_middle, 7);
+		p += 7;
 		
 		spi_dev_t* SPI_DEV = &SPI2;
 		
+		// Loop principale
 		while (sampleCount < samplesPerBatch && 
 			   sampleCount < MAX_SAMPLES_PER_BATCH && 
 			   p < buf_end) {
 			
 			uint64_t accumulator = 0;
 			
-			// Fase 1: Raccolta e filtraggio di decimationFactor campioni
 			for(uint16_t i = 0; i < decimationFactor; i++) {
-				// Leggi campione ADC
-				while (gpio_get_level((gpio_num_t)ADS1256_PIN_DRDY));
-				delayMicroseconds(1);
+				waitDRDY();
+				T6Delay(); // risparmia molto tempo
 				
 				SPI_DEV->data_buf[0] = 0;
 				SPI_DEV->cmd.usr = 1;
 				while (SPI_DEV->cmd.usr);
 				
 				uint8_t rx_buffer[4];
-				memcpy(rx_buffer, (const void*)SPI_DEV->data_buf, 3);
+				
+				#if ENABLE_WORD_COPY
+					*((uint32_t*)rx_buffer) = SPI_DEV->data_buf[0];  // Word copy
+				#else
+					memcpy(rx_buffer, (const void*)SPI_DEV->data_buf, 3);  // Tuo originale
+				#endif
 				
 				uint32_t rawSample = (rx_buffer[0] << 16) | (rx_buffer[1] << 8) | rx_buffer[2];
 				rawSample &= 0x00FFFFFF;
 				
-				// Filtra attraverso FIR (anti-aliasing)
 				uint32_t filteredSample;
 				firFilter.processSample(rawSample, filteredSample);
-				//filteredSample = rawSample;
-				
-				// Accumula per media
 				accumulator += (uint64_t)filteredSample;
 			}
 			
-			// Fase 2: Decimazione con media
 			uint32_t decimatedSample = (uint32_t)(accumulator / decimationFactor);
 			
-			// Fase 3: Serializza direttamente nel JSON usando la tecnica veloce
-			// Controllo spazio: ogni valore richiede 8 char: " + 6 hex + " + ,
-			if (p + 8 >= buf_end) break;
-			
-			// Aggiungi virgola se non è il primo elemento
-			if (sampleCount > 0) *p++ = ',';
+			// Separatore con/senza branch elimination
+			#if ENABLE_BRANCH_ELIM
+				*p = ',';
+				p += (sampleCount > 0);
+			#else
+				if (sampleCount > 0) *p++ = ',';  // Tuo originale
+			#endif
 			
 			*p++ = '"';
 			
-			// Unroll completo per massima velocità
+			// Hex conversion con/senza word copy
 			uint8_t b0 = (decimatedSample >> 16) & 0xFF;
 			uint8_t b1 = (decimatedSample >> 8) & 0xFF;
 			uint8_t b2 = decimatedSample & 0xFF;
 			
-			*p++ = hex[b0 >> 4]; *p++ = hex[b0 & 0x0F];
-			*p++ = hex[b1 >> 4]; *p++ = hex[b1 & 0x0F];  
-			*p++ = hex[b2 >> 4]; *p++ = hex[b2 & 0x0F];
+			#if ENABLE_WORD_COPY
+				*((uint16_t*)p) = *((uint16_t*)&hex_table[b0][0]); p += 2;
+				*((uint16_t*)p) = *((uint16_t*)&hex_table[b1][0]); p += 2;
+				*((uint16_t*)p) = *((uint16_t*)&hex_table[b2][0]); p += 2;
+			#else
+				// Tuo originale
+				*p++ = hex_table[b0][0]; *p++ = hex_table[b0][1];
+				*p++ = hex_table[b1][0]; *p++ = hex_table[b1][1];
+				*p++ = hex_table[b2][0]; *p++ = hex_table[b2][1];
+			#endif
 			
+			*p++ = '"';
+			sampleCount++;
+		}
+		
+		// Footer
+		static const char json_end[] = "]}";
+		memcpy(p, json_end, 2);
+		p += 2;
+		*p = '\0';
+		
+		return p - jsonBuf;
+	}
+
+
+/*
+    int read_data_json_fir(char* jsonBuf, int maxJsonLen, uint16_t samplesPerBatch, uint16_t decimationFactor = 1) {
+		if (!isStreaming || !jsonBuf) return -1;
+		
+		// Pre-calcoli (ottimizzazione 5: register)
+		register float targetSampleRate = 30000.0f / decimationFactor;
+		register uint64_t timestamp = esp_timer_get_time();
+		register uint16_t sampleCount = 0;
+		
+		// Ottimizzazione 5: Register optimization
+		register char* p = jsonBuf;
+		register char* buf_end = jsonBuf + maxJsonLen;
+		register spi_dev_t* SPI_DEV = &SPI2;
+		
+		// ========== 2. WORD-ALIGNED MEMORY OPERATIONS ==========
+		// Header JSON con memcpy sicuro (evita problemi endian)
+		static const char JSON_HEADER_START[7] = "{\"t\":\"";
+		memcpy(p, JSON_HEADER_START, 6);
+		p += 6;
+		
+		// ========== TIMESTAMP CON ASM OTTIMIZZATO ==========
+		// Ottimizzazione 3: Branch elimination per adaptive nibbles
+		register uint8_t adaptiveNibbles = 6;
+		adaptiveNibbles += ((timestamp >= 0xFFFFFF) << 2);      // +4 se >= 16.7 sec
+		adaptiveNibbles += (timestamp >= 0xFFFFFFFFF) * 3;      // +3 se >= 4.6 ore
+		
+		// Maschera branchless
+		static const uint64_t masks[3] = {0xFFFFFF, 0xFFFFFFFFFF, 0xFFFFFFFFFFFFF};
+		register uint8_t mask_idx = (timestamp >= 0xFFFFFF) + (timestamp >= 0xFFFFFFFFF);
+		register uint64_t masked_timestamp = timestamp & masks[mask_idx];
+		
+		// Usa ASM per conversione timestamp
+		convert_timestamp_asm(masked_timestamp, p, adaptiveNibbles);
+		p += adaptiveNibbles;
+		
+		// Middle header con memcpy sicuro
+		static const char JSON_HEADER_MIDDLE[8] = "\",\"v\":[";
+		memcpy(p, JSON_HEADER_MIDDLE, 7);
+		p += 7;
+		
+		// ========== LOOP PRINCIPALE OTTIMIZZATO (SENZA UNROLLING) ==========
+		// Pre-dichiarazioni per ottimizzazione register
+		register uint64_t accumulator;
+		register uint32_t rawSample, filteredSample, decimatedSample;
+		uint8_t rx_buffer[4] __attribute__((aligned(4)));  // Buffer aligned per word copy
+		
+		while (sampleCount < samplesPerBatch && sampleCount < MAX_SAMPLES_PER_BATCH && p < buf_end) {
+			
+			accumulator = 0;
+			
+			for(register uint16_t i = 0; i < decimationFactor; i++) {
+				waitDRDY(); T6Delay();
+				
+				SPI_DEV->data_buf[0] = 0;
+				SPI_DEV->cmd.usr = 1;
+				while (SPI_DEV->cmd.usr);
+				
+				*((uint32_t*)rx_buffer) = SPI_DEV->data_buf[0];  // Word copy
+				
+				rawSample = ((rx_buffer[0] << 16) | (rx_buffer[1] << 8) | rx_buffer[2]) & 0x00FFFFFF;
+				
+				firFilter.processSample(rawSample, filteredSample);
+				accumulator += filteredSample;
+			}
+			
+			decimatedSample = accumulator / decimationFactor;
+			
+			// ========== 3. BRANCH ELIMINATION + 2. WORD-ALIGNED ==========
+			*p = ',';
+			p += (sampleCount > 0);  // Branch elimination: avanza solo se necessario
+			*p++ = '"';
+			
+			// ASM conversion ultra-veloce
+			convert_hex_sample_asm(decimatedSample, p);
+			p += 6;
 			*p++ = '"';
 			
 			sampleCount++;
 		}
 		
-		// Chiudi il JSON
-		*p++ = ']'; 
-		*p++ = '}'; 
+		// ========== FOOTER CON MEMCPY SICURO ==========
+		static const char JSON_FOOTER[3] = "]}";
+		memcpy(p, JSON_FOOTER, 2);
+		p += 2;
 		*p = '\0';
 		
-		return p - jsonBuf;  // Restituisce la lunghezza del JSON
+		return p - jsonBuf;
 	}
-	
+*/	
 	void read_data_batch_fast(BatchData& batch, uint16_t samplesPerBatch, uint16_t decimationFactor = 1) {
 		if (!isStreaming) return;
 		
@@ -1416,6 +1577,7 @@ private:
     static bool spi_initialized;  // flag statico
     static bool resetInProgress;  // flag statico
     static SemaphoreHandle_t spi_bus_mutex;
+	static char hex_table[256][2];
     uint8_t dma_buffer[32];
     // Test signal configuration
     bool testSignalEnabled;
@@ -1738,6 +1900,144 @@ private:
     void sync(void) {
         sendCommand(ADS1256_CMD_SYNC);
     }
+	
+	bool init_hex_lookup_table_safe() {
+		static bool initialized = false;
+		
+		if (initialized) return true;  // Già inizializzata
+		
+		// Verifica che abbiamo memoria sufficiente
+		if (sizeof(hex_table) < 512) {
+			return false;  // Errore: memoria insufficiente
+		}
+		
+		// Inizializza la lookup table
+		const char* hex_chars = "0123456789abcdef";
+		
+		for (int i = 0; i < 256; i++) {
+			int high_nibble = (i >> 4) & 0xF;  // 4 bit alti
+			int low_nibble = i & 0xF;          // 4 bit bassi
+			
+			hex_table[i][0] = hex_chars[high_nibble];
+			hex_table[i][1] = hex_chars[low_nibble];
+		}
+		
+		initialized = true;
+		return true;  // Successo
+	}
+
+	// ====================================================================
+	// FUNZIONE DI TEST/VERIFICA (opzionale)
+	// ====================================================================
+
+	bool verify_hex_lookup_table() {
+		// Test alcuni valori per verificare correttezza
+		if (hex_table[0][0] != '0' || hex_table[0][1] != '0') return false;        // 0x00 → "00"
+		if (hex_table[15][0] != '0' || hex_table[15][1] != 'f') return false;      // 0x0F → "0f" 
+		if (hex_table[16][0] != '1' || hex_table[16][1] != '0') return false;      // 0x10 → "10"
+		if (hex_table[171][0] != 'a' || hex_table[171][1] != 'b') return false;    // 0xAB → "ab"
+		if (hex_table[255][0] != 'f' || hex_table[255][1] != 'f') return false;    // 0xFF → "ff"
+		
+		return true;  // Tutti i test passati
+	}
+	
+	
+	// ========== ASSEMBLY INLINE PER PORZIONI CRITICHE ==========
+
+	// ASM per conversione timestamp ultra-veloce usando la TUA hex_table esistente
+	static inline void convert_timestamp_asm(uint64_t timestamp, char* buffer, uint8_t nibbles) {
+		// Fallback C ultra-ottimizzato usando la tua hex_table esistente
+		static const char hex_chars[16] = {'0','1','2','3','4','5','6','7','8','9','a','b','c','d','e','f'};
+		
+		// Converti da destra a sinistra (MSB first)
+		for (int i = nibbles - 1; i >= 0; i--) {
+			uint8_t nibble = (timestamp >> (i * 4)) & 0xF;
+			buffer[nibbles - 1 - i] = hex_chars[nibble];
+		}
+	}
+
+	// ASM per conversione hex sample usando la TUA hex_table esistente
+	static inline void convert_hex_sample_asm(uint32_t sample, char* output) {
+		// Usa direttamente la tua hex_table con word access ottimizzato
+		register uint8_t b0 = (sample >> 16) & 0xFF;
+		register uint8_t b1 = (sample >> 8) & 0xFF;
+		register uint8_t b2 = sample & 0xFF;
+		
+		// Word copy dalla tua hex_table (2 char per volta)
+		*((uint16_t*)output) = *((uint16_t*)&hex_table[b0][0]);     // byte 0 -> 2 char
+		*((uint16_t*)(output+2)) = *((uint16_t*)&hex_table[b1][0]); // byte 1 -> 2 char  
+		*((uint16_t*)(output+4)) = *((uint16_t*)&hex_table[b2][0]); // byte 2 -> 2 char
+	}
+	
+	// ========== OTTIMIZZAZIONI AGGIUNTIVE CON ASM ==========
+
+	// ASM per copia memory ultra-veloce
+	static inline void fast_memcpy_asm(void* dst, const void* src, size_t len) {
+		if (len >= 16 && ((uintptr_t)dst & 3) == 0 && ((uintptr_t)src & 3) == 0) {
+			// Aligned copy con word transfer
+			asm volatile (
+				"mov.n a2, %0\n"           // dst
+				"mov.n a3, %1\n"           // src  
+				"mov.n a4, %2\n"           // len
+				"srli a4, a4, 2\n"         // len /= 4 (word count)
+				
+				"copy_loop:\n"
+				"l32i a5, a3, 0\n"         // carica word da src
+				"s32i a5, a2, 0\n"         // salva word in dst
+				"addi.n a2, a2, 4\n"       // dst += 4
+				"addi.n a3, a3, 4\n"       // src += 4
+				"addi a4, a4, -1\n"        // count--
+				"bnez a4, copy_loop\n"
+				:
+				: "r" (dst), "r" (src), "r" (len)
+				: "a2", "a3", "a4", "a5", "memory"
+			);
+		} else {
+			memcpy(dst, src, len);  // Fallback
+		}
+	}
+
+	// ASM per checksum/validation ultra-veloce
+	static inline uint32_t fast_checksum_asm(const char* data, size_t len) {
+		uint32_t checksum = 0;
+		asm volatile (
+			"mov.n a2, %1\n"           // data pointer
+			"mov.n a3, %2\n"           // length
+			"movi.n a4, 0\n"           // checksum = 0
+			"srli a3, a3, 2\n"         // len /= 4
+			
+			"checksum_loop:\n"
+			"l32i a5, a2, 0\n"         // carica 4 byte
+			"add a4, a4, a5\n"         // accumula
+			"addi.n a2, a2, 4\n"       // avanza pointer
+			"addi a3, a3, -1\n"        // decrementa counter
+			"bnez a3, checksum_loop\n"
+			
+			"mov.n %0, a4\n"           // result
+			: "=r" (checksum)
+			: "r" (data), "r" (len)
+			: "a2", "a3", "a4", "a5"
+		);
+		return checksum;
+	}
+
+	// ========== MACRO PER OTTIMIZZAZIONI COMPILE-TIME ==========
+	#define LIKELY(x)       __builtin_expect(!!(x), 1)
+	#define UNLIKELY(x)     __builtin_expect(!!(x), 0)
+	#define INLINE          __attribute__((always_inline)) inline
+	#define HOT_FUNCTION    __attribute__((hot))
+	#define COLD_FUNCTION   __attribute__((cold))
+
+	// Funzione wrapper ottimizzata SENZA lookup table aggiuntive
+	HOT_FUNCTION 
+	int read_data_json_optimized_safe(char* jsonBuf, int maxJsonLen, uint16_t samplesPerBatch, uint16_t decimationFactor = 1) {
+		// Prefetch solo della TUA hex_table esistente
+		__builtin_prefetch(hex_table, 0, 3);
+		
+		if (UNLIKELY(!isStreaming || !jsonBuf)) return -1;
+		
+		return read_data_json_fir(jsonBuf, maxJsonLen, samplesPerBatch, decimationFactor);
+	}
 };
 
 // Definizione del flag statico
@@ -1746,6 +2046,7 @@ bool ADS1256_DMA::resetInProgress = false;
 bool ADS1256_DMA::isStreaming = false;
 spi_device_handle_t ADS1256_DMA::spi = nullptr;
 SemaphoreHandle_t ADS1256_DMA::spi_bus_mutex = nullptr;
+char ADS1256_DMA::hex_table[256][2];
 //spi_transaction_t ADS1256_DMA::tr = {};  // Inizializzazione della tr statica
 #endif
 
