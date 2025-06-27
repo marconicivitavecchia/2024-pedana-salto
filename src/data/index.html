@@ -138,11 +138,15 @@
         <div class="config-item">
             <label for="sampleRate">Sample Rate:</label>
             <select id="sampleRate" onchange="updateConfig('samplerate', this.value)">
-                <option value="200">200 Hz</option>
-                <option value="600">600 Hz</option>
-                <option value="1000">1000 Hz</option>
-                <option value="10000">10 kHz</option>
-                <option value="15000">15 kHz</option>
+                <option value="200">200 sps</option>
+				<option value="300">300 sps</option>
+                <option value="600">600 sps</option>
+                <option value="1000">1000 sps</option>
+				<option value="2000">2000 sps</option>
+				<option value="3000">3000 sps</option>
+				<option value="6000">6000 sps</option>
+                <option value="10000">10 Ksps</option>
+                <option value="15000">15 Ksps</option>
                 <option value="30000" selected>30 kHz</option>
             </select>
         </div>
