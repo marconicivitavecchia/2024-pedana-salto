@@ -530,11 +530,11 @@ void adcTask(void* pvParameters) {
 		// Calcola parametri di batch
 		uint32_t targetInterval = 5000;
 		uint16_t samplesPerBatch = (uint16_t)((gc.sampleRate * BATCH_PERIOD_US) / 1000000);
-		samplesPerBatch = std::min<uint16_t>(samplesPerBatch, MAX_SAMPLES_PER_BATCH);
 		uint16_t decimationFactor = getDecimationFactor(gc.sampleRate);
 		if(decimationFactor == 0){
 			decimationFactor = 1;
 		}
+		samplesPerBatch = MAX_SAMPLES_PER_BATCH / decimationFactor;
 		Serial.printf("ADC task: Sample rate: %d Hz\n", gc.sampleRate);
 		Serial.printf("ADC task: Target interval: %d us\n", targetInterval);
 		Serial.printf("ADC task: Expected samples per batch: %d\n", samplesPerBatch);
