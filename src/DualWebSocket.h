@@ -78,7 +78,12 @@ public:
         config.core_id = tskNO_AFFINITY;
         config.task_priority = 5;
         config.lru_purge_enable = true;
-        config.ctrl_port = _port + 1;
+        //config.ctrl_port = _port + 1;
+		if (_port == 81) {
+			config.ctrl_port = 181;
+		} else if (_port == 82) {
+			config.ctrl_port = 182;
+		}
 
         Serial.printf("Starting WebSocket server on port %d\n", _port);
 
