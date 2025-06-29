@@ -181,7 +181,7 @@ public:
     bool sendSync(int client_id, const uint8_t* data, size_t len, uint32_t timeout_ms = 5000) {
         if (!_server || len == 0) return false;
 
-        checkClients();
+        //checkClients();
 
         if (!isClientValid(client_id)) {
             Serial.printf("Send Sync failed: client %d invalid\n", client_id);
@@ -305,132 +305,6 @@ public:
             }
         }
         return success;
-    }
-
-    // ===== METODI OTTIMIZZATI CON BUFFER FISSO (SENZA MUTEX) =====
-
-    bool sendSyncFromQueue(int client_id, QueueHandle_t queue, size_t expectedLen, TickType_t timeout = portMAX_DELAY) {
-        if (!_server || !queue || expectedLen > SEND_BUFFER_SIZE) {
-            Serial.printf("SendSyncFromQueue failed: invalid params (len: %d, max: %d)\n", 
-                expectedLen, SEND_BUFFER_SIZE);
-            return false;
-        }
-
-        BaseType_t result = xQueueReceive(queue, _sendBuffer, timeout);
-        if (result != pdTRUE) {
-            Serial.println("SendSyncFromQueue failed: xQueueReceive timeout");
-            return false;
-        }
-
-        return sendSync(client_id, _sendBuffer, expectedLen);
-    }
-
-    bool sendSyncFromStreamBuffer(int client_id, StreamBufferHandle_t streamBuffer, TickType_t timeout = portMAX_DELAY) {
-        if (!_server || !streamBuffer) {
-            Serial.println("SendSyncFromStreamBuffer failed: invalid params");
-            return false;
-        }
-
-        size_t bytesReceived = xStreamBufferReceive(streamBuffer, _sendBuffer, SEND_BUFFER_SIZE, timeout);
-        if (bytesReceived == 0) {
-            Serial.println("SendSyncFromStreamBuffer failed: no data received");
-            return false;
-        }
-
-        return sendSync(client_id, _sendBuffer, bytesReceived);
-    }
-
-    bool sendSyncFromMessageBuffer(int client_id, MessageBufferHandle_t msgBuffer, TickType_t timeout = portMAX_DELAY) {
-        if (!_server || !msgBuffer) {
-            Serial.println("SendSyncFromMessageBuffer failed: invalid params");
-            return false;
-        }
-
-        size_t msgLen = xMessageBufferReceive(msgBuffer, _sendBuffer, SEND_BUFFER_SIZE, timeout);
-        if (msgLen == 0) {
-            Serial.println("SendSyncFromMessageBuffer failed: no message received");
-            return false;
-        }
-
-        return sendSync(client_id, _sendBuffer, msgLen);
-    }
-
-    bool broadcastSyncFromQueue(QueueHandle_t queue, size_t expectedLen, TickType_t timeout = portMAX_DELAY) {
-        if (!_server || !queue || expectedLen > SEND_BUFFER_SIZE) {
-            Serial.printf("BroadcastSyncFromQueue failed: invalid params (len: %d, max: %d)\n", 
-                expectedLen, SEND_BUFFER_SIZE);
-            return false;
-        }
-
-        checkClients();
-        if (_activeClients == 0) {
-            uint8_t dummy[expectedLen];
-            xQueueReceive(queue, dummy, timeout);
-            return false;
-        }
-
-        BaseType_t result = xQueueReceive(queue, _sendBuffer, timeout);
-        if (result != pdTRUE) {
-            Serial.println("BroadcastSyncFromQueue failed: xQueueReceive timeout");
-            return false;
-        }
-
-        bool success = true;
-        int sentCount = 0;
-        
-        for (int i = 0; i < MAX_CLIENTS; i++) {
-            if (_clients[i].inUse && _clients[i].errorCount < MAX_ERRORS) {
-                if (sendSync(_clients[i].id, _sendBuffer, expectedLen)) {
-                    sentCount++;
-                } else {
-                    success = false;
-                    Serial.printf("Broadcast failed for client %d\n", _clients[i].id);
-                }
-            }
-        }
-
-        Serial.printf("Broadcast sent to %d/%d clients\n", sentCount, _activeClients);
-        return success;
-    }
-
-    bool broadcastSyncFromStreamBuffer(StreamBufferHandle_t streamBuffer, TickType_t timeout = portMAX_DELAY) {
-        if (!_server || !streamBuffer) {
-            return false;
-        }
-
-        checkClients();
-        if (_activeClients == 0) {
-            uint8_t dummy[SEND_BUFFER_SIZE];
-            xStreamBufferReceive(streamBuffer, dummy, SEND_BUFFER_SIZE, timeout);
-            return false;
-        }
-
-        size_t bytesReceived = xStreamBufferReceive(streamBuffer, _sendBuffer, SEND_BUFFER_SIZE, timeout);
-        if (bytesReceived == 0) {
-            return false;
-        }
-
-        return broadcastSync(_sendBuffer, bytesReceived);
-    }
-
-    bool broadcastSyncFromMessageBuffer(MessageBufferHandle_t msgBuffer, TickType_t timeout = portMAX_DELAY) {
-        if (!_server || !msgBuffer) {
-            return false;
-        }
-
-        checkClients();
-        if (_activeClients == 0) {
-            uint8_t dummy[SEND_BUFFER_SIZE];
-            xMessageBufferReceive(msgBuffer, dummy, SEND_BUFFER_SIZE, timeout);
-            return false;
-        }
-
-        size_t msgLen = xMessageBufferReceive(msgBuffer, _sendBuffer, SEND_BUFFER_SIZE, timeout);
-        if (msgLen == 0) {
-            return false;
-        }
-
-        return broadcastSync(_sendBuffer, msgLen);
     }
 
     // DIAGNOSTICA
@@ -736,62 +610,6 @@ public:
 
     bool sendControlAsync(const char* data, size_t len) {
         return sendControlAsync((const uint8_t*)data, len);
-    }
-
-    // ===== METODI OTTIMIZZATI ZERO-COPY =====
-
-    // DATA SERVER - Da Code RTOS
-    bool sendDataFromQueue(QueueHandle_t queue, size_t expectedLen, TickType_t timeout = portMAX_DELAY) {
-        return dataServer.broadcastSyncFromQueue(queue, expectedLen, timeout);
-    }
-
-    bool sendDataToClientFromQueue(int clientId, QueueHandle_t queue, size_t expectedLen, TickType_t timeout = portMAX_DELAY) {
-        return dataServer.sendSyncFromQueue(clientId, queue, expectedLen, timeout);
-    }
-
-    // DATA SERVER - Da Stream Buffer
-    bool sendDataFromStreamBuffer(StreamBufferHandle_t streamBuffer, TickType_t timeout = portMAX_DELAY) {
-        return dataServer.broadcastSyncFromStreamBuffer(streamBuffer, timeout);
-    }
-
-    bool sendDataToClientFromStreamBuffer(int clientId, StreamBufferHandle_t streamBuffer, TickType_t timeout = portMAX_DELAY) {
-        return dataServer.sendSyncFromStreamBuffer(clientId, streamBuffer, timeout);
-    }
-
-    // DATA SERVER - Da Message Buffer
-    bool sendDataFromMessageBuffer(MessageBufferHandle_t msgBuffer, TickType_t timeout = portMAX_DELAY) {
-        return dataServer.broadcastSyncFromMessageBuffer(msgBuffer, timeout);
-    }
-
-    bool sendDataToClientFromMessageBuffer(int clientId, MessageBufferHandle_t msgBuffer, TickType_t timeout = portMAX_DELAY) {
-        return dataServer.sendSyncFromMessageBuffer(clientId, msgBuffer, timeout);
-    }
-
-    // CONTROL SERVER - Da Code RTOS
-    bool sendControlFromQueue(QueueHandle_t queue, size_t expectedLen, TickType_t timeout = portMAX_DELAY) {
-        return controlServer.broadcastSyncFromQueue(queue, expectedLen, timeout);
-    }
-
-    bool sendControlToClientFromQueue(int clientId, QueueHandle_t queue, size_t expectedLen, TickType_t timeout = portMAX_DELAY) {
-        return controlServer.sendSyncFromQueue(clientId, queue, expectedLen, timeout);
-    }
-
-    // CONTROL SERVER - Da Stream Buffer
-    bool sendControlFromStreamBuffer(StreamBufferHandle_t streamBuffer, TickType_t timeout = portMAX_DELAY) {
-        return controlServer.broadcastSyncFromStreamBuffer(streamBuffer, timeout);
-    }
-
-    bool sendControlToClientFromStreamBuffer(int clientId, StreamBufferHandle_t streamBuffer, TickType_t timeout = portMAX_DELAY) {
-        return controlServer.sendSyncFromStreamBuffer(clientId, streamBuffer, timeout);
-    }
-
-    // CONTROL SERVER - Da Message Buffer
-    bool sendControlFromMessageBuffer(MessageBufferHandle_t msgBuffer, TickType_t timeout = portMAX_DELAY) {
-        return controlServer.broadcastSyncFromMessageBuffer(msgBuffer, timeout);
-    }
-
-    bool sendControlToClientFromMessageBuffer(int clientId, MessageBufferHandle_t msgBuffer, TickType_t timeout = portMAX_DELAY) {
-        return controlServer.sendSyncFromMessageBuffer(clientId, msgBuffer, timeout);
     }
 
     // ===== DIAGNOSTICA =====
