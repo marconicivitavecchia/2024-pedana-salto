@@ -774,7 +774,7 @@ void wsTask(void* pvParameters) {
 						enable1 = 127;// A single batch in overflow condition indicates an overflow status
 						Serial.println("wsTask: sendOverflow true - reset buffer");
 						sendOverflowStatus(true);
-						//reset_ringbuffer(batchQueue);
+						reset_ringbuffer(batchQueue);
 					}  
 				}else{
 					if(enable1 < 128){
@@ -807,8 +807,8 @@ void wsTask(void* pvParameters) {
 				Serial.println("ADC monitor non inizializzato!");
 			}
 			batchCount = batchCount * 1000 / timeout;
-			Serial.print(" Batch per sec: "); Serial.println(batchCount);
 			if(!globalConfig.streaming){
+				Serial.print(" Batch per sec: "); Serial.println(batchCount);
 				sendDataKeepAlive(batchCount);
 			}
 			batchCount = 0;
@@ -1102,5 +1102,4 @@ void readWiFiFile() {
         Serial.println("File wifi_credentials.txt non esiste");
     }
 }
-
 
