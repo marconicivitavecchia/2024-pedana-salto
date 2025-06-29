@@ -41,19 +41,6 @@
 #define MAXBATCH RINGALLOC / DATALEN
 //#define MAX_SAMPLES_PER_BATCH 160u  // Aggiunto 'u' per unsigned
 
-//const char* WIFI_SSID = "D-Link-6A30CC";
-//const char* WIFI_PASSWORD = "FabSeb050770250368120110";
-
-// const char* WIFI_SSID = "RedmiSeb";
-// const char* WIFI_PASSWORD = "pippo2503";
-
-// Configurazione Wi-Fi
-//const char* WIFI_SSID = "WebPocket-E280";
-//const char* WIFI_PASSWORD = "dorabino.7468!";
-
-//const char* WIFI_SSID = "sensori";
-//const char* WIFI_PASSWORD = "sensori2019";
-
 // Struttura configurazione
 struct Config {
   uint32_t sampleRate;
