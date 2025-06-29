@@ -3,6 +3,15 @@
 <head>
     <title>WebSocket Test</title>
     <style>
+		.title {
+			text-align: center;
+			border: 1px solid rgba(255, 255, 255, 0.2);
+			border-radius: 20px;
+			padding: 20px 40px;
+			text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+			letter-spacing: 1px;
+			margin: 0;
+		}
 		.yscale-controls {
 			margin: 5px 0;
 			padding: 5px;
@@ -43,8 +52,26 @@
             padding: 10px;
             border: 1px solid #ccc;
         }
-        .config-item {
+         /* NUOVO: Container flexbox per elementi affiancati */
+        .flex-container {
+            display: flex;
+            gap: 20px; /* Spazio tra gli elementi */
             margin: 10px 0;
+        }
+        
+        /* NUOVO: Stili per i singoli elementi flex */
+        .flex-item {
+            flex: 1; /* Ogni elemento occupa lo stesso spazio */
+            padding: 10px;
+            background-color: #e0e0e0;
+            border-radius: 5px;
+        }
+        
+        /* Responsive: su schermi piccoli, torna in colonna */
+        @media (max-width: 768px) {
+            .flex-container {
+                flex-direction: column;
+            }
         }
         #log {
             margin-top: 20px;
@@ -120,7 +147,7 @@
             background-color: #ef4444;
         }
         .overflow-box {
-            width: 150px;
+            #width: 150px;
             padding: 5px;
             text-align: center;
             border-radius: 8px;
@@ -132,7 +159,7 @@
     </style>
 </head>
 <body>
-    <h1>WebSocket Test</h1>
+    <h1 class="title">Websocket data analysis</h1>
 
     <div class="control-panel">
         <div class="config-item">
@@ -166,23 +193,26 @@
                        onchange="updateBufferSize()">
             </label>
             <span>Buffer Size: <span id="bufferInfo">0/0</span></span>
-            <div id="overflowBox" class="overflow-box green">
-                OVERFLOW
-            </div>
         </div>       
         <div class="config-item">
             <label>Streaming Control:</label>
             <button id="streamToggle" onclick="toggleStreaming()">Start Streaming</button>
         </div>
 
-        <div class="config-item">
-            <label>Current Configuration:</label>
-            <div id="currentConfig">Waiting for connection...</div>
-        </div>
-
-        <div class="stats">
-            <div>Batch Stats:</div>
-            <div id="batchStats">No data yet</div>
+        <!-- MODIFICATO: Wrapper flexbox per Current Configuration e Batch Stats -->
+        <div class="flex-container">
+            <div class="flex-item">
+                <label><strong>Current Configuration:</strong></label>
+                <div id="currentConfig">Waiting for connection...</div>
+            </div>
+            
+            <div class="flex-item">
+                <label><strong>Batch Stats:</strong></label>
+                <div id="batchStats">No data yet</div>
+            </div>
+			 <div id="overflowBox" class="overflow-box green flex-item">
+                OVERFLOW
+            </div>
         </div>
         <div class="test-signal-controls">
             <label>Input selection:</label>
@@ -317,7 +347,7 @@
         // Display configuration
         const MIN_PLOT_INTERVAL = 5;
         const MIN_PIXEL_DELTA = 2;
-        const padding = 40;
+        const padding = 10;
         const TARGET_POINTS = 3000;
 
         // Oscilloscope specific variables
@@ -1712,7 +1742,10 @@
                     overflowBox.classList.remove('red');
                     overflowBox.classList.add('green');
                 }
-            }
+            }else if('t' in status){
+				console.log('Dati al posto di controllo: port swap');
+				window.location.reload();
+			}
         }
 		
 		var cntrAttempt = 0;
@@ -1810,3 +1843,4 @@ t5: atterraggio
     </script>
 </body>
 </html>
+
