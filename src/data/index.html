@@ -383,7 +383,7 @@
         canvas.width = canvas.offsetWidth;
         canvas.height = canvas.offsetHeight;
         window.addEventListener('resize', resizeCanvas);
-        
+		// Variabile globale per il gain       
 
         leftButton.onmousedown = async () => {
             isScrolling = true;
@@ -535,92 +535,503 @@
         radioButtons2.forEach(radio => {
             radio.addEventListener('change', handleRadioChange);
         });
-
+//----------------------------------------------------------------------------------------------------------------------- OGGI -----------------------------			
+       //----------------------------------------------------------------------------------------------------------------------- OGGI -----------------------------			
         updateConfig('freq', 1);
 
-        /*
-        function resizeCanvas() {
-        // Ottieni le dimensioni del contenitore
-        const container = canvas.parentElement;
-        const rect = container.getBoundingClientRect();
-        
-        // Aggiorna le dimensioni del canvas
-        canvas.width = rect.width;
-        canvas.height = rect.height;
-        
-        // Forza un ridisegno
-        if (recordBuffer && recordBuffer.length > 0) {
-            drawPlot();
+        // =====================================================
+        // VARIABILI GLOBALI PER IL SISTEMA DI GAIN
+        // =====================================================
+
+        // Fattore di zoom per l'asse Y (1.0 = normale, >1.0 = zoom in, <1.0 = zoom out)
+        let yGain = 1.0;
+
+        // =====================================================
+        // FUNZIONI PRINCIPALI DI CONTROLLO GAIN
+        // =====================================================
+
+        /**
+         * Aggiusta il gain aggiungendo o sottraendo un valore (controllo additivo)
+         * @param {number} delta - Valore da aggiungere/sottrarre (1, -1, 10, -10)
+         */
+        function adjustGainBy(delta) {
+            // Se auto-scale è attivo, non fare nulla - i tasti funzionano solo in modalità manuale
+            if (autoScale) {
+                console.log('Gain manuale disabilitato durante auto-scale');
+                return;
+            }
+            
+            // Calcola il nuovo gain aggiungendo il delta
+            const newGain = yGain + delta;
+            
+            // Protezione più rigorosa: limiti più stretti per evitare crash
+            if (newGain < 0.5 || newGain > 50) {
+                console.log(`Gain ${newGain.toFixed(1)}x fuori dai limiti sicuri (0.5x - 50x)`);
+                return; // Esce senza applicare se fuori limiti
+            }
+            
+            // USA il centro CORRENTE della vista (dove hai navigato con W/S)
+            const currentCenter = (yScale.max + yScale.min) / 2;
+            
+            // PRIMA aggiorna il gain globale
+            yGain = newGain;
+            
+            // Calcola il nuovo range usando SEMPRE il range standard come riferimento
+            const standardRange = 8388608; // Range di riferimento standard
+            const newRange = standardRange / yGain;
+            
+            // Applica il nuovo range mantenendo il centro CORRENTE (dove sei navigato)
+            yScale.min = currentCenter - newRange / 2;
+            yScale.max = currentCenter + newRange / 2;
+            
+            // Verifica finale dei valori
+            if (isNaN(yScale.min) || isNaN(yScale.max) || !isFinite(yScale.min) || !isFinite(yScale.max)) {
+                console.log('Valori finali non validi, reset completo');
+                yScale.min = 0;
+                yScale.max = 8388608;
+                yGain = 1.0;
+            }
+            
+            // Aggiorna tutti i display che mostrano il gain
+            updateGainDisplay();        
+            updateAutoScaleGainDisplay(); 
+            
+            // Ridisegna il grafico per mostrare le modifiche
+            if (inputMode) {
+                drawPlotInc(); 
+            } else {
+                drawPlot();    
+            }
+            
+            console.log(`Y Gain aggiustato di ${delta}: nuovo gain ${yGain.toFixed(2)}x, range: ${(yScale.max - yScale.min).toFixed(0)}, centro: ${currentCenter.toFixed(0)}`);
         }
-    }
-*/		function updateYScale(newValues) {
-			if (!autoScale) return;
-			
-			// Aggiungi nuovi valori al buffer
-			yScaleBuffer.push(...newValues);
-			
-			// Mantieni solo gli ultimi Y_SCALE_BUFFER_SIZE valori
-			if (yScaleBuffer.length > Y_SCALE_BUFFER_SIZE) {
-				yScaleBuffer = yScaleBuffer.slice(-Y_SCALE_BUFFER_SIZE);
-			}
-			
-			if (yScaleBuffer.length === 0) return;
-			
-			// Calcola min e max dai valori nel buffer
-			const minValue = Math.min(...yScaleBuffer);
-			const maxValue = Math.max(...yScaleBuffer);
-			
-			// Aggiungi margine del 10%
-			const range = maxValue - minValue;
-			const margin = Math.max(range * 0.1, 1000);
-			
-			// Aggiorna gradualmente la scala per evitare salti bruschi
-			const smoothFactor = 0.1;
-			
-			const targetMin = minValue - margin;
-			const targetMax = maxValue + margin;
-			
-			// Smooth transition verso i nuovi valori
-			yScale.min = yScale.min + (targetMin - yScale.min) * smoothFactor;
-			yScale.max = yScale.max + (targetMax - yScale.max) * smoothFactor;
-		}
 
-		function resetYScale() {
-			yScaleBuffer = [];
-			yScale.min = 0;
-			yScale.max = 8388608;
-			console.log("YScale resettata ai valori di default");
-		}
+        /**
+         * Aggiusta il centro della vista spostando su/giù
+         * @param {number} delta - Valore da aggiungere/sottrarre al centro (±500000)
+         */
+        function adjustCenterBy(delta) {
+            // Se auto-scale è attivo, non fare nulla - i tasti funzionano solo in modalità manuale
+            if (autoScale) {
+                console.log('Controllo centro disabilitato durante auto-scale');
+                return;
+            }
+            
+            // Calcola il centro corrente
+            const currentCenter = (yScale.max + yScale.min) / 2;
+            const newCenter = currentCenter + delta;
+            
+            // Calcola il range corrente (mantienilo uguale)
+            const currentRange = yScale.max - yScale.min;
+            
+            // Applica il nuovo centro mantenendo lo stesso range
+            yScale.min = newCenter - currentRange / 2;
+            yScale.max = newCenter + currentRange / 2;
+            
+            // Verifica che i valori risultanti siano ragionevoli
+            if (isNaN(yScale.min) || isNaN(yScale.max) || !isFinite(yScale.min) || !isFinite(yScale.max)) {
+                console.log('Valori di centro non validi, ripristino');
+                yScale.min = 0;
+                yScale.max = 8388608;
+            }
+            
+            // Ridisegna il grafico per mostrare le modifiche
+            if (inputMode) {
+                drawPlotInc(); 
+            } else {
+                drawPlot();    
+            }
+            
+            console.log(`Centro spostato di ${delta}: nuovo centro ${newCenter.toFixed(0)}, range: ${currentRange.toFixed(0)}`);
+        }
 
-		function addYScaleControls() {
-			const controlPanel = document.querySelector('.control-panel');
-			
-			const yScaleDiv = document.createElement('div');
-			yScaleDiv.className = 'config-item yscale-controls';
-			yScaleDiv.innerHTML = `
-				<label><strong>Y Scale Controls:</strong></label>
-				<button onclick="resetYScale()">Reset Y Scale</button>
-				<label>
-					<input type="checkbox" id="autoScaleCheckbox" checked onchange="toggleAutoScale()">
-					Auto Scale Y
-				</label>
-				<div id="yScaleInfo" class="yscale-info">Y Range: 0 to 8388608</div>
-			`;
-			
-			controlPanel.appendChild(yScaleDiv);
-		}
+        /**
+         * Resetta il gain a 1.0x (valore normale)
+         */
+        function resetGain() {
+            // Riporta il gain ai valori di default
+            yGain = 1.0;
+            
+            // Cancella il buffer auto-scale per ripartire pulito
+            yScaleBuffer = [];
+            
+            // RESET SEMPLICE: usa sempre valori standard fissi
+            yScale.min = 0;
+            yScale.max = 8388608;
+            
+            // Aggiorna tutti i display
+            updateGainDisplay();
+            updateAutoScaleGainDisplay();
+            
+            // Ridisegna il grafico
+            if (inputMode) {
+                drawPlotInc();
+            } else {
+                drawPlot();
+            }
+            
+            console.log('Y Gain e scala Y resettati ai valori standard (0 - 8388608)');
+        }
 
-		function toggleAutoScale() {
-			autoScale = document.getElementById('autoScaleCheckbox').checked;
-			console.log("Auto-scaling:", autoScale ? "abilitato" : "disabilitato");
-		}
+        // =====================================================
+        // FUNZIONI DI CALCOLO E APPLICAZIONE GAIN
+        // =====================================================
 
-		function updateYScaleInfo() {
-			const infoElement = document.getElementById('yScaleInfo');
-			if (infoElement) {
-				infoElement.textContent = `Y Range: ${yScale.min.toFixed(0)} to ${yScale.max.toFixed(0)}`;
-			}
-		}
+        /**
+         * Calcola il gain "effettivo" basato sulla scala Y corrente
+         * Utile per sapere quanto zoom ha applicato l'auto-scale
+         */
+        function calculateEffectiveGain() {
+            const defaultRange = 8388608; // Range Y di default (da 0 a 8388608)
+            const currentRange = yScale.max - yScale.min; // Range corrente
+            
+            // Più piccolo è il range, maggiore è il gain (zoom)
+            return defaultRange / currentRange;
+        }
+
+        /**
+         * Applica il gain manualmente alla scala Y quando auto-scale è disattivo
+         */
+        function applyGainToYScale() {
+            // Trova il centro della vista corrente
+            const centerY = (yScale.max + yScale.min) / 2;
+            
+            // Calcola il range corrente
+            const currentRange = yScale.max - yScale.min;
+            
+            // Calcola il nuovo range applicando il gain
+            // Gain maggiore = range più piccolo = più zoom
+            const newRange = currentRange / yGain;
+            
+            // Aggiorna i limiti mantenendo il centro
+            yScale.min = centerY - newRange / 2;
+            yScale.max = centerY + newRange / 2;
+            
+            console.log(`Scala Y con gain ${yGain}x: ${yScale.min.toFixed(0)} - ${yScale.max.toFixed(0)}`);
+        }
+
+        // =====================================================
+        // FUNZIONI DI AGGIORNAMENTO DISPLAY
+        // =====================================================
+
+        /**
+         * Aggiorna il display del gain totale ("Total Gain: 15.2x")
+         */
+        function updateGainDisplay() {
+            const currentGainElement = document.getElementById('currentGain');
+            
+            if (currentGainElement) {
+                // Mostra il gain corrente
+                currentGainElement.textContent = `Total Gain: ${yGain.toFixed(2)}x`;
+                
+                // Cambia colore in base al livello di gain
+                if (yGain > 5) {
+                    currentGainElement.style.color = '#dc2626'; // Rosso per gain alto
+                } else if (yGain > 1) {
+                    currentGainElement.style.color = '#0369a1'; // Blu per gain medio
+                } else {
+                    currentGainElement.style.color = '#059669'; // Verde per gain basso/zoom out
+                }
+            }
+        }
+
+        /**
+         * Aggiorna il display del gain effettivo quando auto-scale è attivo
+         */
+        function updateEffectiveGainDisplay() {
+            if (autoScale) {
+                const effectiveGain = calculateEffectiveGain(); // Calcola il gain reale dall'auto-scale
+                const autoScaleGainElement = document.getElementById('autoScaleGain');
+                if (autoScaleGainElement) {
+                    // Mostra solo il gain effettivo calcolato dall'auto-scale
+                    autoScaleGainElement.textContent = `${effectiveGain.toFixed(2)}x`;
+                    
+                    // Colore basato sul gain effettivo
+                    if (effectiveGain > 5) {
+                        autoScaleGainElement.style.color = '#dc2626';
+                    } else if (effectiveGain > 1) {
+                        autoScaleGainElement.style.color = '#0369a1';
+                    } else {
+                        autoScaleGainElement.style.color = '#059669';
+                    }
+                }
+            }
+        }
+
+        /**
+         * Aggiorna il display del gain nell'area auto-scale
+         * Mostra gain effettivo se auto-scale ON, gain manuale se auto-scale OFF
+         */
+        function updateAutoScaleGainDisplay() {
+            const autoScaleGainElement = document.getElementById('autoScaleGain');
+            if (autoScaleGainElement) {
+                if (autoScale) {
+                    // Auto-scale ATTIVO: mostra il gain che l'auto-scale ha calcolato
+                    updateEffectiveGainDisplay();
+                } else {
+                    // Auto-scale DISATTIVO: mostra il gain manuale che stai controllando
+                    autoScaleGainElement.textContent = `${yGain.toFixed(2)}x`;
+                    
+                    // Colore basato sul gain manuale
+                    if (yGain > 5) {
+                        autoScaleGainElement.style.color = '#dc2626';
+                    } else if (yGain > 1) {
+                        autoScaleGainElement.style.color = '#0369a1';
+                    } else {
+                        autoScaleGainElement.style.color = '#059669';
+                    }
+                }
+            }
+        }
+
+        /**
+         * Inizializza tutti i display del gain (chiamata al caricamento pagina)
+         */
+        function initializeGainDisplays() {
+            updateGainDisplay();           // Inizializza "Total Gain"
+            updateAutoScaleGainDisplay();  // Inizializza gain auto-scale
+            updateYScaleInfo();           // Inizializza info scala Y
+        }
+
+        // =====================================================
+        // FUNZIONI MODIFICATE PER INTEGRAZIONE GAIN
+        // =====================================================
+
+        /**
+         * FUNZIONE PRINCIPALE: Aggiorna la scala Y durante lo streaming
+         * Integrata con il sistema di gain
+         */
+        function updateYScale(newValues) {
+            // Se auto-scale è disattivato, non fare nulla automaticamente
+            if (!autoScale) return;
+            
+            // Aggiungi i nuovi valori al buffer per il calcolo della scala
+            yScaleBuffer.push(...newValues);
+            
+            // Mantieni solo gli ultimi Y_SCALE_BUFFER_SIZE valori per performance
+            if (yScaleBuffer.length > Y_SCALE_BUFFER_SIZE) {
+                yScaleBuffer = yScaleBuffer.slice(-Y_SCALE_BUFFER_SIZE);
+            }
+            
+            if (yScaleBuffer.length === 0) return;
+            
+            // Calcola min e max dai valori recenti
+            const minValue = Math.min(...yScaleBuffer);
+            const maxValue = Math.max(...yScaleBuffer);
+            
+            // Calcola il range base con margine del 10%
+            const range = maxValue - minValue;
+            const margin = Math.max(range * 0.1, 1000);
+            
+            // *** QUI È LA MAGIA DEL GAIN ***
+            // Applica il gain al range: gain maggiore = range più piccolo = più zoom
+            const baseRange = range + 2 * margin;
+            const gainedRange = baseRange / yGain;
+            
+            // Centra la vista sui dati
+            const centerValue = (minValue + maxValue) / 2;
+            
+            // Aggiorna gradualmente la scala per evitare salti bruschi
+            const smoothFactor = 0.1;
+            const targetMin = centerValue - gainedRange / 2;
+            const targetMax = centerValue + gainedRange / 2;
+            
+            // Smooth transition verso i nuovi valori
+            yScale.min = yScale.min + (targetMin - yScale.min) * smoothFactor;
+            yScale.max = yScale.max + (targetMax - yScale.max) * smoothFactor;
+            
+            // Aggiorna il display per mostrare il gain effettivo in tempo reale
+            updateEffectiveGainDisplay();
+        }
+
+        /**
+         * Resetta la scala Y considerando il gain corrente
+         */
+        function resetYScale() {
+            yScaleBuffer = []; // Cancella il buffer
+            
+            if (yGain === 1.0) {
+                // Gain normale: usa i valori di default
+                yScale.min = 0;
+                yScale.max = 8388608;
+            } else {
+                // Gain diverso da 1.0: applica il gain ai valori di default
+                const defaultCenter = 4194304; // Centro del range di default
+                const defaultRange = 8388608;   // Range di default
+                const gainedRange = defaultRange / yGain; // Applica il gain
+                
+                // Centra sul range di default ma con il gain applicato
+                yScale.min = defaultCenter - gainedRange / 2;
+                yScale.max = defaultCenter + gainedRange / 2;
+            }
+            
+            console.log(`YScale resettata con gain ${yGain}x: ${yScale.min.toFixed(0)} - ${yScale.max.toFixed(0)}`);
+        }
+
+        /**
+         * Gestisce il toggle dell'auto-scale
+         * Integrata per gestire il passaggio gain automatico ↔ gain manuale
+         */
+        function toggleAutoScale() {
+            autoScale = document.getElementById('autoScaleCheckbox').checked;
+            console.log("Auto-scaling:", autoScale ? "abilitato" : "disabilitato");
+            
+            if (autoScale) {
+                // Attivazione auto-scale: RESETTA il gain a 1.0 per evitare doppi effetti
+                yGain = 1.0;
+                
+                // Aggiorna i display
+                updateGainDisplay();
+                updateAutoScaleGainDisplay();
+                
+                console.log('Auto-scale attivato - gain resettato a 1.0x');
+            } else {
+                // Disattivazione auto-scale: "congela" il gain corrente
+                // Copia il gain effettivo dell'auto-scale come nuovo gain manuale
+                const effectiveGain = calculateEffectiveGain();
+                yGain = effectiveGain;
+                
+                // Aggiorna i display per mostrare il nuovo gain manuale
+                updateGainDisplay();
+                updateAutoScaleGainDisplay();
+                
+                console.log(`Gain copiato dall'auto-scale: ${effectiveGain.toFixed(2)}x`);
+                
+                // Ridisegna mantenendo esattamente la stessa vista
+                if (inputMode) {
+                    drawPlotInc();
+                } else {
+                    drawPlot();
+                }
+            }
+        }
+
+        /**
+         * Aggiorna le info della scala Y mostrandone anche il gain
+         */
+        function updateYScaleInfo() {
+            const infoElement = document.getElementById('yScaleInfo');
+            if (infoElement) {
+                infoElement.textContent = `Y Range: ${yScale.min.toFixed(0)} to ${yScale.max.toFixed(0)} (Gain: ${yGain.toFixed(2)}x)`;
+            }
+        }
+
+        /**
+         * Crea e aggiunge i controlli di gain all'interfaccia
+         */
+        function addYScaleControls() {
+            const controlPanel = document.querySelector('.control-panel');
+            
+            const yScaleDiv = document.createElement('div');
+            yScaleDiv.className = 'config-item yscale-controls';
+            yScaleDiv.innerHTML = `
+                <label><strong>Y Scale Controls:</strong></label>
+                <button onclick="resetYScale()">Reset Y Scale</button>
+                <label>
+                    <input type="checkbox" id="autoScaleCheckbox" checked onchange="toggleAutoScale()">
+                    Auto Scale Y (Gain: <span id="autoScaleGain" style="font-weight: bold; color: #0369a1;">1.0x</span>)
+                </label>
+                <div style="margin: 5px 0; display: flex; align-items: center; gap: 15px;">
+                    <label>Y Gain:</label>
+                    
+                    <!-- Prima coppia: +1/-1 -->
+                    <div style="display: flex; flex-direction: column; align-items: center;">
+                        <button onclick="adjustGainBy(1)" style="border: 2px solid #0369a1; padding: 2px 8px; margin: 1px; background: #e0f2fe; cursor: pointer; font-size: 12px;">+</button>
+                        <span style="font-size: 10px; color: #0369a1; font-weight: bold;">+1/-1</span>
+                        <button onclick="adjustGainBy(-1)" style="border: 2px solid #0369a1; padding: 2px 8px; margin: 1px; background: #e0f2fe; cursor: pointer; font-size: 12px;">-</button>
+                    </div>
+                    
+                    <!-- Seconda coppia: +10/-10 -->
+                    <div style="display: flex; flex-direction: column; align-items: center;">
+                        <button onclick="adjustGainBy(10)" style="border: 2px solid #dc2626; padding: 2px 8px; margin: 1px; background: #fee2e2; cursor: pointer; font-size: 12px;">+</button>
+                        <span style="font-size: 10px; color: #dc2626; font-weight: bold;">+10/-10</span>
+                        <button onclick="adjustGainBy(-10)" style="border: 2px solid #dc2626; padding: 2px 8px; margin: 1px; background: #fee2e2; cursor: pointer; font-size: 12px;">-</button>
+                    </div>
+                    
+                    <!-- Terza coppia: centro fino -->
+                    <div style="display: flex; flex-direction: column; align-items: center;">
+                        <button onclick="adjustCenterBy(250000)" style="border: 2px solid #059669; padding: 2px 8px; margin: 1px; background: #d1fae5; cursor: pointer; font-size: 12px;">+</button>
+                        <span style="font-size: 10px; color: #059669; font-weight: bold;">Centro</span>
+                        <button onclick="adjustCenterBy(-250000)" style="border: 2px solid #059669; padding: 2px 8px; margin: 1px; background: #d1fae5; cursor: pointer; font-size: 12px;">-</button>
+                    </div>
+                    
+                    <button onclick="resetGain()" style="margin-left: 10px; background: #ff6b6b; color: white; border: none; padding: 4px 8px; border-radius: 3px; cursor: pointer;">Reset</button>
+                </div>
+                <div style="margin: 5px 0;">
+                    <span id="currentGain" style="font-weight: bold; color: #0369a1;">Total Gain: 1.0x</span>
+                </div>
+                <div id="yScaleInfo" class="yscale-info">Y Range: 0 to 8388608</div>
+            `;
+            
+            controlPanel.appendChild(yScaleDiv);
+            
+            // Inizializza i display dopo aver aggiunto l'HTML
+            setTimeout(() => {
+                initializeGainDisplays();
+            }, 100);
+        }
+
+        // =====================================================
+        // TASTI RAPIDI PER IL GAIN
+        // =====================================================
+
+        // Aggiunge controlli con tasti rapidi per il gain
+        document.addEventListener('keydown', function(event) {
+            // Funziona solo se non stai scrivendo in un campo di testo
+            if (event.target.tagName !== 'INPUT' && event.target.tagName !== 'TEXTAREA') {
+                switch(event.key) {
+                    case 'ArrowUp':
+                        adjustGainBy(1); // Aumenta di 1
+                        event.preventDefault();
+                        break;
+                    case 'ArrowDown':
+                        adjustGainBy(-1); // Diminuisce di 1
+                        event.preventDefault();
+                        break;
+                    case 'PageUp':
+                        adjustGainBy(10); // Aumenta di 10
+                        event.preventDefault();
+                        break;
+                    case 'PageDown':
+                        adjustGainBy(-10); // Diminuisce di 10
+                        event.preventDefault();
+                        break;
+                    case '1':
+                        adjustGainBy(1); // Aumenta di 1
+                        event.preventDefault();
+                        break;
+                    case '2':
+                        adjustGainBy(-1); // Diminuisce di 1
+                        event.preventDefault();
+                        break;
+                    case '5':
+                        adjustGainBy(10); // Aumenta di 10
+                        event.preventDefault();
+                        break;
+                    case '0':
+                        adjustGainBy(-10); // Diminuisce di 10
+                        event.preventDefault();
+                        break;
+                    case 'w':
+                    case 'W':
+                        adjustCenterBy(250000); // Centro su (più fino)
+                        event.preventDefault();
+                        break;
+                    case 's':
+                    case 'S':
+                        adjustCenterBy(-250000); // Centro giù (più fino)
+                        event.preventDefault();
+                        break;
+                    case 'r':
+                    case 'R':
+                        resetGain(); // Resetta tutto a 1.0x
+                        event.preventDefault();
+                        break;
+                }
+            }
+        });
+//----------------------------------------------------------------------------------------------------------------------- END OGGI-----------------------------
+//----------------------------------------------------------------------------------------------------------------------- END OGGI-----------------------------
         function resizeCanvas() {
             console.log("resizeCanvas");
             canvas.width = canvas.offsetWidth;
@@ -632,7 +1043,7 @@
                 playRecord();
              }
         }
-//-----------------------------------------------------------------------------------------------------------------------
+
         // JavaScript
         function saveRecordedBatches() {
             const content = recordBuffer.map(batch => {
@@ -940,24 +1351,28 @@
         }
 */
         function playRecord() {
-            // disabilita il modo test se attivo
-            adcSignalEnabled = false;
-            testSignalEnabled0 = false;
-            testSignalEnabled1 = false;
-            if(isStreaming) {
-                toggleStreaming();
-            }
-            inputMode = false;
-            recordBuffer = recordBuffer.slice(0, maxBufferSize);
-            currPlayIndex = 0;
-            const firstBatch = recordBuffer[0];
-            xScale.min = parseInt(firstBatch.t, 16);
-            xScale.max = xScale.min + bufferTimespan;
-            report = analyzeJump(recordBuffer, SAMPLE_RATE);   
-            printJumpReport(report);  
-            drawPlot();       
-            scrollView(0);            
-        }
+			// disabilita il modo test se attivo
+			adcSignalEnabled = false;
+			testSignalEnabled0 = false;
+			testSignalEnabled1 = false;
+			if(isStreaming) {
+				toggleStreaming();
+			}
+			inputMode = false;
+			recordBuffer = recordBuffer.slice(0, maxBufferSize);
+			currPlayIndex = 0;
+			const firstBatch = recordBuffer[0];
+			xScale.min = parseInt(firstBatch.t, 16);
+			xScale.max = xScale.min + bufferTimespan;
+			
+			// Mantieni la scala Y corrente senza auto-scaling automatico
+			// L'utente può usare i controlli di gain manualmente se necessario
+			
+			report = analyzeJump(recordBuffer, SAMPLE_RATE);   
+			printJumpReport(report);  
+			drawPlot();       
+			scrollView(0);            
+		}
 
         function toggleRecording() {
             if (!isRecording) {
@@ -1843,4 +2258,3 @@ t5: atterraggio
     </script>
 </body>
 </html>
-
