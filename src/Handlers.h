@@ -31,7 +31,7 @@ esp_err_t apiWiFiConfigGet(httpd_req_t *req) {
     return ESP_OK;
 }
 
-// API 2: POST /api/wifi/config
+// VERSIONE CORRETTA del handler apiWiFiConfigPost
 esp_err_t apiWiFiConfigPost(httpd_req_t *req) {
     ESP32WebServer* server = (ESP32WebServer*)req->user_ctx;
     server->currentRequest = req;
@@ -68,6 +68,28 @@ esp_err_t apiWiFiConfigPost(httpd_req_t *req) {
     bool keepExistingBackup = doc["keepExistingBackupPassword"] | false;
     bool forceEmptyPrimary = doc["forceEmptyPrimaryPassword"] | false;
     bool forceEmptyBackup = doc["forceEmptyBackupPassword"] | false;
+    
+    // ⭐ NOVITÀ: Rileva se ci sono modifiche che richiedono riconnessione
+    bool needsReconnection = false;
+    String currentSSID = WiFi.SSID();
+    
+    // Verifica se l'SSID primario è cambiato
+    if (primarySSID != currentSSID) {
+        needsReconnection = true;
+        Serial.println("🔄 SSID change detected - reconnection needed");
+    }
+    
+    // Verifica se è stata fornita una nuova password
+    if (primaryPassword.length() > 0) {
+        needsReconnection = true;
+        Serial.println("🔄 New password provided - reconnection needed");
+    }
+    
+    // Verifica se è cambiato lo stato "open network"
+    if (forceEmptyPrimary) {
+        needsReconnection = true;
+        Serial.println("🔄 Network security change - reconnection needed");
+    }
     
     // Gestione "force empty" (priorità massima)
     if (forceEmptyPrimary) {
@@ -125,25 +147,47 @@ esp_err_t apiWiFiConfigPost(httpd_req_t *req) {
     Serial.println(backupPassword.length() > 0 ? "[PROTECTED]" : "[EMPTY/OPEN]");
     Serial.print("Auto Connect: ");
     Serial.println(autoConnect ? "Yes" : "No");
+    Serial.print("Needs Reconnection: ");
+    Serial.println(needsReconnection ? "Yes" : "No");
     
     // Salva credenziali
     bool success = WiFiManager::saveCredentialsToFileSystem(primarySSID, primaryPassword, backupSSID, backupPassword);
-    
-    // Connetti se il salvataggio è riuscito
-    if (success) {
-        success = WiFiManager::connectIntelligent();
-    }
-    
+
+    // ⭐ RISPOSTA CORRETTA: Include sempre i flag necessari
     JsonDocument response;
     response["success"] = success;
-    response["connecting"] = success;
-    response["message"] = success ? "Configuration saved and connecting" : "Failed to save configuration";
-    
+    response["reconnecting"] = success && needsReconnection;  // ⭐ Flag corretto
+    response["connecting"] = success && needsReconnection;    // ⭐ Alias per compatibilità
+    response["needs_reconnection"] = needsReconnection;       // ⭐ Info aggiuntiva
+    response["message"] = success ? 
+        (needsReconnection ? "Configuration saved - reconnecting..." : "Configuration saved successfully") : 
+        "Failed to save configuration";
+
     String responseStr;
     serializeJson(response, responseStr);
     server->sendJSON(responseStr, success ? 200 : 500);
-    
+    Serial.println("📤 Response: " + responseStr);
     server->currentRequest = nullptr;
+    
+    // ⭐ RICONNESSIONE ASINCRONA: Solo se necessario
+    if (success && needsReconnection) {
+        Serial.println("🔄 Starting WiFi reconnection process...");
+        
+        // Aspetta un po' per permettere l'invio della risposta
+        delay(500);
+        
+        WiFiManager::loadCredentialsFromFileSystem();
+        Serial.println("Credentials reloaded from filesystem");
+        
+        // Disconnetti e riconnetti alla rete primaria
+        Serial.println("🔄 Forcing reconnection to primary network...");
+        WiFi.disconnect();
+        delay(1000);
+        WiFiManager::connectIntelligent();
+    } else if (success) {
+        Serial.println("ℹ️ Configuration saved but no reconnection needed");
+    }
+
     return ESP_OK;
 }
 
@@ -364,6 +408,40 @@ esp_err_t apiDebugFile(httpd_req_t *req) {
     return ESP_OK;
 }
 
+// API 7: POST /api/system/reboot
+esp_err_t apiSystemReboot(httpd_req_t *req) {
+    ESP32WebServer* server = (ESP32WebServer*)req->user_ctx;
+    server->currentRequest = req;
+    
+    // CORS preflight
+    if (req->method == HTTP_OPTIONS) {
+        server->addAPIHeaders();
+        server->currentRequest = nullptr;
+        return httpd_resp_send(req, NULL, 0);
+    }
+    
+    Serial.println("🔄 Reboot request received");
+    
+    // Invia risposta immediata prima del reboot
+    JsonDocument response;
+    response["success"] = true;
+    response["message"] = "Rebooting in 2 seconds...";
+    
+    String responseStr;
+    serializeJson(response, responseStr);
+    server->sendJSON(responseStr, 200);
+    
+    server->currentRequest = nullptr;
+    
+    // Ritarda il reboot per permettere l'invio della risposta
+    delay(2000);
+    
+    Serial.println("🔄 Restarting ESP32...");
+    ESP.restart();
+    
+    return ESP_OK;
+}
+
 // ===================================
 // SETUP FINALE da caricare in .ino
 // ===================================
@@ -385,9 +463,9 @@ void setupWiFiAPI(ESP32WebServer& webServer) {
 	// Registra il test
 	webServer.addHandler("/test", HTTP_GET, test_handler);
 	webServer.addHandler("/simple", HTTP_GET, simpleTestHandler);
+	webServer.addHandler("/api/system/reboot", HTTP_POST, apiSystemReboot);
 	//webServer.addHandler("/api/wificredentials", HTTP_GET, simpleTestHandler);
 }
-
 #endif
 // Setup nel tuo Arduino:
 // webServer.addHandler("/api/my-endpoint", HTTP_POST, mySimpleAPI);
