@@ -5,13 +5,6 @@ SPA WIFI CONFIG - VERSIONE PULITA
 Usa l'IP corrente dalla barra degli indirizzi
 */
 
-/*
-===============================
-SPA WIFI CONFIG - VERSIONE PULITA
-===============================
-Usa l'IP corrente dalla barra degli indirizzi
-*/
-
 class WiFiConfigAPI {
     constructor() {
         // Usa l'IP corrente del browser - semplice e funziona sempre
@@ -319,6 +312,7 @@ class WiFiConfigAPI {
         try {
             console.log('🧪 Testing WiFi connection...', credentials.ssid);
             
+            // Formato corretto per il tuo handler C++
             const testPayload = {
                 ssid: credentials.ssid,
                 password: credentials.password || ''
@@ -339,6 +333,28 @@ class WiFiConfigAPI {
             return {
                 success: false,
                 error: error.message
+            };
+        }
+    }
+
+    async rebootDevice() {
+        try {
+            console.log('🔄 Sending reboot command...');
+            
+            const result = await this.fetchJSON('/api/system/reboot', {
+                method: 'POST'
+            });
+
+            return {
+                success: result.success || true,
+                message: result.message || 'Reboot command sent'
+            };
+        } catch (error) {
+            // È normale che fallisca - l'ESP32 si disconnette durante il reboot
+            console.log('Reboot request sent (connection lost as expected)');
+            return {
+                success: true,
+                message: 'Reboot command sent'
             };
         }
     }
@@ -379,6 +395,7 @@ class WiFiConfigUI {
         this.api = new WiFiConfigAPI();
         this.isScanning = false;
         this.isSaving = false;
+        this.isRebooting = false; // Flag per prevenire doppi reboot
         this.networks = [];
         this.currentConfig = {};
         
@@ -387,6 +404,8 @@ class WiFiConfigUI {
     }
 
     initializeEventListeners() {
+        console.log('🔗 Initializing event listeners...');
+        
         document.getElementById('wifiForm')?.addEventListener('submit', async (e) => {
             e.preventDefault();
             await this.handleSaveConfig();
@@ -395,6 +414,28 @@ class WiFiConfigUI {
         document.getElementById('scanBtn')?.addEventListener('click', () => this.handleScanNetworks());
         document.getElementById('resetBtn')?.addEventListener('click', () => this.handleResetConfig());
         document.getElementById('testBtn')?.addEventListener('click', () => this.handleTestConnection());
+        
+        // REBOOT BUTTON - Con debug e gestione tooltip
+        const rebootBtn = document.getElementById('rebootBtn');
+        if (rebootBtn) {
+            console.log('✅ Reboot button found - attaching listener');
+            rebootBtn.addEventListener('click', (e) => {
+                // Previeni comportamenti default
+                e.preventDefault();
+                e.stopPropagation();
+                
+                console.log('🔄 Reboot button clicked!');
+                this.handleReboot();
+            });
+            
+            // Gestisci anche il mouse leave per nascondere tooltip
+            rebootBtn.addEventListener('mouseleave', () => {
+                this.hideAllTooltips();
+            });
+        } else {
+            console.error('❌ Reboot button NOT found!');
+        }
+        
         document.getElementById('loadBtn')?.addEventListener('click', () => this.loadCurrentConfig());
         document.getElementById('refreshStatusBtn')?.addEventListener('click', () => this.refreshSystemStatus());
 
@@ -426,6 +467,41 @@ class WiFiConfigUI {
                 passwordField.placeholder = 'Enter backup WiFi password';
             }
         });
+
+        // DEBUG TOGGLE per Progress Bar
+        document.getElementById('debugProgressBar')?.addEventListener('change', (e) => {
+            this.toggleProgressBarDebug(e.target.checked);
+        });
+        
+        console.log('✅ Event listeners initialized');
+    }
+
+    toggleProgressBarDebug(show) {
+        const progressContainer = document.getElementById('reconnectProgress');
+        const progressBar = document.getElementById('progressBar');
+        const progressText = document.getElementById('progressText');
+        
+        if (show) {
+            // Mostra progress bar per debug
+            if (progressContainer) progressContainer.style.display = 'block';
+            if (progressBar) {
+                progressBar.style.width = '60%';
+                progressBar.textContent = '60%';
+            }
+            if (progressText) {
+                progressText.textContent = 'DEBUG MODE: Progress bar visible for testing';
+            }
+            console.log('🔧 Debug progress bar enabled');
+        } else {
+            // Nascondi progress bar solo se non c'è un reboot in corso
+            const isRebooting = progressText && progressText.textContent.includes('rebooting');
+            if (!isRebooting && progressContainer) {
+                progressContainer.style.display = 'none';
+                console.log('🔧 Debug progress bar disabled');
+            } else if (isRebooting) {
+                console.log('🔧 Debug toggle ignored - reboot in progress');
+            }
+        }
     }
 
     async loadInitialData() {
@@ -441,10 +517,28 @@ class WiFiConfigUI {
                 this.showStatus('✅ Initial data loaded', 'success');
             } else {
                 this.showStatus('⚠️ Could not load data', 'warning');
+                // Se fallisce tutto, almeno mostra l'IP corrente dalla URL
+                this.updateIPFromURL();
             }
         } catch (error) {
             console.error('Error loading initial data:', error);
             this.showStatus(`❌ Failed to load: ${error.message}`, 'error');
+            this.updateIPFromURL();
+        }
+    }
+
+    updateIPFromURL() {
+        // Fallback: estrae IP dalla URL corrente
+        const ipElement = document.getElementById('currentIP');
+        if (ipElement) {
+            const currentHost = window.location.hostname;
+            if (currentHost && currentHost !== 'localhost') {
+                ipElement.textContent = currentHost;
+                ipElement.style.color = '#ffc107'; // Giallo = da URL
+            } else {
+                ipElement.textContent = 'Unknown';
+                ipElement.style.color = '#6c757d'; // Grigio
+            }
         }
     }
 
@@ -456,6 +550,7 @@ class WiFiConfigUI {
                 this.currentConfig = result;
                 this.populateConfigForm(result);
                 this.updateConnectionStatus(result.wifi);
+                this.updateIPDisplay(result.wifi);
                 this.displayConfiguredNetworks(result.configured_networks);
                 return true;
             } else {
@@ -468,35 +563,321 @@ class WiFiConfigUI {
         }
     }
 
-    async handleSaveConfig() {
-        if (this.isSaving) return;
+    // VERSIONE CORRETTA della funzione handleSaveConfig nel JavaScript
+	async handleSaveConfig() {
+		if (this.isSaving) return;
+		
+		try {
+			this.isSaving = true;
+			this.updateSaveButton(true);
+			
+			const formData = this.getFormData();
+			
+			// ⭐ NOVITÀ: Rileva PRIMA se ci saranno modifiche
+			const willNeedReconnection = this.doesConfigNeedReconnection(formData);
+			console.log('🔍 Pre-save analysis:', {
+				willNeedReconnection: willNeedReconnection,
+				currentSSID: this.currentConfig?.primarySSID || 'unknown',
+				newSSID: formData.primarySSID,
+				hasNewPassword: formData.primaryPassword?.length > 0,
+				isOpenNetwork: formData.primaryOpenNetwork
+			});
+			
+			const result = await this.api.saveConfig(formData);
+			
+			if (result.success) {
+				// ⭐ LOGICA SEMPLIFICATA: Se abbiamo modifiche WiFi, sempre progress bar
+				const needsProgress = result.reconnecting || 
+									result.connecting || 
+									willNeedReconnection ||
+									this.hasWiFiChanges(formData);
+				
+				console.log('📊 Post-save analysis:', {
+					serverSaysReconnecting: result.reconnecting,
+					serverSaysConnecting: result.connecting,
+					localAnalysis: willNeedReconnection,
+					hasWiFiChanges: this.hasWiFiChanges(formData),
+					finalDecision: needsProgress
+				});
+				
+				if (needsProgress) {
+					console.log('🚀 Starting progress bar countdown');
+					this.showStatus('✅ Configuration saved - reconnecting...', 'success');
+					this.startReconnectionCountdown();
+				} else {
+					console.log('ℹ️ No progress bar needed - minor changes only');
+					this.showStatus('✅ Configuration saved successfully!', 'success');
+					// Ricarica comunque i dati per aggiornare l'UI
+					setTimeout(() => this.loadCurrentConfig(), 1000);
+				}
+			} else {
+				this.showStatus(`❌ Save failed: ${result.error}`, 'error');
+			}
+		} catch (error) {
+			this.showStatus(`❌ Save error: ${error.message}`, 'error');
+		} finally {
+			this.isSaving = false;
+			this.updateSaveButton(false);
+		}
+	}
+
+	// ⭐ NUOVA FUNZIONE: Rileva se ci sono modifiche WiFi significative
+	hasWiFiChanges(newConfig) {
+		// Se l'SSID primario è diverso dal form, è una modifica
+		if (newConfig.primarySSID && newConfig.primarySSID.trim() !== '') {
+			const currentPrimarySSID = this.currentConfig?.primarySSID || '';
+			if (newConfig.primarySSID !== currentPrimarySSID) {
+				console.log('🔄 SSID change detected:', {
+					old: currentPrimarySSID,
+					new: newConfig.primarySSID
+				});
+				return true;
+			}
+		}
+		
+		// Se è stata fornita una password, è una modifica
+		if (newConfig.primaryPassword && newConfig.primaryPassword.trim() !== '') {
+			console.log('🔄 New password provided');
+			return true;
+		}
+		
+		// Se è cambiato lo stato "open network", è una modifica
+		if (newConfig.primaryOpenNetwork) {
+			console.log('🔄 Open network mode selected');
+			return true;
+		}
+		
+		// Se l'SSID backup è diverso, è una modifica (meno critica ma comunque)
+		if (newConfig.backupSSID && newConfig.backupSSID.trim() !== '') {
+			const currentBackupSSID = this.currentConfig?.backupSSID || '';
+			if (newConfig.backupSSID !== currentBackupSSID) {
+				console.log('🔄 Backup SSID change detected');
+				return true;
+			}
+		}
+		
+		return false;
+	}
+
+	// ⭐ VERSIONE MIGLIORATA della funzione esistente
+	doesConfigNeedReconnection(newConfig) {
+		// Se non abbiamo configurazione precedente, assume riconnessione necessaria
+		if (!this.currentConfig || !this.currentConfig.success) {
+			console.log('🔄 No previous config - reconnection needed');
+			return true;
+		}
+		
+		// Verifica se l'SSID primario è cambiato
+		if (this.currentConfig.primarySSID !== newConfig.primarySSID) {
+			console.log('🔄 SSID change detected - reconnection needed');
+			return true;
+		}
+		
+		// Verifica se è stata fornita una nuova password
+		if (newConfig.primaryPassword && newConfig.primaryPassword.trim() !== '') {
+			console.log('🔄 New password provided - reconnection needed');
+			return true;
+		}
+		
+		// Verifica se è cambiato lo stato "open network"
+		if (newConfig.primaryOpenNetwork) {
+			console.log('🔄 Open network mode change - reconnection needed');
+			return true;
+		}
+		
+		// Verifica se è cambiato l'auto-connect
+		if (this.currentConfig.autoConnect !== newConfig.autoConnect) {
+			console.log('🔄 Auto-connect setting changed');
+			return false; // Non richiede riconnessione immediata
+		}
+		
+		return false;
+	}
+
+    startReconnectionCountdown() {
+        let countdown = 10;
         
+        // Nascondi status normale e mostra progress
+        const statusMessage = document.getElementById('statusMessage');
+        const progressContainer = document.getElementById('reconnectProgress');
+        const progressBar = document.getElementById('progressBar');
+        const progressText = document.getElementById('progressText');
+        const debugToggle = document.getElementById('debugProgressBar');
+        
+        // Nascondi messaggio status normale
+        if (statusMessage) statusMessage.style.display = 'none';
+        
+        // Mostra progress container (anche se debug è attivo)
+        if (progressContainer) progressContainer.style.display = 'block';
+        
+        // Se il debug è attivo, disattivalo automaticamente
+        if (debugToggle && debugToggle.checked) {
+            debugToggle.checked = false;
+            console.log('🔧 Debug mode disabled - real countdown starting');
+        }
+        
+        const updateCountdown = () => {
+            if (countdown > 0) {
+                const percentage = ((10 - countdown) / 10) * 100;
+                
+                // Aggiorna progress bar
+                if (progressBar) {
+                    progressBar.style.width = percentage + '%';
+                    progressBar.textContent = `${Math.round(percentage)}%`;
+                }
+                
+                // Aggiorna testo
+                if (progressText) {
+                    progressText.textContent = `REAL COUNTDOWN: Page will reload in ${countdown} seconds...`;
+                }
+                
+                console.log(`🔄 Countdown: ${countdown}s (${Math.round(percentage)}%)`);
+                
+                countdown--;
+                setTimeout(updateCountdown, 1000);
+            } else {
+                // Finito - 100%
+                if (progressBar) {
+                    progressBar.style.width = '100%';
+                    progressBar.textContent = 'Complete!';
+                }
+                if (progressText) {
+                    progressText.textContent = 'Reloading page now...';
+                }
+                
+                console.log('🔄 Countdown completed - reloading page');
+                setTimeout(() => {
+                    window.location.reload();
+                }, 500);
+            }
+        };
+        
+        updateCountdown();
+    }
+
+    async handleReboot() {
+        // Nascondi eventuali tooltip o popup prima di mostrare il confirm
+        this.hideAllTooltips();
+        
+        // Previeni doppi click
+        if (this.isRebooting) {
+            console.log('🔄 Reboot already in progress, ignoring...');
+            return;
+        }
+        
+        if (!confirm('⚠️ This will restart the ESP32 device. Continue?')) {
+            return;
+        }
+
         try {
-            this.isSaving = true;
-            this.updateSaveButton(true);
+            this.isRebooting = true; // Flag per prevenire doppi click
+            this.showStatus('🔄 Rebooting ESP32...', 'info');
             
-            const formData = this.getFormData();
-            const result = await this.api.saveConfig(formData);
+            const result = await this.api.rebootDevice();
             
             if (result.success) {
-                this.showStatus('✅ Configuration saved successfully!', 'success');
-                
-                if (result.connecting) {
-                    this.showStatus('🔄 Attempting to connect...', 'info');
-                    setTimeout(() => this.pollConnectionStatus(), 3000);
-                }
+                // Avvia countdown per riconnessione
+                this.startRebootCountdown();
             } else {
-                this.showStatus(`❌ Save failed: ${result.error}`, 'error');
+                this.showStatus(`❌ Reboot failed: ${result.error}`, 'error');
+                this.isRebooting = false; // Reset flag se fallisce
             }
         } catch (error) {
-            this.showStatus(`❌ Save error: ${error.message}`, 'error');
-        } finally {
-            this.isSaving = false;
-            this.updateSaveButton(false);
+            // È normale che fallisca - l'ESP32 si sta riavviando
+            console.log('Expected error during reboot:', error);
+            this.startRebootCountdown();
         }
     }
 
+    hideAllTooltips() {
+        // Rimuovi tutti i tooltip attivi
+        const tooltips = document.querySelectorAll('[title]');
+        tooltips.forEach(el => {
+            el.setAttribute('data-original-title', el.getAttribute('title') || '');
+            el.removeAttribute('title');
+        });
+        
+        // Forza la chiusura di eventuali tooltip Bootstrap o simili
+        const activeTooltips = document.querySelectorAll('.tooltip, .bs-tooltip-top, .bs-tooltip-bottom, .bs-tooltip-left, .bs-tooltip-right');
+        activeTooltips.forEach(tooltip => {
+            tooltip.remove();
+        });
+        
+        // Rimuovi anche eventuali overlay
+        const overlays = document.querySelectorAll('.tooltip-backdrop, .modal-backdrop');
+        overlays.forEach(overlay => {
+            overlay.remove();
+        });
+    }
+
+    startRebootCountdown() {
+        let countdown = 15; // Aumentato a 15 secondi per dare tempo all'ESP32
+        
+        const statusMessage = document.getElementById('statusMessage');
+        const progressContainer = document.getElementById('reconnectProgress');
+        const progressBar = document.getElementById('progressBar');
+        const progressText = document.getElementById('progressText');
+        const debugToggle = document.getElementById('debugProgressBar');
+        
+        // Nascondi messaggio status normale
+        if (statusMessage) statusMessage.style.display = 'none';
+        
+        // Mostra progress container
+        if (progressContainer) progressContainer.style.display = 'block';
+        
+        // Se il debug è attivo, disattivalo automaticamente
+        if (debugToggle && debugToggle.checked) {
+            debugToggle.checked = false;
+            console.log('🔧 Debug mode disabled - reboot countdown starting');
+        }
+        
+        const updateCountdown = () => {
+            if (countdown > 0) {
+                const percentage = ((15 - countdown) / 15) * 100;
+                
+                // Aggiorna progress bar
+                if (progressBar) {
+                    progressBar.style.width = percentage + '%';
+                    progressBar.textContent = `${Math.round(percentage)}%`;
+                }
+                
+                // Aggiorna testo
+                if (progressText) {
+                    progressText.textContent = `ESP32 rebooting... Reconnecting in ${countdown} seconds...`;
+                }
+                
+                console.log(`🔄 Reboot countdown: ${countdown}s (${Math.round(percentage)}%)`);
+                countdown--;
+                setTimeout(updateCountdown, 1000);
+            } else {
+                // Finito - completa la barra e ricarica immediatamente
+                if (progressBar) {
+                    progressBar.style.width = '100%';
+                    progressBar.textContent = '100%';
+                }
+                if (progressText) {
+                    progressText.textContent = 'Reconnecting now...';
+                }
+                
+                console.log('🔄 Reboot countdown completed - reloading immediately');
+                
+                // Ricarica immediatamente senza attesa extra
+                setTimeout(() => {
+                    if (progressContainer) {
+                        progressContainer.style.display = 'none';
+                    }
+                    window.location.reload();
+                }, 500); // Solo 500ms per vedere il 100%
+            }
+        };
+        
+        updateCountdown();
+    }
+
     async handleResetConfig() {
+        // Nascondi eventuali tooltip prima del confirm
+        this.hideAllTooltips();
+        
         if (!confirm('⚠️ This will delete all WiFi configurations. Continue?')) {
             return;
         }
@@ -578,6 +959,7 @@ class WiFiConfigUI {
             if (result.success) {
                 this.updateSystemStatusDisplay(result);
                 this.updateConnectionStatus(result.wifi);
+                this.updateIPDisplay(result.wifi); // Aggiorna IP nel header
                 return true;
             } else {
                 console.error('System status failed:', result.error);
@@ -586,6 +968,19 @@ class WiFiConfigUI {
         } catch (error) {
             console.error('System status error:', error);
             return false;
+        }
+    }
+
+    updateIPDisplay(wifiStatus) {
+        const ipElement = document.getElementById('currentIP');
+        if (!ipElement) return;
+        
+        if (wifiStatus && wifiStatus.ip) {
+            ipElement.textContent = wifiStatus.ip;
+            ipElement.style.color = '#28a745'; // Verde se connesso
+        } else {
+            ipElement.textContent = 'Not connected';
+            ipElement.style.color = '#dc3545'; // Rosso se disconnesso
         }
     }
 
@@ -758,10 +1153,10 @@ class WiFiConfigUI {
     
     getFormData() {
         return {
-            primarySSID: document.getElementById('primarySSID')?.value.trim() || '',
+            primarySSID: document.getElementById('primarySSID')?.value?.trim() || '',
             primaryPassword: document.getElementById('primaryPassword')?.value || '',
             primaryOpenNetwork: document.getElementById('primaryOpenNetwork')?.checked || false,
-            backupSSID: document.getElementById('backupSSID')?.value.trim() || '',
+            backupSSID: document.getElementById('backupSSID')?.value?.trim() || '',
             backupPassword: document.getElementById('backupPassword')?.value || '',
             backupOpenNetwork: document.getElementById('backupOpenNetwork')?.checked || false,
             autoConnect: document.getElementById('autoConnect')?.checked !== false
@@ -770,9 +1165,16 @@ class WiFiConfigUI {
 
     showStatus(message, type) {
         const statusElement = document.getElementById('statusMessage');
+        const progressContainer = document.getElementById('reconnectProgress');
+        
         if (!statusElement) {
             console.log(`Status [${type}]: ${message}`);
             return;
+        }
+        
+        // Nascondi progress se mostriamo status normale (ma solo se non è un reboot)
+        if (progressContainer && !message.includes('Rebooting')) {
+            progressContainer.style.display = 'none';
         }
         
         statusElement.textContent = message;

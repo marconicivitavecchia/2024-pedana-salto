@@ -135,6 +135,129 @@
             margin-top: 4px;
         }
         
+        /* Countdown Progress Bar - Semplificato */
+        .reconnect-progress {
+            margin: 15px auto;
+            padding: 20px;
+            background: #e8f4fd;
+            border: 1px solid #007bff;
+            border-radius: 8px;
+            max-width: 500px;
+            text-align: center;
+        }
+        
+        .progress-header {
+            font-weight: 600;
+            color: #0056b3;
+            margin-bottom: 15px;
+            font-size: 1rem;
+        }
+        
+        .progress-bar {
+            width: 100%;
+            height: 25px;
+            background: #e9ecef;
+            border-radius: 12px;
+            overflow: hidden;
+            margin: 10px 0;
+            box-shadow: inset 0 1px 3px rgba(0,0,0,0.2);
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #007bff, #28a745);
+            border-radius: 12px;
+            transition: width 1s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 600;
+            font-size: 0.9rem;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+        }
+        
+        .progress-text {
+            font-weight: 500;
+            color: #495057;
+            margin-top: 10px;
+            font-size: 0.95rem;
+        }
+        
+        /* IP Display nel header */
+        .ip-display {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            padding: 8px 12px;
+            margin-right: 10px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+        }
+        
+        .ip-label {
+            color: #6c757d;
+            font-weight: 500;
+        }
+        
+        .ip-value {
+            color: #007bff;
+            font-weight: 600;
+            margin-left: 5px;
+        }
+        
+        .header-actions {
+            display: flex;
+            align-items: center;
+        }
+        
+        /* Debug Toggle */
+        .debug-toggle {
+            display: flex;
+            align-items: center;
+            margin: 0 15px;
+            cursor: pointer;
+            font-size: 0.9rem;
+        }
+        
+        .debug-toggle input {
+            margin-right: 5px;
+        }
+        
+        .debug-label {
+            color: #6c757d;
+            user-select: none;
+        }
+        
+        .debug-toggle input:checked + .debug-label {
+            color: #007bff;
+            font-weight: 500;
+        }
+        
+        /* Pulsante reboot */
+        .btn-warning {
+            background-color: #ffc107;
+            border-color: #ffc107;
+            color: #212529;
+        }
+        
+        .btn-warning:hover {
+            background-color: #e0a800;
+            border-color: #d39e00;
+            color: #212529;
+        }
+        
+        /* Status message animations */
+        .status {
+            transition: all 0.3s ease;
+        }
+        
+        .status.info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        
         @media (max-width: 768px) {
             .system-info {
                 flex-direction: column;
@@ -156,6 +279,11 @@
             <div class="container">
                 <h1>📶 WiFi Configuration</h1>
                 <div class="header-actions">
+                    <!-- DEBUG TOGGLE per Progress Bar -->
+                    <label class="debug-toggle">
+                        <input type="checkbox" id="debugProgressBar">
+                        <span class="debug-label">🔧 Debug Progress Bar</span>
+                    </label>
                     <button id="refreshStatusBtn" class="btn btn-outline">🔄 Refresh</button>
                 </div>
             </div>
@@ -217,6 +345,7 @@
                         <div class="card-actions">
                             <button id="loadBtn" class="btn btn-outline">📥 Load Config</button>
                             <button id="testBtn" class="btn btn-secondary">🧪 Test Connection</button>
+                            <button id="rebootBtn" class="btn btn-warning" onclick="window.wifiConfig?.handleReboot()">🔄 Reboot ESP32</button>
                             <button id="resetBtn" class="btn btn-danger">🗑️ Reset Config</button>
                         </div>
                     </div>
@@ -309,6 +438,15 @@
                                 <button type="submit" id="saveBtn" class="btn btn-success btn-large">
                                     💾 Save Configuration
                                 </button>
+                                
+                                <!-- Progress Bar SOTTO IL PULSANTE -->
+                                <div id="reconnectProgress" style="display: none; margin-top: 15px; padding: 15px; background: #007bff; color: white; text-align: center; border-radius: 8px;">
+                                    <div style="font-size: 1rem; margin-bottom: 10px;">🔄 Reconnecting to WiFi...</div>
+                                    <div style="background: white; height: 25px; border-radius: 12px; overflow: hidden; margin: 8px 0;">
+                                        <div id="progressBar" style="background: #28a745; height: 100%; width: 0%; transition: width 1s; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 0.9rem;">0%</div>
+                                    </div>
+                                    <div id="progressText" style="font-size: 0.9rem;">Preparing...</div>
+                                </div>
                             </div>
                         </form>
                     </div>
