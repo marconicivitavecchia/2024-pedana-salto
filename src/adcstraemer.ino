@@ -41,6 +41,19 @@
 #define MAXBATCH RINGALLOC / DATALEN
 //#define MAX_SAMPLES_PER_BATCH 160u  // Aggiunto 'u' per unsigned
 
+//const char* WIFI_SSID = "D-Link-6A30CC";
+//const char* WIFI_PASSWORD = "FabSeb050770250368120110";
+
+// const char* WIFI_SSID = "RedmiSeb";
+// const char* WIFI_PASSWORD = "pippo2503";
+
+// Configurazione Wi-Fi
+//const char* WIFI_SSID = "WebPocket-E280";
+//const char* WIFI_PASSWORD = "dorabino.7468!";
+
+//const char* WIFI_SSID = "sensori";
+//const char* WIFI_PASSWORD = "sensori2019";
+
 // Struttura configurazione
 struct Config {
   uint32_t sampleRate;
@@ -547,6 +560,9 @@ void adcTask(void* pvParameters) {
 				samplesPerBatch = min(samplesPerBatch, (uint16_t)MAX_SAMPLES_PER_BATCH);
 				adc.setEMAalfa(emaAlpha);
 				decimationFactor = getDecimationFactor(gc.sampleRate);
+				if(decimationFactor == 0){
+					decimationFactor = 1;
+				}
 				Serial.printf("adcTask: Blocco task: %d Hz\n", gc.sampleRate);
 				Serial.printf("adcTask: targetInterval: %d\n", targetInterval);
 				Serial.printf("adcTask: samplesPerBatch: %d\n", samplesPerBatch);
