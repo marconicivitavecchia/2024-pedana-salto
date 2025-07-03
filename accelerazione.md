@@ -226,6 +226,25 @@ $$\frac{1}{2} m v_{\text{iniziale}}^2 = m g h$$
 Risolvendo per $h$:
 $$h = \frac{v_{\text{iniziale}}^2}{2g}$$
 
+Dalla formula dell'altezza:
+
+$$h = \frac{v_{\text{iniziale}}^2}{2g}$$
+
+puoi ricavare la velocità iniziale:
+
+$$v_{\text{iniziale}} = \sqrt{2gh}$$
+
+Ora, se hai la formula della velocità iniziale in funzione del tempo, puoi sostituirla. Le possibili connessioni dipendono dal contesto:
+
+**1. Se il tempo è il tempo di volo totale:**
+Per un moto parabolico, il tempo di volo totale è:
+$$t = \frac{2v_{\text{iniziale}}}{g}$$
+
+Quindi: $v_{\text{iniziale}} = \frac{gt}{2}$
+
+Sostituendo nella formula dell'altezza:
+$$h = \frac{1}{2g} \cdot \left(\frac{gt}{2}\right)^2 = \frac{g^2t^2}{8g} = \frac{gt^2}{8}$$
+
 # Conclusione: Metodo di Calcolo Indipendente
 
 ## Calcolo della Velocità Iniziale
