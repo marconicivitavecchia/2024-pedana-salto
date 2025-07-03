@@ -12,7 +12,7 @@ $$P_s​$$ è la forza totale misurata durante il salto.
 
 $$P_0$$ è la forza a riposo (peso statico dell'atleta).
 
-## CDimostrazione della formula
+## Dimostrazione della formula
 
 Questa formula deriva dall'applicazione della seconda legge di Newton durante la fase di caricamento del salto.
 
