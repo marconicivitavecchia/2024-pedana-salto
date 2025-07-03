@@ -307,5 +307,6 @@ Non richiede parametri esterni come peso o massa dell'atleta.
 
 Sitografia:
 - http://lia.deis.unibo.it/Courses/InfoChim0910/lucidi/4-integrazioneDifferenziali(1x).pdf
+- https://nsa.readthedocs.io/en/latest/03_integrali/docs/source/09_int_numerici.html
 
 >[Torna all'indice](readme.md#fasi-progetto)
