@@ -305,4 +305,7 @@ Il metodo è:
 
 Non richiede parametri esterni come peso o massa dell'atleta.
 
+Sitografia:
+- http://lia.deis.unibo.it/Courses/InfoChim0910/lucidi/4-integrazioneDifferenziali(1x).pdf
+
 >[Torna all'indice](readme.md#fasi-progetto)
