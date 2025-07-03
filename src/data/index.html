@@ -246,17 +246,18 @@
             </label>
             <span id="testSignalInfo">Samples per batch: 0</span>
         </div>
-        <div class="filter-controls"></div>
-            <label>Recorded data filtering:</label>
-            <label>
-                <input type="radio" name="filter" value="none" checked>
-                None
-            </label>
-            <label>
-                <input type="radio" name="filter" value="kalman" checked>
-                Kalman
-            </label>
-        </div>
+        <!-- CORRETTO: -->
+		<div class="filter-controls">
+			<label>Recorded data filtering:</label>
+			<label>
+				<input type="radio" name="filter" value="none" checked>
+				None
+			</label>
+			<label>
+				<input type="radio" name="filter" value="kalman">
+				Kalman
+			</label>
+		</div>
         <div class="scope-controls">
             <div class="timebase-controls">
                 <label>Timebase (ms/div):
@@ -278,15 +279,17 @@
                 </label>
                 <button id="recordBtn" onclick="toggleRecording()">Start Recording</button>
                 <button id="loadRecordBtn" onclick="document.getElementById('recordFileInput').click()">Load Record</button>
-                <button id="play" onclick="playRecord()">></button>
+                <button id="play">></button>
                 <button id="scrollLeft"><<</button>
                 <button id="scrollRight">>></button>
                 <button id="scrollLeftFast"><<<</button>
                 <button id="scrollRightFast">>>></button>
+				<button onclick="centerViewOnData()">Center on Data</button>
                 <label>File Name Prefix:
                     <input type="text" id="filePrefix" value="data">
                 </label>
-                <input type="file" id="recordFileInput" accept=".txt,.json" style="display: none" onchange="loadRecord(this.files[0])"> 
+				<input type="file" id="recordFileInput" accept=".txt,.json" style="display: none">
+
             </div>
             </div>
         </div>
@@ -383,6 +386,15 @@
         canvas.width = canvas.offsetWidth;
         canvas.height = canvas.offsetHeight;
         window.addEventListener('resize', resizeCanvas);
+		window.addEventListener('load', () => {
+			addMetadataControls();
+			addEMAControlsForJumpPhases();
+			updateSamplesPerBatch();
+			addYScaleControls();
+			setInterval(updateYScaleInfo, 1000);
+			addSaveLoadControls(); // Aggiungi i nuovi controlli
+			console.log('🎛️ Sistema EMA completo con pulsante ricalcola inizializzato');
+		});
 		// Variabile globale per il gain       
 
         leftButton.onmousedown = async () => {
@@ -546,6 +558,10 @@
         // Fattore di zoom per l'asse Y (1.0 = normale, >1.0 = zoom in, <1.0 = zoom out)
         let yGain = 1.0;
 
+        // Variabili globali per la gestione della pressione continua
+        let buttonPressIntervals = {};
+        let buttonPressTimeouts = {};
+
         // =====================================================
         // FUNZIONI PRINCIPALI DI CONTROLLO GAIN
         // =====================================================
@@ -565,7 +581,7 @@
             const newGain = yGain + delta;
             
             // Protezione più rigorosa: limiti più stretti per evitare crash
-            if (newGain < 0.5 || newGain > 50) {
+            if (newGain < 0.5 || newGain > 256) {
                 console.log(`Gain ${newGain.toFixed(1)}x fuori dai limiti sicuri (0.5x - 50x)`);
                 return; // Esce senza applicare se fuori limiti
             }
@@ -912,67 +928,237 @@
         function updateYScaleInfo() {
             const infoElement = document.getElementById('yScaleInfo');
             if (infoElement) {
-                infoElement.textContent = `Y Range: ${yScale.min.toFixed(0)} to ${yScale.max.toFixed(0)} (Gain: ${yGain.toFixed(2)}x)`;
+                infoElement.textContent = `Y Range: ${yScale.min.toFixed(0)} to ${yScale.max.toFixed(0)} (Gain: ${yGain.toFixed(2)}x), Current Y center: ${((yScale.min+yScale.max)/2).toFixed(0)}`;
+            }
+        }
+
+        // =====================================================
+        // FUNZIONI DI GESTIONE PRESSIONE CONTINUA
+        // =====================================================
+
+        /**
+         * Avvia la pressione continua di un pulsante
+         * @param {string} buttonId - ID univoco del pulsante
+         * @param {Function} actionFunction - Funzione da eseguire ripetutamente
+         * @param {number} initialDelay - Ritardo iniziale prima di iniziare la raffica (ms)
+         * @param {number} repeatInterval - Intervallo tra le pressioni nella raffica (ms)
+         */
+        function startContinuousPress(buttonId, actionFunction, initialDelay = 300, repeatInterval = 100) {
+            // Esegui immediatamente la prima azione
+            actionFunction();
+            
+            // Avvia la raffica dopo il ritardo iniziale
+            buttonPressTimeouts[buttonId] = setTimeout(() => {
+                buttonPressIntervals[buttonId] = setInterval(actionFunction, repeatInterval);
+            }, initialDelay);
+        }
+
+        /**
+         * Ferma la pressione continua di un pulsante
+         * @param {string} buttonId - ID univoco del pulsante
+         */
+        function stopContinuousPress(buttonId) {
+            // Ferma il timeout iniziale se ancora attivo
+            if (buttonPressTimeouts[buttonId]) {
+                clearTimeout(buttonPressTimeouts[buttonId]);
+                delete buttonPressTimeouts[buttonId];
+            }
+            
+            // Ferma l'intervallo di ripetizione se attivo
+            if (buttonPressIntervals[buttonId]) {
+                clearInterval(buttonPressIntervals[buttonId]);
+                delete buttonPressIntervals[buttonId];
             }
         }
 
         /**
-         * Crea e aggiunge i controlli di gain all'interfaccia
+         * Ferma tutte le pressioni continue attive
          */
-        function addYScaleControls() {
-            const controlPanel = document.querySelector('.control-panel');
-            
-            const yScaleDiv = document.createElement('div');
-            yScaleDiv.className = 'config-item yscale-controls';
-            yScaleDiv.innerHTML = `
-                <label><strong>Y Scale Controls:</strong></label>
-                <button onclick="resetYScale()">Reset Y Scale</button>
-                <label>
-                    <input type="checkbox" id="autoScaleCheckbox" checked onchange="toggleAutoScale()">
-                    Auto Scale Y (Gain: <span id="autoScaleGain" style="font-weight: bold; color: #0369a1;">1.0x</span>)
-                </label>
-                <div style="margin: 5px 0; display: flex; align-items: center; gap: 15px;">
-                    <label>Y Gain:</label>
-                    
-                    <!-- Prima coppia: +1/-1 -->
-                    <div style="display: flex; flex-direction: column; align-items: center;">
-                        <button onclick="adjustGainBy(1)" style="border: 2px solid #0369a1; padding: 2px 8px; margin: 1px; background: #e0f2fe; cursor: pointer; font-size: 12px;">+</button>
-                        <span style="font-size: 10px; color: #0369a1; font-weight: bold;">+1/-1</span>
-                        <button onclick="adjustGainBy(-1)" style="border: 2px solid #0369a1; padding: 2px 8px; margin: 1px; background: #e0f2fe; cursor: pointer; font-size: 12px;">-</button>
-                    </div>
-                    
-                    <!-- Seconda coppia: +10/-10 -->
-                    <div style="display: flex; flex-direction: column; align-items: center;">
-                        <button onclick="adjustGainBy(10)" style="border: 2px solid #dc2626; padding: 2px 8px; margin: 1px; background: #fee2e2; cursor: pointer; font-size: 12px;">+</button>
-                        <span style="font-size: 10px; color: #dc2626; font-weight: bold;">+10/-10</span>
-                        <button onclick="adjustGainBy(-10)" style="border: 2px solid #dc2626; padding: 2px 8px; margin: 1px; background: #fee2e2; cursor: pointer; font-size: 12px;">-</button>
-                    </div>
-                    
-                    <!-- Terza coppia: centro fino -->
-                    <div style="display: flex; flex-direction: column; align-items: center;">
-                        <button onclick="adjustCenterBy(250000)" style="border: 2px solid #059669; padding: 2px 8px; margin: 1px; background: #d1fae5; cursor: pointer; font-size: 12px;">+</button>
-                        <span style="font-size: 10px; color: #059669; font-weight: bold;">Centro</span>
-                        <button onclick="adjustCenterBy(-250000)" style="border: 2px solid #059669; padding: 2px 8px; margin: 1px; background: #d1fae5; cursor: pointer; font-size: 12px;">-</button>
-                    </div>
-                    
-                    <button onclick="resetGain()" style="margin-left: 10px; background: #ff6b6b; color: white; border: none; padding: 4px 8px; border-radius: 3px; cursor: pointer;">Reset</button>
-                </div>
-                <div style="margin: 5px 0;">
-                    <span id="currentGain" style="font-weight: bold; color: #0369a1;">Total Gain: 1.0x</span>
-                </div>
-                <div id="yScaleInfo" class="yscale-info">Y Range: 0 to 8388608</div>
-            `;
-            
-            controlPanel.appendChild(yScaleDiv);
-            
-            // Inizializza i display dopo aver aggiunto l'HTML
-            setTimeout(() => {
-                initializeGainDisplays();
-            }, 100);
+        function stopAllContinuousPress() {
+            for (let buttonId in buttonPressTimeouts) {
+                clearTimeout(buttonPressTimeouts[buttonId]);
+            }
+            for (let buttonId in buttonPressIntervals) {
+                clearInterval(buttonPressIntervals[buttonId]);
+            }
+            buttonPressTimeouts = {};
+            buttonPressIntervals = {};
         }
 
+        /**
+         * Configura un pulsante per la pressione continua
+         * @param {string} buttonId - ID del pulsante
+         * @param {Function} actionFunction - Funzione da eseguire
+         * @param {number} initialDelay - Ritardo iniziale (default: 300ms)
+         * @param {number} repeatInterval - Intervallo ripetizione (default: 100ms)
+         */
+        function setupContinuousButton(buttonId, actionFunction, initialDelay = 300, repeatInterval = 100) {
+            const button = document.getElementById(buttonId);
+            if (!button) {
+                console.warn(`Button ${buttonId} not found`);
+                return;
+            }
+            
+            // Mouse events
+            button.addEventListener('mousedown', (e) => {
+                e.preventDefault();
+                startContinuousPress(buttonId, actionFunction, initialDelay, repeatInterval);
+                
+                // Effetto visivo: pulsante premuto
+                button.style.transform = 'scale(0.95)';
+                button.style.opacity = '0.8';
+            });
+            
+            button.addEventListener('mouseup', () => {
+                stopContinuousPress(buttonId);
+                
+                // Ripristina effetto visivo
+                button.style.transform = 'scale(1)';
+                button.style.opacity = '1';
+            });
+            
+            button.addEventListener('mouseleave', () => {
+                stopContinuousPress(buttonId);
+                
+                // Ripristina effetto visivo
+                button.style.transform = 'scale(1)';
+                button.style.opacity = '1';
+            });
+            
+            // Touch events per dispositivi mobili
+            button.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                startContinuousPress(buttonId, actionFunction, initialDelay, repeatInterval);
+                
+                // Effetto visivo
+                button.style.transform = 'scale(0.95)';
+                button.style.opacity = '0.8';
+            });
+            
+            button.addEventListener('touchend', (e) => {
+                e.preventDefault();
+                stopContinuousPress(buttonId);
+                
+                // Ripristina effetto visivo
+                button.style.transform = 'scale(1)';
+                button.style.opacity = '1';
+            });
+            
+            button.addEventListener('touchcancel', (e) => {
+                e.preventDefault();
+                stopContinuousPress(buttonId);
+                
+                // Ripristina effetto visivo
+                button.style.transform = 'scale(1)';
+                button.style.opacity = '1';
+            });
+        }
+
+        /**
+         * Crea e aggiunge i controlli di gain all'interfaccia CON PRESSIONE CONTINUA
+        */
+        function addYScaleControls() {
+			const controlPanel = document.querySelector('.control-panel');
+			
+			const yScaleDiv = document.createElement('div');
+			yScaleDiv.className = 'config-item yscale-controls';
+			yScaleDiv.innerHTML = `
+				<label><strong>Y Scale Controls:</strong></label>
+				<button onclick="resetYScale()">Reset Y Scale</button>
+				<button onclick="centerViewOnData()" style="background: #059669; color: white; border: none; padding: 4px 8px; border-radius: 3px; cursor: pointer;">Center on Data</button>
+				<label>
+					<input type="checkbox" id="autoScaleCheckbox" checked onchange="toggleAutoScale()">
+					Auto Scale Y (Gain: <span id="autoScaleGain" style="font-weight: bold; color: #0369a1;">1.0x</span>)
+				</label>
+				
+				<!-- FRECCE DIREZIONALI PER NAVIGAZIONE DATI -->
+				<div style="margin: 5px 0; display: flex; align-items: center; gap: 10px; background: #f0f8ff; padding: 8px; border-radius: 4px; border: 1px solid #0ea5e9;">
+					<span style="font-size: 12px; color: #0369a1; font-weight: bold;">Navigazione dati:</span>
+					
+					<!-- Freccia sinistra (indietro nel tempo) -->
+					<div id="leftDataArrow" style="display: none; align-items: center; gap: 5px; color: #dc2626; font-weight: bold;">
+						<span style="font-size: 18px;">⬅️</span>
+						<span style="font-size: 11px;">Usa - o ←</span>
+					</div>
+					
+					<!-- Indicatore centrato -->
+					<div id="centeredIndicator" style="display: none; align-items: center; gap: 5px; color: #059669; font-weight: bold;">
+						<span style="font-size: 18px;">🎯</span>
+						<span style="font-size: 11px;">Centrato</span>
+					</div>
+					
+					<!-- Freccia destra (avanti nel tempo) -->
+					<div id="rightDataArrow" style="display: none; align-items: center; gap: 5px; color: #dc2626; font-weight: bold;">
+						<span style="font-size: 18px;">➡️</span>
+						<span style="font-size: 11px;">Usa + o →</span>
+					</div>
+				</div>
+				
+				<div style="margin: 5px 0; display: flex; align-items: center; gap: 15px;">
+					<label>Y Gain:</label>
+					
+					<!-- Prima coppia: +1/-1 -->
+					<div style="display: flex; flex-direction: column; align-items: center;">
+						<button id="gain-plus-1" style="border: 2px solid #0369a1; padding: 2px 8px; margin: 1px; background: #e0f2fe; cursor: pointer; font-size: 12px;">+</button>
+						<span style="font-size: 10px; color: #0369a1; font-weight: bold;">+1/-1</span>
+						<button id="gain-minus-1" style="border: 2px solid #0369a1; padding: 2px 8px; margin: 1px; background: #e0f2fe; cursor: pointer; font-size: 12px;">-</button>
+					</div>
+					
+					<!-- Seconda coppia: +10/-10 -->
+					<div style="display: flex; flex-direction: column; align-items: center;">
+						<button id="gain-plus-10" style="border: 2px solid #dc2626; padding: 2px 8px; margin: 1px; background: #fee2e2; cursor: pointer; font-size: 12px;">+</button>
+						<span style="font-size: 10px; color: #dc2626; font-weight: bold;">+10/-10</span>
+						<button id="gain-minus-10" style="border: 2px solid #dc2626; padding: 2px 8px; margin: 1px; background: #fee2e2; cursor: pointer; font-size: 12px;">-</button>
+					</div>
+					
+					<!-- Terza coppia: centro normale -->
+					<div style="display: flex; flex-direction: column; align-items: center;">
+						<button id="center-plus-250k" style="border: 2px solid #059669; padding: 2px 8px; margin: 1px; background: #d1fae5; cursor: pointer; font-size: 12px;">+</button>
+						<span style="font-size: 10px; color: #059669; font-weight: bold;">Centro</span>
+						<button id="center-minus-250k" style="border: 2px solid #059669; padding: 2px 8px; margin: 1px; background: #d1fae5; cursor: pointer; font-size: 12px;">-</button>
+					</div>
+					
+					<!-- QUARTA coppia: centro fine (5x più preciso) -->
+					<div style="display: flex; flex-direction: column; align-items: center;">
+						<button id="center-plus-50k" style="border: 2px solid #7c3aed; padding: 2px 8px; margin: 1px; background: #f3e8ff; cursor: pointer; font-size: 12px;">+</button>
+						<span style="font-size: 10px; color: #7c3aed; font-weight: bold;">Fine</span>
+						<button id="center-minus-50k" style="border: 2px solid #7c3aed; padding: 2px 8px; margin: 1px; background: #f3e8ff; cursor: pointer; font-size: 12px;">-</button>
+					</div>
+					
+					<button onclick="resetGain()" style="margin-left: 10px; background: #ff6b6b; color: white; border: none; padding: 4px 8px; border-radius: 3px; cursor: pointer;">Reset</button>
+				</div>
+				<div style="margin: 5px 0;">
+					<span id="currentGain" style="font-weight: bold; color: #0369a1;">Total Gain: 1.0x</span>
+				</div>
+				<div id="yScaleInfo" class="yscale-info">Y Range: 0 to 8388608</div>
+			`;
+			
+			controlPanel.appendChild(yScaleDiv);
+			
+			// Configurazione event listeners per pressione continua (come prima)
+			setTimeout(() => {
+				setupContinuousButton('gain-plus-1', () => adjustGainBy(1));
+				setupContinuousButton('gain-minus-1', () => adjustGainBy(-1));
+				setupContinuousButton('gain-plus-10', () => adjustGainBy(10), 400, 150);
+				setupContinuousButton('gain-minus-10', () => adjustGainBy(-10), 400, 150);
+				setupContinuousButton('center-plus-250k', () => {
+					adjustCenterBy(50000);
+				}, 300, 80);
+				setupContinuousButton('center-minus-250k', () => {
+					adjustCenterBy(-50000);
+				}, 300, 80);
+				setupContinuousButton('center-plus-50k', () => {
+					adjustCenterBy(1000);
+				}, 300, 60);
+				setupContinuousButton('center-minus-50k', () => {
+					adjustCenterBy(-1000);
+				}, 300, 60);
+				
+				initializeGainDisplays();
+			}, 100);
+		}
         // =====================================================
-        // TASTI RAPIDI PER IL GAIN
+        // TASTI RAPIDI PER IL GAIN (CON ESC DI EMERGENZA)
         // =====================================================
 
         // Aggiunge controlli con tasti rapidi per il gain
@@ -980,6 +1166,11 @@
             // Funziona solo se non stai scrivendo in un campo di testo
             if (event.target.tagName !== 'INPUT' && event.target.tagName !== 'TEXTAREA') {
                 switch(event.key) {
+                    case 'Escape':
+                        stopAllContinuousPress(); // Ferma tutto in caso di emergenza
+                        console.log('🛑 Tutte le pressioni continue fermate con ESC');
+                        event.preventDefault();
+                        break;
                     case 'ArrowUp':
                         adjustGainBy(1); // Aumenta di 1
                         event.preventDefault();
@@ -1014,12 +1205,23 @@
                         break;
                     case 'w':
                     case 'W':
-                        adjustCenterBy(250000); // Centro su (più fino)
+                        adjustCenterBy(150000); // Centro su (normale)
                         event.preventDefault();
                         break;
                     case 's':
                     case 'S':
-                        adjustCenterBy(-250000); // Centro giù (più fino)
+                        adjustCenterBy(-150000); // Centro giù (normale)
+                        event.preventDefault();
+                        break;
+                    // NUOVI tasti per controllo centro fine
+                    case 'q':
+                    case 'Q':
+                        adjustCenterBy(1000); // Centro su (fine, 5x più preciso)
+                        event.preventDefault();
+                        break;
+                    case 'a':
+                    case 'A':
+                        adjustCenterBy(-1000); // Centro giù (fine, 5x più preciso)
                         event.preventDefault();
                         break;
                     case 'r':
@@ -1030,6 +1232,15 @@
                 }
             }
         });
+
+        // =====================================================
+        // CLEANUP AUTOMATICO ALLA CHIUSURA PAGINA
+        // =====================================================
+
+        window.addEventListener('beforeunload', () => {
+            stopAllContinuousPress();
+        });
+
 //----------------------------------------------------------------------------------------------------------------------- END OGGI-----------------------------
 //----------------------------------------------------------------------------------------------------------------------- END OGGI-----------------------------
         function resizeCanvas() {
@@ -1043,48 +1254,7 @@
                 playRecord();
              }
         }
-
-        // JavaScript
-        function saveRecordedBatches() {
-            const content = recordBuffer.map(batch => {
-                const hexBatch = {
-                    //t: batch.t.toString(16),
-                    t: batch.t,
-                    v: batch.v
-                };
-                return JSON.stringify(hexBatch);
-            }).join('\n');
-            
-            const blob = new Blob([content], { type: 'text/plain' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = getDefaultFileName();
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-        }
-
-        async function loadRecord(file) {
-            console.log("loadRecord");
-            if (!file) return;
-            try {
-                const text = await file.text();
-                const lines = text.split('\n').filter(line => line.trim());
-                recordBuffer = lines.map(line => {
-                    const hexBatch = JSON.parse(line);
-                    return {
-                        //t: parseInt(hexBatch.t, 16),
-                        t: parseInt(hexBatch.t),
-                        v: hexBatch.v
-                    };
-                });
-            } catch (error) {
-                console.error('Error loading record:', error);
-            }
-        }
-
+/*
         function detectJumpThresholds(recordBuffer, sampleRate) {
             let result = {t1: null, t2: null, t3: null, t4: null, t5: null};
             let minDerivative = Infinity;
@@ -1112,7 +1282,7 @@
             staticWeight /= staticCount;
 
             const dt0 = 1/sampleRate;
-            precBatchTime = recordBuffer[0].t / 1000000 - dt0;
+            precBatchTime = parseInt(recordBuffer[0].t, 16) / 1000000 - dt0;
             filterh.predict();
             lastForce = filterh.update(calculateValue(recordBuffer[0].v[0]));
             batchLen = recordBuffer[0].v.length;
@@ -1120,10 +1290,9 @@
             let lastDerivative = null;            
             for(let batchIdx = 0; batchIdx < recordBuffer.length; batchIdx++) {
                 const batch = recordBuffer[batchIdx];
-                const batchTime = parseInt(batch.t, 16) / 1000000;
 
                 // Calcola dt medio dai primi due batch
-                currBatchTime = recordBuffer[batchIdx].t / 1000000;
+                currBatchTime = parseInt(recordBuffer[batchIdx].t, 16) / 1000000;
                 const dt = (currBatchTime - precBatchTime) / batchLen;
                 
                 for(let i = 0; i < batch.v.length; i++) {                   
@@ -1137,18 +1306,7 @@
                         result.t1 = currentTime;
                     }
 
-                    /*
-                    if(result.t2 == null && result.t1 !== null && derivative > maxDerivative && lastDerivative < derivative) {
-                        maxDerivative = derivative;
-                        result.t2 = currentTime;
-                        console.log(maxDerivative);
-                    }
-                    
-                    if(result.t3 == null && result.t2 !== null && derivative < minDerivative && lastDerivative > derivative) {
-                        minDerivative = derivative;
-                        result.t3 = currentTime;
-                    }
-                    */
+    
 
                     if(result.t2 == null && result.t1 !== null && derivative > 0 && force > staticWeight && lastForce <= staticWeight) {
                         result.t2 = currentTime;
@@ -1176,9 +1334,10 @@
             console.log(`t1: ${result.t1} - t2: ${result.t2} - t3: ${result.t3} - t4: ${result.t4} - t5: ${result.t5}`);
             return result;
         }
-
+*/
+		
         function analyzeJump(recordBuffer, sampleRate) {
-            const times = detectJumpThresholds(recordBuffer, sampleRate);
+            const times = detectJumpThresholds(recordBuffer, sampleRate, 1);
             thresholds = times;
 
             const g = 9.81;
@@ -1297,61 +1456,354 @@
             document.body.appendChild(div);
             return div;
         }
-/*
-        function doBufferFiltering(recordBuffer, filterh, filtera){
-            if(filterh){
-                const content = recordBuffer.map(batch => {
-                    const filteredBatch = {
-                        t: batch.t,
-                        v: batch.v,
-                        vh: batch.v.map(val => {
-                            filterh.predict();
-                            const filtered = filterh.update(val);
-                            return filtered;
-                        }),
-                        va: batch.v.map(val => {
-                            filtera.predict();
-                            const filtered = filtera.update(val);
-                            return filtered;
-                        })
-                    };
-                    return filteredBatch;
-                })
-            }else{
-                const content = recordBuffer.map(batch => {
-                    const filteredBatch = {
-                        t: batch.t,
-                        v: batch.v,
-                        vh: batch.v,
-                        va: batch.v,
-                    };
-                    return filteredBatch;
-                })
-            }
-        }
+		// =====================================================
+		// SISTEMA DI SALVATAGGIO/CARICAMENTO AVANZATO CON METADATI
+		// =====================================================
+		
+				// Modifica la funzione loadRecord per gestire i metadati (RETROCOMPATIBILE)
+		async function loadRecord(file) {
+			console.log("loadRecordWithMetadata - Retrocompatibile");
+			if (!file) return;
+			
+			try {
+				const text = await file.text();
+				const lines = text.split('\n').filter(line => line.trim());
+				
+				let metadata = null;
+				let dataStartIndex = 0;
+				let hasMetadata = false;
+				
+				// Controlla se la prima riga contiene metadati
+				if (lines.length > 0) {
+					try {
+						const firstLine = JSON.parse(lines[0]);
+						if (firstLine.type === "METADATA") {
+							metadata = firstLine;
+							dataStartIndex = 1;
+							hasMetadata = true;
+							console.log('✅ File CON metadati trovato:', metadata);
+						}
+					} catch (e) {
+						console.log('📁 File SENZA metadati (formato vecchio) - Retrocompatibilità attiva');
+					}
+				}
+				
+				// Carica i batch (saltando la prima riga se contiene metadati)
+				recordBuffer = lines.slice(dataStartIndex).map(line => {
+					const hexBatch = JSON.parse(line);
+					return {
+						t: hexBatch.t,
+						v: hexBatch.v
+					};
+				});
+				
+				// Gestione metadati con retrocompatibilità
+				if (hasMetadata) {
+					// File nuovo con metadati: applica i metadati salvati
+					applyMetadataToView(metadata);
+					showToast('File caricato con metadati salvati', 'success');
+				} else {
+					// File vecchio senza metadati: usa impostazioni di default ma segna come "da salvare"
+					console.log('🔄 File vecchio senza metadati - Applicazione impostazioni di default');
+					
+					// Resetta a valori di default
+					yGain = 1.0;
+					resetYScale();
+					
+					// Aggiorna tutti i display
+					updateGainDisplay();
+					updateAutoScaleGainDisplay();
+					updateYScaleInfo();
+					
+					// Segna che il file necessita di metadati al prossimo salvataggio
+					markFileAsNeedingMetadata();
+					
+					showToast('File vecchio caricato - Metadati saranno aggiunti al salvataggio', 'info');
+				}
+				
+				console.log(`📊 Caricati ${recordBuffer.length} batch - Metadati: ${hasMetadata ? 'Presenti' : 'Assenti'}`);
+				
+			} catch (error) {
+				console.error('❌ Errore durante il caricamento del record:', error);
+				showToast('Errore nel caricamento del file', 'error');
+				alert('Errore nel caricamento del file. Verifica che sia un file valido.');
+			}
+		}
+		
+		document.getElementById('recordFileInput').addEventListener('change', function(e) {
+			loadRecord(e.target.files[0]);
+		});
+		
+		document.getElementById('play').addEventListener('click', function(e) {
+			playRecord();
+		});
+		
+		// Modifica playRecord per usare la nuova versione
+		function playRecord() {
+			playRecordWithMetadata(); // <-- Usa la nuova funzione
+		}
+		
+		// Aggiungi questa funzione per salvare con metadati
+		function saveRecordedBatchesWithMetadata() {
+			// Calcola il centro corrente della vista Y
+			const currentCenter = (yScale.max + yScale.min) / 2;
+			
+			// Crea il JSON dei metadati
+			const metadata = {
+				type: "METADATA",
+				version: "1.0",
+				timestamp: new Date().toISOString(),
+				yGain: yGain,
+				currentCenter: currentCenter,
+				yScaleMin: yScale.min,
+				yScaleMax: yScale.max,
+				sampleRate: SAMPLE_RATE,
+				bufferDurationSec: bufferDurationSec,
+				totalBatches: recordBuffer.length,
+				notes: "File saved with Y-scale metadata for accurate playback"
+			};
+			
+			// Crea il contenuto del file: prima i metadati, poi i batch
+			let content = JSON.stringify(metadata) + '\n';
+			
+			// Aggiungi tutti i batch
+			content += recordBuffer.map(batch => {
+				const hexBatch = {
+					t: batch.t,
+					v: batch.v
+				};
+				return JSON.stringify(hexBatch);
+			}).join('\n');
+			
+			// Salva il file
+			const blob = new Blob([content], { type: 'text/plain' });
+			const url = URL.createObjectURL(blob);
+			const a = document.createElement('a');
+			a.href = url;
+			a.download = getDefaultFileName();
+			document.body.appendChild(a);
+			a.click();
+			document.body.removeChild(a);
+			URL.revokeObjectURL(url);
+			
+			console.log('File salvato con metadati:', metadata);
+		}
 
-        function doBatchFiltering(batch, filterh, filtera, type){
-            filter = null;
-            if(filterh && type == "h"){
-                filter = filterh;
-            }else if(filterh && type == "a"){
-                filter = filtera;
-            }else{
-                 return batch;
-            }
-            const filteredBatch = {
-                t: batch.t,
-                v: batch.v.map(val => {
-                    filter.predict();
-                    const filtered = filter.update(val);
-                    return filtered;
-                }),
-            };
-            return filteredBatch;
-        }
-*/
-        function playRecord() {
-			// disabilita il modo test se attivo
+		// Nuova funzione per segnare i file senza metadati
+		let fileNeedsMetadata = false;
+
+		function markFileAsNeedingMetadata() {
+			fileNeedsMetadata = true;
+			
+			// Mostra un indicatore visivo che il file verrà aggiornato
+			const saveBtn = document.getElementById('saveMetadataBtn');
+			if (saveBtn) {
+				saveBtn.style.background = '#f59e0b'; // Arancione per indicare "da aggiornare"
+				saveBtn.title = 'File vecchio caricato - Clicca per salvare con metadati aggiornati';
+				saveBtn.textContent = 'Add Metadata';
+				
+				// Lampeggia brevemente per attirare l'attenzione
+				let blinkCount = 0;
+				const blinkInterval = setInterval(() => {
+					saveBtn.style.opacity = saveBtn.style.opacity === '0.5' ? '1' : '0.5';
+					blinkCount++;
+					if (blinkCount >= 6) { // 3 lampeggi
+						clearInterval(blinkInterval);
+						saveBtn.style.opacity = '1';
+					}
+				}, 300);
+			}
+			
+			console.log('🏷️ File marcato come bisognoso di metadati');
+		}
+
+		// Nuova funzione per applicare i metadati alla vista
+		function applyMetadataToView(metadata) {
+			console.log('Applicazione metadati alla vista...');
+			
+			// Ripristina il gain salvato
+			if (metadata.yGain !== undefined) {
+				yGain = metadata.yGain;
+				console.log(`Gain ripristinato: ${yGain}x`);
+			}
+			
+			// Ripristina la scala Y salvata
+			if (metadata.yScaleMin !== undefined && metadata.yScaleMax !== undefined) {
+				yScale.min = metadata.yScaleMin;
+				yScale.max = metadata.yScaleMax;
+				console.log(`Scala Y ripristinata: ${yScale.min} - ${yScale.max}`);
+			} else if (metadata.currentCenter !== undefined) {
+				// Fallback: usa centro e gain per ricostruire la scala
+				const standardRange = 8388608;
+				const newRange = standardRange / yGain;
+				yScale.min = metadata.currentCenter - newRange / 2;
+				yScale.max = metadata.currentCenter + newRange / 2;
+				console.log(`Scala Y ricostruita da centro: ${yScale.min} - ${yScale.max}`);
+			}
+			
+			// Ripristina sample rate se diverso
+			if (metadata.sampleRate !== undefined && metadata.sampleRate !== SAMPLE_RATE) {
+				SAMPLE_RATE = metadata.sampleRate;
+				document.getElementById('sampleRate').value = SAMPLE_RATE;
+				console.log(`Sample rate ripristinato: ${SAMPLE_RATE}`);
+			}
+			
+			// Aggiorna tutti i display
+			updateGainDisplay();
+			updateAutoScaleGainDisplay();
+			updateYScaleInfo();
+			
+			// Mostra info sui metadati caricati
+			showMetadataInfo(metadata);
+		}
+
+		// Funzione per mostrare le informazioni sui metadati caricati
+		function showMetadataInfo(metadata) {
+			const info = `
+		📁 File caricato con metadati:
+		• Gain: ${metadata.yGain}x
+		• Centro Y: ${metadata.currentCenter}
+		• Range Y: ${metadata.yScaleMin} - ${metadata.yScaleMax}
+		• Sample Rate: ${metadata.sampleRate} Hz
+		• Batch totali: ${metadata.totalBatches}
+		• Salvato: ${new Date(metadata.timestamp).toLocaleString()}
+			`;
+			
+			console.log(info);
+			
+			// Mostra temporaneamente un toast
+			showToast('Metadati caricati con successo!', 'success');
+		}
+
+		// Funzione per salvare solo i metadati correnti (tasto Save) - RETROCOMPATIBILE
+		function saveCurrentMetadata() {
+			if (recordBuffer.length === 0) {
+				alert('Nessun dato da salvare. Carica prima una traccia.');
+				return;
+			}
+			
+			const currentCenter = (yScale.max + yScale.min) / 2;
+			
+			const metadata = {
+				type: "METADATA",
+				version: "1.0",
+				timestamp: new Date().toISOString(),
+				yGain: yGain,
+				currentCenter: currentCenter,
+				yScaleMin: yScale.min,
+				yScaleMax: yScale.max,
+				sampleRate: SAMPLE_RATE,
+				bufferDurationSec: bufferDurationSec,
+				totalBatches: recordBuffer.length,
+				notes: fileNeedsMetadata ? 
+					"Legacy file updated with metadata for first time" : 
+					"Updated metadata for existing trace"
+			};
+			
+			// Ricrea il file con i nuovi metadati
+			let content = JSON.stringify(metadata) + '\n';
+			
+			// Aggiungi tutti i batch esistenti
+			content += recordBuffer.map(batch => {
+				const hexBatch = {
+					t: batch.t,
+					v: batch.v
+				};
+				return JSON.stringify(hexBatch);
+			}).join('\n');
+			
+			// Determina il nome del file
+			const blob = new Blob([content], { type: 'text/plain' });
+			const url = URL.createObjectURL(blob);
+			const a = document.createElement('a');
+			a.href = url;
+			
+			// Nome file appropriato
+			let fileName;
+			if (fileNeedsMetadata) {
+				// File vecchio: aggiungi suffisso _with_metadata
+				const originalName = getDefaultFileName();
+				const nameParts = originalName.split('.');
+				if (nameParts.length > 1) {
+					nameParts[nameParts.length - 2] += '_with_metadata';
+				} else {
+					nameParts[0] += '_with_metadata';
+				}
+				fileName = nameParts.join('.');
+			} else {
+				// File già con metadati: aggiungi suffisso _updated
+				const originalName = getDefaultFileName();
+				const nameParts = originalName.split('.');
+				if (nameParts.length > 1) {
+					nameParts[nameParts.length - 2] += '_updated';
+				} else {
+					nameParts[0] += '_updated';
+				}
+				fileName = nameParts.join('.');
+			}
+			
+			a.download = fileName;
+			document.body.appendChild(a);
+			a.click();
+			document.body.removeChild(a);
+			URL.revokeObjectURL(url);
+			
+			// Reset del flag e aggiornamento UI
+			if (fileNeedsMetadata) {
+				fileNeedsMetadata = false;
+				const saveBtn = document.getElementById('saveMetadataBtn');
+				if (saveBtn) {
+					saveBtn.style.background = '#059669'; // Verde normale
+					saveBtn.title = 'Salva gain e centro correnti nel file';
+					saveBtn.textContent = 'Save Metadata';
+				}
+				showToast('File vecchio aggiornato con metadati!', 'success');
+			} else {
+				showToast('Metadati aggiornati e salvati!', 'success');
+			}
+			
+			console.log('💾 Metadati salvati:', metadata);
+		}
+
+		// Funzione di utilità per mostrare notifiche toast
+		function showToast(message, type = 'info') {
+			// Rimuovi toast precedenti
+			const existingToast = document.getElementById('toast');
+			if (existingToast) {
+				existingToast.remove();
+			}
+			
+			// Crea nuovo toast
+			const toast = document.createElement('div');
+			toast.id = 'toast';
+			toast.style.cssText = `
+				position: fixed;
+				top: 20px;
+				right: 20px;
+				padding: 15px 20px;
+				border-radius: 5px;
+				color: white;
+				font-weight: bold;
+				z-index: 10000;
+				transition: opacity 0.3s;
+				${type === 'success' ? 'background: #059669;' : 
+				  type === 'error' ? 'background: #dc2626;' : 
+				  'background: #0369a1;'}
+			`;
+			toast.textContent = message;
+			
+			document.body.appendChild(toast);
+			
+			// Rimuovi dopo 3 secondi
+			setTimeout(() => {
+				toast.style.opacity = '0';
+				setTimeout(() => toast.remove(), 300);
+			}, 3000);
+		}
+
+		// Modifica la funzione playRecord per usare i metadati
+		function playRecordWithMetadata() {
+			// Disabilita il modo test se attivo
 			adcSignalEnabled = false;
 			testSignalEnabled0 = false;
 			testSignalEnabled1 = false;
@@ -1361,68 +1813,191 @@
 			inputMode = false;
 			recordBuffer = recordBuffer.slice(0, maxBufferSize);
 			currPlayIndex = 0;
-			const firstBatch = recordBuffer[0];
-			xScale.min = parseInt(firstBatch.t, 16);
-			xScale.max = xScale.min + bufferTimespan;
 			
-			// Mantieni la scala Y corrente senza auto-scaling automatico
-			// L'utente può usare i controlli di gain manualmente se necessario
+			// Centratura intelligente sui dati (come prima)
+			if (recordBuffer.length > 0) {
+				const firstBatch = recordBuffer[0];
+				const lastBatch = recordBuffer[recordBuffer.length - 1];
+				const dataStartTime = parseInt(firstBatch.t, 16);
+				const dataEndTime = parseInt(lastBatch.t, 16);
+				const dataCenterTime = (dataStartTime + dataEndTime) / 2;
+				
+				const currentTimeWindow = timebaseDiv * DIVISIONS_X * 1000000;
+				xScale.min = dataCenterTime - currentTimeWindow / 2;
+				xScale.max = dataCenterTime + currentTimeWindow / 2;
+				
+				console.log(`Playback centrato: centro dati=${dataCenterTime}, finestra=${currentTimeWindow}`);
+			}
 			
+			// I metadati Y sono già stati applicati durante il caricamento
+			// Non fare auto-scaling automatico qui
+			
+			// Analisi del salto e report
 			report = analyzeJump(recordBuffer, SAMPLE_RATE);   
 			printJumpReport(report);  
 			drawPlot();       
-			scrollView(0);            
+			scrollView(0);
 		}
 
-        function toggleRecording() {
-            if (!isRecording) {
-                // Start recording
-                recordBuffer = []; // Reset buffer
-                isRecording = true;
-                document.getElementById('recordBtn').innerHTML = 'Stop Recording';
-            } else {
-                // Stop and save
-                isRecording = false;
-                saveRecordedBatches();
-                document.getElementById('recordBtn').innerHTML = 'Start Recording';
-            }
-        }
+		// Funzione per aggiornare i controlli HTML
+		function addSaveLoadControls() {
+			// Trova i controlli esistenti per il recording
+			const recordBtn = document.getElementById('recordBtn');
+			const loadRecordBtn = document.getElementById('loadRecordBtn');
+			
+			if (recordBtn && loadRecordBtn) {
+				// Modifica il testo del load button per chiarire che carica con metadati
+				loadRecordBtn.title = 'Carica traccia con metadati Y-scale';
+				
+				// Crea il pulsante Save per salvare metadati aggiornati
+				const saveBtn = document.createElement('button');
+				saveBtn.id = 'saveMetadataBtn';
+				saveBtn.textContent = 'Save Metadata';
+				saveBtn.title = 'Salva gain e centro correnti nel file';
+				saveBtn.style.cssText = `
+					background: #059669;
+					color: white;
+					border: none;
+					padding: 4px 8px;
+					border-radius: 3px;
+					cursor: pointer;
+					margin-left: 5px;
+				`;
+				saveBtn.onclick = saveCurrentMetadata;
+				
+				// Inserisci il pulsante dopo il load button
+				loadRecordBtn.parentNode.insertBefore(saveBtn, loadRecordBtn.nextSibling);
+				
+				console.log('Controlli di salvataggio/caricamento con metadati aggiunti');
+			}
+		}
+
+		// Modifica le funzioni esistenti per usare le nuove versioni
+		function toggleRecording() {
+			if (!isRecording) {
+				// Start recording
+				recordBuffer = []; // Reset buffer
+				isRecording = true;
+				document.getElementById('recordBtn').innerHTML = 'Stop Recording';
+			} else {
+				// Stop and save WITH METADATA
+				isRecording = false;
+				saveRecordedBatchesWithMetadata(); // <-- Usa la nuova funzione
+				document.getElementById('recordBtn').innerHTML = 'Start Recording';
+			}
+		}
+		// =====================================================
+		// ESEMPI DI FORMATO FILE CON METADATI
+		// =====================================================
+
+		/*
+		ESEMPIO di file salvato con metadati:
+
+		{"type":"METADATA","version":"1.0","timestamp":"2025-07-01T10:30:00.000Z","yGain":60,"currentCenter":36304,"yScaleMin":-33601,"yScaleMax":106209,"sampleRate":30000,"bufferDurationSec":10,"totalBatches":500,"notes":"File saved with Y-scale metadata for accurate playback"}
+		{"t":1655484153000000,"v":["400000","400001","400002",...]}
+		{"t":1655484153005000,"v":["400010","400011","400012",...]}
+		...
+
+		La prima riga contiene sempre i metadati (riconoscibile da "type":"METADATA")
+		Le righe successive contengono i batch di dati come prima
+		*/
+	
+		// Funzione per aggiungere i controlli metadati
+		function addMetadataControls() {
+			const controlPanel = document.querySelector('.control-panel');
+			
+			// Trova i controlli di recording esistenti
+			const recordBtn = document.getElementById('recordBtn');
+			const loadRecordBtn = document.getElementById('loadRecordBtn');
+			
+			if (recordBtn && loadRecordBtn) {
+				// Aggiungi i nuovi pulsanti
+				const saveBtn = document.createElement('button');
+				saveBtn.id = 'saveMetadataBtn';
+				saveBtn.textContent = 'Save with Metadata';
+				saveBtn.onclick = saveCurrentMetadata;
+				saveBtn.style.cssText = `
+					background: #059669;
+					color: white;
+					border: none;
+					padding: 4px 8px;
+					border-radius: 3px;
+					cursor: pointer;
+					margin-left: 5px;
+				`;
+							
+				// Inserisci i pulsanti
+				loadRecordBtn.parentNode.insertBefore(saveBtn, loadRecordBtn.nextSibling);
+				console.log('✅ Controlli metadati aggiunti');
+			}
+		}
+		
+		// Funzione per creare template metadati vuoto
+		function createMetadataTemplate() {
+			const template = {
+				type: "METADATA",
+				version: "1.0",
+				timestamp: new Date().toISOString(),
+				yGain: 1.0,
+				currentCenter: 4194304,
+				yScaleMin: 0,
+				yScaleMax: 8388608,
+				sampleRate: 30000,
+				bufferDurationSec: 10,
+				totalBatches: 0,
+				autoScale: true,
+				notes: "Template metadati - modifica i valori secondo necessità"
+			};
+			
+			return JSON.stringify(template, null, 2);
+		}
+		
+		/**
+		 * Formatta la distanza temporale in modo leggibile
+		 */
+		function formatTimeDistance(microseconds) {
+			if (microseconds > 1000000) {
+				return `${(microseconds / 1000000).toFixed(1)}s`;
+			} else if (microseconds > 1000) {
+				return `${(microseconds / 1000).toFixed(1)}ms`;
+			} else {
+				return `${microseconds.toFixed(0)}μs`;
+			}
+		}
+		
+		function centerViewOnData() {
+			 if (!inputMode && recordBuffer.length > 0) {
+				const firstBatch = recordBuffer[0];
+				const lastBatch = recordBuffer[recordBuffer.length - 1];
+				
+				const dataStartTime = parseInt(firstBatch.t, 16);
+				const dataEndTime = parseInt(lastBatch.t, 16);
+				const dataCenterTime = (dataStartTime + dataEndTime) / 2;
+				
+				const currentTimeWindow = timebaseDiv * DIVISIONS_X * 1000000;
+				
+				xScale.min = dataCenterTime - currentTimeWindow / 2;
+				xScale.max = dataCenterTime + currentTimeWindow / 2;
+				
+				drawPlot();
+				console.log(`Vista centrata automaticamente sui dati: centro=${dataCenterTime}`);
+			}
+		}
 
         function scrollView(deltaMs) {
-            console.log("scrollView: "+deltaMs);
-            // Verifica che ci siano dati
-            if (recordBuffer.length === 0) return;
+			console.log("scrollView: "+deltaMs);
+			if (recordBuffer.length === 0) return;
 
-            // Calcola la nuova finestra temporale
-            //const timeWindow = timebaseDiv * DIVISIONS_X * 1000;
-            //const timeWindow = bufferDurationSec * 1000000; // converti in microsecondi
-            const timeWindow = timebaseDiv * DIVISIONS_X * 1000000;  // in microsecondi
-
-            console.log("scrollView timeWindow: "+timeWindow);
-            // Sposta la finestra di visualizzazione
-            xScale.min += deltaMs;
-            xScale.max = xScale.min + timeWindow;
-            console.log("scrollView xScale.min: "+xScale.min);
-            console.log("scrollView xScale.max: "+xScale.max);
-            
-
-            // Verifica limiti
-            /*
-            if (xScale.min < recordBuffer[0].t) {
-                console.log("xScale.min < recordBuffer[0].t "+recordBuffer[0].t);
-                // Non andare prima del primo campione
-                xScale.min = recordBuffer[0].t;
-                xScale.max = xScale.min + timeWindow;
-            } else if (xScale.max > recordBuffer[recordBuffer.length - 1].t) {
-                console.log("xScale.max > recordBuffer[recordBuffer.length - 1].t "+recordBuffer[recordBuffer.length - 1].t);
-                // Non andare oltre l'ultimo campione
-                xScale.max = recordBuffer[recordBuffer.length - 1].t;
-                xScale.min = xScale.max - timeWindow;
-            }
-            */
-            // Ridisegna con la nuova finestra temporale
-            drawPlot();
-        }
+			const timeWindow = timebaseDiv * DIVISIONS_X * 1000000;
+			console.log("scrollView timeWindow: "+timeWindow);
+			
+			xScale.min += deltaMs;
+			xScale.max = xScale.min + timeWindow;
+			console.log("scrollView xScale.min: "+xScale.min);
+			console.log("scrollView xScale.max: "+xScale.max);
+			
+			drawPlot();
+		}
 
         function drawThresholds(times) {
             if (recordBuffer.length > 0) {
@@ -1630,8 +2205,9 @@
                 for (let batch of batchesInWindow) {
                     for(let j=0; j < n; j++){  
                         // filtra i campioni                      
-                        filterh.predict();
-                        value = filterh.update(calculateValue(batch.v[j]));
+                        //filterh.predict();
+                        //value = filterh.update(calculateValue(batch.v[j]));
+						value = calculateValue(batch.v[j]);
                         
                         // Calcola il timestamp preciso per questo campione nel batch
                         const sampleTime = parseInt(batch.t, 16) + (j * (1000000 / SAMPLE_RATE)); // in microsecondi
@@ -1646,8 +2222,8 @@
                             ctx.lineTo(x, y);
                         }
                         
-                        lastX = x;
-                        lastY = y;
+                        //lastX = x;
+                        //lastY = y;
                         count++;
                     }
                 }
@@ -1706,24 +2282,22 @@
         */
        
         function updateTimebase() {
-            timebaseDiv = parseFloat(document.getElementById('timebaseDiv').value);
-            console.log("timebaseDiv update: "+timebaseDiv);
-            // Aggiorna la finestra temporale in base alla nuova base dei tempi
-            const timeWindow = timebaseDiv * DIVISIONS_X * 1000000;  // in microsecondi
-            
-            // Mantieni il centro della vista ma cambia la scala
-            const centerTime = (xScale.max + xScale.min) / 2;
-            console.log("centerTime: "+centerTime);
-            console.log("timeWindow: "+timeWindow);
-            xScale.min = centerTime - timeWindow / 2;
-            xScale.max = centerTime + timeWindow / 2;
-            
-            // Ridisegna con la nuova scala temporale
-            //drawPlot();
-            if (!inputMode){
-                playRecord();
-            }
-        }
+			const oldCenterTime = (xScale.max + xScale.min) / 2;
+			timebaseDiv = parseFloat(document.getElementById('timebaseDiv').value);
+			console.log("timebaseDiv update: " + timebaseDiv);
+			
+			const newTimeWindow = timebaseDiv * DIVISIONS_X * 1000000;
+			xScale.min = oldCenterTime - newTimeWindow / 2;
+			xScale.max = oldCenterTime + newTimeWindow / 2;
+			
+			console.log("Centro mantenuto a: " + oldCenterTime);
+			console.log("Nuova finestra temporale: " + newTimeWindow);
+			console.log("Nuovo range: " + xScale.min + " - " + xScale.max);
+			
+			if (!inputMode) {
+				drawPlot();
+			}
+		}
         
         function updateSamplesPerBatch() {
             SAMPLE_RATE = parseInt(document.getElementById('sampleRate').value);
@@ -1838,12 +2412,6 @@
             updateSamplesPerBatch();
             updateConfig('samplerate', this.value);
         });
-
-        window.addEventListener('load', () => {
-			updateSamplesPerBatch();
-			addYScaleControls();
-			setInterval(updateYScaleInfo, 1000);
-		});
         /*-------------------------------------------------------------------------
             TEST SIGNAL GENERATION SECTION
           -------------------------------------------------------------------------
@@ -2248,13 +2816,412 @@
             const message = args.join(' ');
             log.innerHTML = message + '<br>' + log.innerHTML;
         };
-        /*
-t1: contatto con la piattaforma di forza
-t2: velocità discendente massima
-t3: velocità ascendente massima
-t4: stacco
-t5: atterraggio
-*/
+			/*
+			t1: start downward movement
+			t2: max downward speed
+			t3: max upward speed
+			t4: take off
+			t5: touch down
+			*/
+			
+//------------------------------------------------JUMP DETECTION--------------------------------------------------------------------------------
+		// =====================================================
+		// SISTEMA COMPLETO: EMA MULTI-FASE + PULSANTE RICALCOLA
+		// =====================================================
+
+		// =====================================================
+		// 1. CONTROLLI HTML EMA (come hai già)
+		// =====================================================
+
+		function addEMAControlsForJumpPhases() {
+			const controlPanel = document.querySelector('.control-panel');
+			
+			const emaControlsDiv = document.createElement('div');
+			emaControlsDiv.className = 'ema-jump-controls';
+			emaControlsDiv.innerHTML = `
+				<div style="margin: 10px 0; padding: 10px; background: #f0f8ff; border: 1px solid #0ea5e9; border-radius: 4px;">
+					<label><strong>EMA per Fasi del Salto:</strong></label>
+					
+					<div style="display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; margin: 5px 0;">
+						<div style="text-align: center;">
+							<label style="font-size: 11px; color: #059669; font-weight: bold;">T1: Peso Statico</label>
+							<select id="emaAlphaStatic" style="width: 100%;">
+								<option value="0.01">0.01</option>
+								<option value="0.02">0.02</option>
+								<option value="0.05" selected>0.05</option>
+								<option value="0.1">0.10</option>
+								<option value="0.2">0.20</option>
+							</select>
+						</div>
+						
+						<div style="text-align: center;">
+							<label style="font-size: 11px; color: #dc2626; font-weight: bold;">T1: Movimento</label>
+							<select id="emaAlphaT1" style="width: 100%;">
+								<option value="0.05">0.05</option>
+								<option value="0.1" selected>0.10</option>
+								<option value="0.2">0.20</option>
+								<option value="0.3">0.30</option>
+								<option value="0.5">0.50</option>
+							</select>
+						</div>
+						
+						<div style="text-align: center;">
+							<label style="font-size: 11px; color: #0369a1; font-weight: bold;">T2-T3: Transizioni</label>
+							<select id="emaAlphaT2T3" style="width: 100%;">
+								<option value="0.05">0.05</option>
+								<option value="0.1">0.10</option>
+								<option value="0.2" selected>0.20</option>
+								<option value="0.3">0.30</option>
+								<option value="0.5">0.50</option>
+							</select>
+						</div>
+						
+						<div style="text-align: center;">
+							<label style="font-size: 11px; color: #7c3aed; font-weight: bold;">T4: Stacco</label>
+							<select id="emaAlphaT4" style="width: 100%;">
+								<option value="0.1">0.10</option>
+								<option value="0.2">0.20</option>
+								<option value="0.3" selected>0.30</option>
+								<option value="0.4">0.40</option>
+								<option value="0.5">0.50</option>
+							</select>
+						</div>
+						
+						<div style="text-align: center;">
+							<label style="font-size: 11px; color: #ea580c; font-weight: bold;">T5: Atterraggio</label>
+							<select id="emaAlphaT5" style="width: 100%;">
+								<option value="0.2">0.20</option>
+								<option value="0.3">0.30</option>
+								<option value="0.4" selected>0.40</option>
+								<option value="0.5">0.50</option>
+								<option value="0.7">0.70</option>
+							</select>
+						</div>
+						
+						<!-- ✅ NUOVO: Controllo EMA Derivata -->
+						<div style="text-align: center;">
+							<label style="font-size: 11px; color: #92400e; font-weight: bold;">Derivata Smooth</label>
+							<select id="emaAlphaDerivative" style="width: 100%;">
+								<option value="0.0001" selected>0.0001</option>
+								<option value="0.0005">0.0005</option>
+								<option value="0.001">0.001</option>
+								<option value="0.005">0.005</option>
+								<option value="0.01">0.01</option>
+								<option value="0.02">0.02</option>
+								<option value="0.05">0.05</option>
+								<option value="0.1">0.10</option>
+							</select>
+						</div>
+					</div>
+					
+					<div style="margin: 5px 0; font-size: 12px; color: #0369a1;">
+						💡 <strong>Consigli:</strong> 
+						Derivata: più basso = più smooth (0.0001 ultra-smooth, 0.1 veloce)
+					</div>
+					
+					<div style="margin: 5px 0;">
+						<button onclick="resetEMAToDefaults()" style="background: #6b7280; color: white; border: none; padding: 3px 8px; border-radius: 3px; cursor: pointer; margin-right: 5px;">Reset Default</button>
+						<button onclick="setEMAForHighNoise()" style="background: #dc2626; color: white; border: none; padding: 3px 8px; border-radius: 3px; cursor: pointer; margin-right: 5px;">Alto Rumore</button>
+						<button onclick="setEMAForFastJumps()" style="background: #059669; color: white; border: none; padding: 3px 8px; border-radius: 3px; cursor: pointer; margin-right: 5px;">Salti Veloci</button>
+						
+						<!-- ✅ PULSANTE RICALCOLA INTEGRATO -->
+						<button id="recalcThresholdsBtn" onclick="recalculateThresholds()" style="background: #0ea5e9; color: white; border: none; padding: 3px 8px; border-radius: 3px; cursor: pointer; font-weight: bold;">🔄 Ricalcola Soglie</button>
+					</div>
+				</div>
+			`;
+			
+			controlPanel.appendChild(emaControlsDiv);
+			console.log('✅ Controlli EMA multi-fase + derivata configurabile aggiunti');
+		}
+
+		// =====================================================
+		// 2. FUNZIONI PRESET EMA (come hai già)
+		// =====================================================
+
+		function resetEMAToDefaults() {
+			document.getElementById('emaAlphaStatic').value = '0.05';
+			document.getElementById('emaAlphaT1').value = '0.1';
+			document.getElementById('emaAlphaT2T3').value = '0.2';
+			document.getElementById('emaAlphaT4').value = '0.3';
+			document.getElementById('emaAlphaT5').value = '0.4';
+			document.getElementById('emaAlphaDerivative').value = '0.0001'; // ✅ Default derivata
+			console.log('🔄 EMA reset ai valori di default (derivata=0.0001)');
+		}
+
+		function setEMAForHighNoise() {
+			document.getElementById('emaAlphaStatic').value = '0.01';
+			document.getElementById('emaAlphaT1').value = '0.05';
+			document.getElementById('emaAlphaT2T3').value = '0.1';
+			document.getElementById('emaAlphaT4').value = '0.2';
+			document.getElementById('emaAlphaT5').value = '0.3';
+			document.getElementById('emaAlphaDerivative').value = '0.0001'; // ✅ Ultra-smooth per rumore alto
+			console.log('🔇 EMA configurato per alto rumore (derivata ultra-smooth)');
+		}
+
+		function setEMAForFastJumps() {
+			document.getElementById('emaAlphaStatic').value = '0.05';
+			document.getElementById('emaAlphaT1').value = '0.2';
+			document.getElementById('emaAlphaT2T3').value = '0.3';
+			document.getElementById('emaAlphaT4').value = '0.5';
+			document.getElementById('emaAlphaT5').value = '0.7';
+			document.getElementById('emaAlphaDerivative').value = '0.01'; // ✅ Più veloce per salti rapidi
+			console.log('⚡ EMA configurato per salti veloci (derivata più reattiva)');
+		}
+
+		// =====================================================
+		// 3. FUNZIONE RICALCOLA SOGLIE (NUOVA)
+		// =====================================================
+
+		function recalculateThresholds() {
+			const btn = document.getElementById('recalcThresholdsBtn');
+			
+			// Controlla se ci sono dati
+			if(!recordBuffer || recordBuffer.length === 0) {
+				alert('⚠️ Carica prima un file con i dati del salto!');
+				return;
+			}
+			
+			// Feedback visivo
+			const originalText = btn.innerHTML;
+			btn.innerHTML = '⏳ Ricalcolo...';
+			btn.disabled = true;
+			btn.style.background = '#f59e0b';
+			
+			try {
+				// Ricalcola le soglie con i valori EMA correnti
+				console.log('🔄 Ricalcolo soglie con EMA correnti...');
+				const result = detectJumpThresholds(recordBuffer, SAMPLE_RATE);
+				
+				// Aggiorna le soglie globali
+				thresholds = result;
+				
+				// Ridisegna il grafico se siamo in modalità playback
+				if(!inputMode && recordBuffer.length > 0) {
+					drawPlot();
+				}
+				
+				// Conta eventi trovati
+				const eventsFound = [result.t1, result.t2, result.t3, result.t4, result.t5].filter(t => t !== null).length;
+				
+				// Feedback successo
+				btn.innerHTML = `✅ ${eventsFound}/5`;
+				btn.style.background = eventsFound === 5 ? '#059669' : '#f59e0b';
+				
+				console.log(`✅ Ricalcolo completato: ${eventsFound}/5 eventi trovati`);
+				
+				// Ripristina pulsante dopo 2 secondi
+				setTimeout(() => {
+					btn.innerHTML = originalText;
+					btn.style.background = '#0ea5e9';
+					btn.disabled = false;
+				}, 2000);
+				
+			} catch(error) {
+				console.error('❌ Errore durante il ricalcolo:', error);
+				
+				// Feedback errore
+				btn.innerHTML = '❌ Errore';
+				btn.style.background = '#dc2626';
+				
+				setTimeout(() => {
+					btn.innerHTML = originalText;
+					btn.style.background = '#0ea5e9';
+					btn.disabled = false;
+				}, 2000);
+			}
+		}
+
+		// =====================================================
+		// 4. ALGORITMO DETECTJUMPTHRESHOLDS (come hai già)
+		// =====================================================
+
+		function detectJumpThresholds(recordBuffer, sampleRate) {
+			let result = {t1: null, t2: null, t3: null, t4: null, t5: null};
+			let minDerivative = Infinity;
+			let maxDerivative = -Infinity;
+			let precBatchTime;
+			let currBatchTime;
+			let batchLen;
+			let lastForce = null;
+			
+			// ✅ LEGGI TUTTI I VALORI EMA DAI MENU (INCLUSA DERIVATA)
+			const emaAlphas = {
+				static: parseFloat(document.getElementById('emaAlphaStatic')?.value || 0.05),
+				t1: parseFloat(document.getElementById('emaAlphaT1')?.value || 0.1),
+				t2t3: parseFloat(document.getElementById('emaAlphaT2T3')?.value || 0.2),
+				t4: parseFloat(document.getElementById('emaAlphaT4')?.value || 0.3),
+				t5: parseFloat(document.getElementById('emaAlphaT5')?.value || 0.4),
+				// ✅ EMA DERIVATA CONFIGURABILE DAL MENU
+				derivative: parseFloat(document.getElementById('emaAlphaDerivative')?.value || 0.0001)
+			};
+			
+			console.log(`🎛️ EMA multi-fase: Statico=${emaAlphas.static}, T1=${emaAlphas.t1}, T2-T3=${emaAlphas.t2t3}, T4=${emaAlphas.t4}, T5=${emaAlphas.t5}, Derivata=${emaAlphas.derivative}`);
+			
+			// CALCOLO PESO STATICO (con EMA dedicato)
+			let staticWeight = 0;
+			let staticCount = 0;
+			let staticEmaValue = null;
+			
+			for(let batchIdx = 0; batchIdx < recordBuffer.length && staticCount < 50; batchIdx++) {
+				const batch = recordBuffer[batchIdx];
+				
+				for(let i = 0; i < batch.v.length && staticCount < 1000; i++) {
+					const rawValue = calculateValue(batch.v[i]);
+					
+					if(staticEmaValue === null) {
+						staticEmaValue = rawValue;
+					} else {
+						staticEmaValue = emaAlphas.static * rawValue + (1 - emaAlphas.static) * staticEmaValue;
+					}
+					
+					staticWeight += staticEmaValue;
+					staticCount++;
+				}
+			}
+			staticWeight /= staticCount;
+			
+			console.log(`📊 Peso statico (EMA α=${emaAlphas.static}): ${staticWeight.toFixed(0)} da ${staticCount} campioni`);
+			
+			// INIZIALIZZAZIONE PRINCIPALE
+			const dt0 = 1/sampleRate;
+			precBatchTime = parseInt(recordBuffer[0].t, 16) / 1000000 - dt0;
+			
+			// EMA values separati per ogni fase
+			let emaValues = {
+				current: null,
+				t1: null,      
+				t2t3: null,
+				t4: null,
+				t5: null
+			};
+			
+			// ✅ EMA per la derivata (configurabile)
+			let derivativeEma = null;
+			
+			// Inizializza tutti gli EMA con il primo valore
+			const firstRawValue = calculateValue(recordBuffer[0].v[0]);
+			emaValues.t1 = firstRawValue;
+			emaValues.t2t3 = firstRawValue;
+			emaValues.t4 = firstRawValue;
+			emaValues.t5 = firstRawValue;
+			emaValues.current = firstRawValue;
+			
+			filterh.predict();
+			lastForce = filterh.update(emaValues.current);
+			batchLen = recordBuffer[0].v.length;
+			
+			// ANALISI PRINCIPALE CON EMA DINAMICO PER FASE
+			let lastDerivative = null;
+			let sampleIndex = 0;
+			
+			for(let batchIdx = 0; batchIdx < recordBuffer.length; batchIdx++) {
+				const batch = recordBuffer[batchIdx];
+				
+				currBatchTime = parseInt(recordBuffer[batchIdx].t, 16) / 1000000;
+				const dt = (currBatchTime - precBatchTime) / batchLen;
+				
+				for(let i = 0; i < batch.v.length; i++) {
+					if(batchIdx === 0 && i === 0) {
+						sampleIndex++;
+						continue;
+					}
+					
+					const rawValue = calculateValue(batch.v[i]);
+					
+					// AGGIORNA TUTTI GLI EMA CONTEMPORANEAMENTE
+					emaValues.t1 = emaAlphas.t1 * rawValue + (1 - emaAlphas.t1) * emaValues.t1;
+					emaValues.t2t3 = emaAlphas.t2t3 * rawValue + (1 - emaAlphas.t2t3) * emaValues.t2t3;
+					emaValues.t4 = emaAlphas.t4 * rawValue + (1 - emaAlphas.t4) * emaValues.t4;
+					emaValues.t5 = emaAlphas.t5 * rawValue + (1 - emaAlphas.t5) * emaValues.t5;
+					
+					// SELEZIONE EMA IN BASE ALLA FASE CORRENTE
+					let selectedEmaValue;
+					if(result.t1 === null) {
+						selectedEmaValue = emaValues.t1;        // Fase T1: rilevamento movimento
+					} else if(result.t2 === null || result.t3 === null) {
+						selectedEmaValue = emaValues.t2t3;      // Fase T2-T3: transizioni peso
+					} else if(result.t4 === null) {
+						selectedEmaValue = emaValues.t4;        // Fase T4: stacco
+					} else if(result.t5 === null) {
+						selectedEmaValue = emaValues.t5;        // Fase T5: atterraggio
+					} else {
+						selectedEmaValue = emaValues.t2t3;      // Default: transizioni
+					}
+					
+					filterh.predict();
+					let force = filterh.update(selectedEmaValue);
+					
+					const currentTime = currBatchTime + (i * dt);
+					
+					// ✅ CALCOLA DERIVATA RAW
+					const rawDerivative = (force - lastForce) / dt;
+					
+					// ✅ APPLICA EMA CONFIGURABILE ALLA DERIVATA
+					let smoothedDerivative;
+					if(derivativeEma === null) {
+						derivativeEma = rawDerivative;  // Inizializza con la prima derivata
+						smoothedDerivative = rawDerivative;
+					} else {
+						derivativeEma = emaAlphas.derivative * rawDerivative + (1 - emaAlphas.derivative) * derivativeEma;
+						smoothedDerivative = derivativeEma;
+					}
+					
+					// ✅ DEBUG: Confronto derivata raw vs smoothed (ogni 2000 campioni)
+					if(sampleIndex % 2000 === 0) {
+						console.log(`📈 Derivata #${sampleIndex}: Raw=${rawDerivative.toFixed(0)}, Smoothed=${smoothedDerivative.toFixed(2)}, Alpha=${emaAlphas.derivative}`);
+					}
+					
+					/*
+					t1: start downward movement
+					t2: max downward speed
+					t3: max upward speed
+					t4: take off
+					t5: touch down
+					*/
+					
+					// ✅ USA DERIVATA SMOOTHED CONFIGURABILE NELLE SOGLIE
+					
+					//t1: start downward movement
+					if(result.t1 === null && (smoothedDerivative < 0 && force < staticWeight && lastForce >= staticWeight)) {
+						result.t1 = currentTime;
+						console.log(`✅ T1 trovato (EMA α=${emaAlphas.t1}, derivata α=${emaAlphas.derivative}): time=${currentTime.toFixed(3)}, derivata_raw=${rawDerivative.toFixed(0)}, derivata_smooth=${smoothedDerivative.toFixed(2)}`);
+					}
+					
+					//t2: max downward speed
+					if(result.t2 == null && result.t1 !== null && smoothedDerivative > 0 && force > staticWeight && lastForce <= staticWeight) {
+						result.t2 = currentTime;
+						console.log(`✅ T2 trovato (derivata α=${emaAlphas.derivative}): time=${currentTime.toFixed(3)}, derivata_smooth=${smoothedDerivative.toFixed(2)}`);
+					}
+					
+					// t3: max upward speed
+					if(result.t3 == null && result.t2 !== null && smoothedDerivative < 0 && force < staticWeight && lastForce >= staticWeight) {
+						result.t3 = currentTime;
+						console.log(`✅ T3 trovato (derivata α=${emaAlphas.derivative}): time=${currentTime.toFixed(3)}, derivata_smooth=${smoothedDerivative.toFixed(2)}`);
+					}
+					
+					// t4: take off
+					if(result.t4 == null && force < 0.05 * staticWeight && smoothedDerivative < -100) {
+						result.t4 = currentTime;
+						console.log(`✅ T4 trovato (derivata α=${emaAlphas.derivative}): time=${currentTime.toFixed(3)}, derivata_smooth=${smoothedDerivative.toFixed(2)}`);
+					}
+					
+					// t5: touch down
+					if(result.t5 == null && result.t4 !== null && force > 0 * staticWeight && smoothedDerivative > 10) {
+						result.t5 = currentTime;
+						console.log(`✅ T5 trovato (derivata α=${emaAlphas.derivative}): time=${currentTime.toFixed(3)}, derivata_smooth=${smoothedDerivative.toFixed(2)}`);
+					}
+					
+					lastForce = force;
+					lastDerivative = smoothedDerivative;
+					sampleIndex++;
+				}
+				precBatchTime = currBatchTime;
+			}
+			
+			console.log(`t1: ${result.t1} - t2: ${result.t2} - t3: ${result.t3} - t4: ${result.t4} - t5: ${result.t5}`);
+			console.log(`📊 Derivata finale smoothed (α=${emaAlphas.derivative}): ${derivativeEma?.toFixed(2)}`);
+			return result;
+		}		
     </script>
 </body>
 </html>
