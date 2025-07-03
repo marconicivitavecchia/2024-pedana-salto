@@ -12,6 +12,44 @@ $$P_s​$$ è la forza totale misurata durante il salto.
 
 $$P_0$$ è la forza a riposo (peso statico dell'atleta).
 
+## CDimostrazione della formula
+
+Questa formula deriva dall'applicazione della seconda legge di Newton durante la fase di caricamento del salto.
+
+Analizziamo la situazione:
+
+**Durante il caricamento del salto:**
+- L'atleta esercita una forza $P_s$ sulla pedana
+- Per il terzo principio di Newton, la pedana esercita una forza di reazione $P_s$ verso l'alto sull'atleta
+- Il peso dell'atleta (forza gravitazionale) è $P_0 = mg$ verso il basso
+
+**Applicando la seconda legge di Newton:**
+$$\sum F = ma$$
+
+Le forze che agiscono sull'atleta sono:
+- Forza di reazione della pedana: $+P_s$ (verso l'alto)
+- Peso: $-P_0$ (verso il basso)
+
+Quindi:
+$$P_s - P_0 = ma$$
+
+Risolvendo per l'accelerazione:
+$$a = \frac{P_s - P_0}{m}$$
+
+Ma sappiamo che $P_0 = mg$, quindi $m = \frac{P_0}{g}$
+
+Sostituendo:
+$$a = \frac{P_s - P_0}{\frac{P_0}{g}} = \frac{(P_s - P_0) \cdot g}{P_0}$$
+
+$$a = g \cdot \frac{P_s - P_0}{P_0} = g \left(\frac{P_s}{P_0} - 1\right)$$
+
+**Interpretazione fisica:**
+- Se $P_s = P_0$: $a = 0$ (atleta fermo)
+- Se $P_s > P_0$: $a > 0$ (accelerazione verso l'alto)
+- Se $P_s < P_0$: $a < 0$ (accelerazione verso il basso)
+
+Il termine $\left(\frac{P_s}{P_0} - 1\right)$ rappresenta il "fattore di caricamento" rispetto al peso a riposo.
+
 La tara della pedana è già inclusa nel calcolo del peso statico $$P_0$$​, quindi non serve sottrarre una massa separata come $$m_t$$.
 
 Se tara e peso dell'atleta vengono campionati nello stesso momento e con lo stesso sistema, l'errore relativo associato a queste misure si cancella nei calcoli che utilizzano differenze relative.
