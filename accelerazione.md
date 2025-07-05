@@ -305,6 +305,81 @@ Il metodo è:
 
 Non richiede parametri esterni come peso o massa dell'atleta.
 
+## ✅ SIpossono usare direttamente i "counts" dell’ADC?
+
+Ottima domanda — e la risposta è **molto interessante dal punto di vista pratico**:
+✅ **No, non serve conoscere il valore assoluto di \$F\$ in Newton. Basta usare il valore grezzo dell’ADC (in divisioni o "counts")**, **purché** usi sempre la **stessa unità** per \$F\_s\$ e \$F\_0\$.
+
+---
+
+## ✅ Perché funziona anche con i "counts" dell’ADC?
+
+La formula chiave per l’accelerazione relativa è:
+
+$$
+a = g \cdot \left( \frac{F_s - F_0}{F_0} \right)
+$$
+
+Ora, se sia \$F\_s\$ che \$F\_0\$ sono misurati dallo **stesso ADC**, con lo **stesso guadagno**, lo **stesso ponte di Wheatstone** o la **stessa cella di carico**, allora possiamo scrivere:
+
+$$
+F_s = K \cdot D_s \quad \text{e} \quad F_0 = K \cdot D_0
+$$
+
+dove:
+
+* \$D\_s\$ è la lettura dell’ADC durante il salto (in counts)
+* \$D\_0\$ è la lettura dell’ADC a riposo
+* \$K\$ è il fattore di conversione tra counts e Newton (che **non serve conoscere**)
+
+Quindi:
+
+$$
+a = g \cdot \left( \frac{K D_s - K D_0}{K D_0} \right)
+= g \cdot \left( \frac{D_s - D_0}{D_0} \right)
+$$
+
+👉 **Risultato**: puoi calcolare l'accelerazione relativa usando direttamente i valori **grezzi dell’ADC**, senza convertire in Newton.
+
+---
+
+## ✅ Questo vale anche per l’integrazione e il calcolo dell’altezza?
+
+Sì, **assolutamente**, se:
+
+* Usi lo stesso \$D\_0\$ come riferimento per tutta la durata del salto
+* Non cambia il guadagno o la scala del tuo sistema ADC durante la registrazione
+
+Tutta l'integrazione dell'accelerazione relativa è basata su:
+
+$$
+a[n] = g \cdot \frac{D[n] - D_0}{D_0}
+$$
+
+quindi anche **velocità e altezza finale** saranno corretti in metri al secondo e in metri.
+
+---
+
+## 📌 Attenzione a questi dettagli pratici
+
+1. **\$D\_0\$ deve essere stabile**
+   Fai una media su più campioni a riposo per ridurre il rumore.
+
+2. **ADC senza offset o drift**
+   Se l’ADC introduce un offset termico o non-lineare, potresti avere errori sistematici. Ma finché l’errore è **costante**, si annulla nel rapporto.
+
+3. **Campionamento sufficientemente veloce**
+   Se integri numericamente, serve una frequenza di campionamento **almeno 200 Hz**, meglio 500 Hz o più, per seguire bene la fase impulsiva del salto.
+
+---
+
+## ✅ Conclusione
+
+Puoi **tranquillamente usare i valori grezzi dell’ADC** per tutto il tuo calcolo (accelerazione, velocità, altezza) — non è necessaria la conversione in Newton o chilogrammi **se usi sempre lo stesso riferimento statico** \$D\_0\$.
+
+Se vuoi, posso aiutarti a scrivere una versione del tuo script che lavora direttamente con i counts ADC, senza calibrazione.
+
+
 Sitografia:
 - http://lia.deis.unibo.it/Courses/InfoChim0910/lucidi/4-integrazioneDifferenziali(1x).pdf
 - https://nsa.readthedocs.io/en/latest/03_integrali/docs/source/09_int_numerici.html
