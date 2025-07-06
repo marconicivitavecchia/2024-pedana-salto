@@ -2,7 +2,7 @@
 >
 # Filtri per Motion Tracking
 
-## **Filtro running mean (media mobile cumulativa)
+## **Filtro running mean (media mobile cumulativa)**
 
 * una **funzione** che aggiorna la media ogni volta che riceve un nuovo valore;
 * una o più **variabili globali** per tenere traccia del conteggio e della media corrente.
