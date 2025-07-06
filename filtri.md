@@ -7,7 +7,12 @@
 * una **funzione** che aggiorna la media ogni volta che riceve un nuovo valore;
 * una o più **variabili globali** per tenere traccia del conteggio e della media corrente.
 
----
+In formula:
+
+```
+mean_n = mean_{n-1} + (x_n - mean_{n-1}) / n
+```
+aggiorna la media senza dover sommare tutti i valori ogni volta.
 
 ### Esempio: Running Mean con variabile globale
 
@@ -23,14 +28,6 @@ function updateRunningMean(newValue) {
   return mean;
 }
 ```
-La formula:
-
-```
-mean_n = mean_{n-1} + (x_n - mean_{n-1}) / n
-```
-
-aggiorna la media senza dover sommare tutti i valori ogni volta.
-
 
 ### Varianti:
 
