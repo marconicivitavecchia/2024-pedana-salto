@@ -2,6 +2,43 @@
 >
 # Filtri per Motion Tracking
 
+## **Filtro running mean (media mobile cumulativa)
+
+* una **funzione** che aggiorna la media ogni volta che riceve un nuovo valore;
+* una o più **variabili globali** per tenere traccia del conteggio e della media corrente.
+
+---
+
+### Esempio: Running Mean con variabile globale
+
+```js
+// Variabili globali
+let mean = 0;
+let count = 0;
+
+// Funzione per aggiornare la media
+function updateRunningMean(newValue) {
+  count++;
+  mean += (newValue - mean) / count;
+  return mean;
+}
+```
+La formula:
+
+```
+mean_n = mean_{n-1} + (x_n - mean_{n-1}) / n
+```
+
+aggiorna la media senza dover sommare tutti i valori ogni volta.
+
+
+### Varianti:
+
+Se vuoi una **media mobile su una finestra (windowed mean)** invece di una cumulativa infinita, allora devi usare un array circolare e sommare solo gli ultimi N elementi. Fammi sapere se vuoi anche quella!
+
+Altrimenti questa soluzione è **ottima per calcolare la media progressiva in modo efficiente**, ideale ad esempio per sensori, streaming, ecc.
+
+
 ## Filtro EMA (Exponential Moving Average)
 
 ### Formula e Parametri
