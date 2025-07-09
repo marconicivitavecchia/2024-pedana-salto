@@ -156,6 +156,192 @@
             transition: background-color 0.3s;
             mask-origin: 5px;
         }
+		
+		.cursor-line {
+			position: absolute;
+			top: 0;
+			bottom: 0;
+			width: 2px;
+			pointer-events: none;
+			z-index: 10;
+		}
+
+		.cursor-1 {
+			background: #dc2626;
+			box-shadow: 2px 0 4px rgba(220, 38, 38, 0.3);
+		}
+
+		.cursor-2 {
+			background: #059669;
+			box-shadow: 2px 0 4px rgba(5, 150, 105, 0.3);
+		}
+
+		.cursor-label {
+			position: absolute;
+			top: -25px;
+			left: -15px;
+			background: rgba(0,0,0,0.8);
+			color: white;
+			padding: 2px 6px;
+			border-radius: 3px;
+			font-size: 11px;
+			font-weight: bold;
+		}
+
+		.measurement-panel {
+			background: #e0f2fe;
+			border: 2px solid #0ea5e9;
+			border-radius: 8px;
+			padding: 15px;
+			margin: 15px 0;
+		}
+
+		.measurement-grid {
+			display: grid;
+			grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+			gap: 15px;
+		}
+
+		.measurement-item {
+			background: white;
+			padding: 10px;
+			border-radius: 6px;
+			border-left: 4px solid #0ea5e9;
+		}
+
+		.measurement-value {
+			font-size: 16px;
+			font-weight: bold;
+			color: #111827;
+		}
+		/* NUOVO: Stili per il cursore trascinabile */
+		/* NUOVO: Cursore in basso */
+		.draggable-cursor {
+			position: absolute;
+			bottom: 0;
+			width: 12px;        /* Ridotto da 20px */
+			height: 15px;       /* Ridotto da 20px */
+			cursor: ew-resize;
+			z-index: 15;
+			box-shadow: 0 -2px 8px rgba(245, 158, 11, 0.6);
+			border-radius: 6px 6px 0 0;  /* Ridotto */
+			border: 1px solid #fff;      /* Ridotto da 2px */
+			transform: translateX(-50%); /* Centrato */
+			margin-left: 0;              /* Rimuovi margini */
+		}
+		
+		/* Aggiungi stili specifici per entrambi i cursori */
+		#draggableCursor1 {
+			background: linear-gradient(135deg, #f59e0b, #d97706);
+			box-shadow: 0 -2px 8px rgba(245, 158, 11, 0.6);
+		}
+
+		#draggableCursor2 {
+			background: linear-gradient(135deg, #10b981, #059669); /* Senza !important */
+			box-shadow: 0 -2px 8px rgba(16, 185, 129, 0.6);
+		}
+		
+		.draggable-cursor:hover {
+			transform: translateX(-50%) scale(1.2);
+			transition: all 0.2s ease;
+		}
+
+		/* Hover specifici */
+		#draggableCursor1:hover {
+			background: linear-gradient(135deg, #fbbf24, #f59e0b);
+		}
+
+		#draggableCursor2:hover {
+			background: linear-gradient(135deg, #34d399, #10b981);
+		}
+
+		.draggable-cursor::before {
+			position: absolute;
+			top: 2px;           /* Aggiustato */
+			left: 50%;
+			transform: translateX(-50%);
+			color: white;
+			font-size: 6px;     /* Ridotto */
+		}
+		
+		#draggableCursor1::before {
+			content: '1';
+			font-weight: bold;
+		}
+
+		#draggableCursor2::before {
+			content: '2';
+			font-weight: bold;
+		}	
+
+		/* Su schermi piccoli, posiziona i pannelli verticalmente */
+		@media (max-width: 768px) {
+			.cursor-info-panel-1 {
+				top: 10px;
+				right: 10px;
+			}
+			
+			.cursor-info-panel-2 {
+				top: 200px; /* Sotto il primo pannello */
+				right: 10px;
+			}
+		}
+
+		/* Pannello base (mantieni quello esistente) */
+		.cursor-info-panel {
+			position: absolute;
+			background: rgba(0, 0, 0, 0.85);
+			color: white;
+			padding: 10px 15px;
+			border-radius: 8px;
+			font-family: monospace;
+			font-size: 12px;
+			box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+			min-width: 250px;
+			z-index: 20;
+			display: none;
+		}
+
+		/* Posizionamento specifico per ogni pannello */
+		.cursor-info-panel-1 {
+			top: -145px;
+			right: 10px;
+			border-left: 4px solid #f59e0b; /* Bordo arancione */
+		}
+
+		.cursor-info-panel-2 {
+			top: -145px;
+			right: 280px; /* Spostato a sinistra per non sovrapporsi */
+			border-left: 4px solid #10b981; /* Bordo verde */
+		}
+
+		/* Titolo del cursore */
+		.cursor-title {
+			font-weight: bold;
+			margin-bottom: 8px;
+			text-align: center;
+			padding-bottom: 5px;
+			border-bottom: 1px solid rgba(255,255,255,0.3);
+		}
+
+		/* Stili esistenti per info-row, info-label, info-value rimangono uguali */
+		.cursor-info-panel .info-row {
+			display: flex;
+			justify-content: space-between;
+			margin: 3px 0;
+			padding: 2px 0;
+			border-bottom: 1px solid rgba(255,255,255,0.2);
+		}
+
+		.cursor-info-panel .info-label {
+			color: #fbbf24;
+			font-weight: bold;
+		}
+
+		.cursor-info-panel .info-value {
+			color: #34d399;
+			text-align: right;
+		}
     </style>
 </head>
 <body>
@@ -180,11 +366,26 @@
         <div class="config-item">
             <label for="emaAlpha">EMA Alpha:</label>
             <select id="emaAlpha" onchange="updateConfig('alfaema', this.value)">
+				<option value="0.005">0.005</option>
+				<option value="0.01">0.01</option>
+				<option value="0.02">0.02</option>
+				<option value="0.03">0.03</option>
+				<option value="0.04">0.05</option>
                 <option value="0.05">0.05</option>
-                <option value="0.1" selected>0.10</option>
+				<option value="0.06">0.06</option>
+				<option value="0.07">0.07</option>
+				<option value="0.08">0.08</option>
+				<option value="0.09">0.09</option>
+                <option value="0.1">0.10</option>
                 <option value="0.2">0.20</option>
                 <option value="0.3">0.30</option>
+				<option value="0.4">0.40</option>
                 <option value="0.5">0.50</option>
+				<option value="0.6">0.60</option>
+				<option value="0.7">0.70</option>
+				<option value="0.8">0.80</option>
+				<option value="0.9">0.90</option>
+				<option value="1" selected>1</option>
             </select>
         </div>
         <div class="buffer-controls">
@@ -277,6 +478,9 @@
                         <option value="50">50</option>
                     </select>
                 </label>
+                <label>Play offset (ms):
+                    <input type="number" id="startOffset" value="0" min="0" max="1000" step="1">
+                </label>
                 <button id="recordBtn" onclick="toggleRecording()">Start Recording</button>
                 <button id="loadRecordBtn" onclick="document.getElementById('recordFileInput').click()">Load Record</button>
                 <button id="play">></button>
@@ -289,7 +493,6 @@
                     <input type="text" id="filePrefix" value="data">
                 </label>
 				<input type="file" id="recordFileInput" accept=".txt,.json" style="display: none">
-
             </div>
             </div>
         </div>
@@ -298,13 +501,109 @@
     <div class="plot-container">
         <div class="plot-controls">
             <button onclick="resetView()">Reset View</button>
+            <!-- ✅ CONTROLLI CURSORI -->
+            <button id="resetCursors" onclick="resetCursors()" disabled>Reset Cursori</button>
+			<!-- NUOVO: Controllo cursore trascinabile -->
+			<button id="toggleDraggableCursor" onclick="toggleDraggableCursor()">Attiva Cursore Trascinabile</button>
         </div>
         <canvas id="plotCanvas"></canvas>
+        
+		<!-- NUOVO: Cursore trascinabile -->
+		<div id="draggableCursor1" class="draggable-cursor" style="display: none;"></div>
+		<div id="draggableCursor2" class="draggable-cursor" style="display: none; background: linear-gradient(135deg, #10b981, #059669);"></div>
+		<!-- Sostituisci il pannello singolo con due pannelli -->
+		
+		<!-- Pannello Cursore 1 (Arancione) -->
+		<div id="cursorInfoPanel1" class="cursor-info-panel cursor-info-panel-1">
+			<div class="cursor-title">🟠 Cursore 1</div>
+			<div class="info-row">
+				<span class="info-label">Tempo:</span>
+				<span class="info-value" id="cursorTime1">-</span>
+			</div>
+			<div class="info-row">
+				<span class="info-label">Batch:</span>
+				<span class="info-value" id="cursorBatch1">-</span>
+			</div>
+			<div class="info-row">
+				<span class="info-label">Indice Batch:</span>
+				<span class="info-value" id="cursorSampleIndex1">-</span>
+			</div>
+			<div class="info-row">
+				<span class="info-label">Valore:</span>
+				<span class="info-value" id="cursorValue1">-</span>
+			</div>
+			<div class="info-row">
+				<span class="info-label">Posizione X:</span>
+				<span class="info-value" id="cursorPosition1">-</span>
+			</div>
+			<div class="info-row">
+				<span class="info-label">Forza relativa:</span>
+				<span class="info-value" id="relativeForce1">-</span>
+			</div>
+		</div>
+
+		<!-- Pannello Cursore 2 (Verde) -->
+		<div id="cursorInfoPanel2" class="cursor-info-panel cursor-info-panel-2">
+			<div class="cursor-title">🟢 Cursore 2</div>
+			<div class="info-row">
+				<span class="info-label">Tempo:</span>
+				<span class="info-value" id="cursorTime2">-</span>
+			</div>
+			<div class="info-row">
+				<span class="info-label">Batch:</span>
+				<span class="info-value" id="cursorBatch2">-</span>
+			</div>
+			<div class="info-row">
+				<span class="info-label">Indice Batch:</span>
+				<span class="info-value" id="cursorSampleIndex2">-</span>
+			</div>
+			<div class="info-row">
+				<span class="info-label">Valore:</span>
+				<span class="info-value" id="cursorValue2">-</span>
+			</div>
+			<div class="info-row">
+				<span class="info-label">Posizione X:</span>
+				<span class="info-value" id="cursorPosition2">-</span>
+			</div>
+			<div class="info-row">
+				<span class="info-label">Forza relativa:</span>
+				<span class="info-value" id="relativeForce2">-</span>
+			</div>
+		</div>
+        
         <div class="zoom-box" id="zoomBox"></div>
         <div class="value-info" id="valueInfo"></div>
     </div>
 
+    <!-- ✅ PANNELLO MISURAZIONI CURSORI -->
+    <div id="measurementPanel" class="measurement-panel" style="display: none;">
+        <div class="measurement-title">📊 Misurazioni tra Cursori</div>
+        <div class="measurement-grid">
+            <div class="measurement-item">
+                <div class="measurement-label">Distanza Temporale</div>
+                <div id="timeDiff" class="measurement-value">-</div>
+            </div>
+            <div class="measurement-item">
+                <div class="measurement-label">Distanza in Batch</div>
+                <div id="batchDiff" class="measurement-value">-</div>
+            </div>
+            <div class="measurement-item">
+                <div class="measurement-label">Distanza in Campioni</div>
+                <div id="sampleDiff" class="measurement-value">-</div>
+            </div>
+            <div class="measurement-item">
+                <div class="measurement-label">Differenza Valori</div>
+                <div id="valueDiff" class="measurement-value">-</div>
+            </div>
+			<div class="measurement-item">
+                <div class="measurement-label">Velocità</div>
+                <div id="relArea" class="measurement-value">-</div>
+            </div>
+        </div>
+    </div>
+	
     <div id="log"></div>
+	<div id="report"></div>
 
     <script src="matrixUtils.js"></script>
     <script src="filter.js"></script>       
@@ -324,7 +623,6 @@
         // Test signal variables
         let testSignalTime = 0;
         let lastTestSignalUpdate = 0;
-        let thresholds = null;
         let testSignalEnabled0 = false;
         let testSignalEnabled1 = false;
         let remoteTestEnabled = false;
@@ -344,8 +642,10 @@
         // Variabili per registrazione
         let isRecording = false;
         let recordBuffer = [];
+		let loadBuffer = [];
         let recordBufferSize = 50000; // Circa 250 secondi di dati con intervallo 5ms
         let currPlayIndex = 0;
+		let thresholdsList = [];
 
         // Display configuration
         const MIN_PLOT_INTERVAL = 5;
@@ -363,7 +663,26 @@
         let pausedAt = null;      // timestamp quando messo in pausa
         let animationFrameId = null;  // ID per cancelAnimationFrame
         let isAtLeftLimit = false;  // flag per limite sinistro
-
+		// Variabili cursori (aggiungi dopo le tue variabili globali)
+		let cursorMode = false;
+		//let cursors = {
+		//	cursor1: { active: false, x: 0, time: 0, batchIndex: -1, sampleIndex: -1, value: 0, relArea: 0 },
+		//	cursor2: { active: false, x: 0, time: 0, batchIndex: -1, sampleIndex: -1, value: 0, relArea: 0 }
+		//};
+		//let nextCursorToPlace = 1;
+		// NUOVO: Variabili per il cursore trascinabile
+		let draggableCursorsActive = false;
+		let isDragging = null; // Memorizza quale cursore si sta trascinando
+		let cursors = {
+			cursor1: { x: 0, time: 0, batchIndex: -1, sampleIndex: -1, value: 0, rf: 0, relArea: 0  },
+			cursor2: { x: 0, time: 0, batchIndex: -1, sampleIndex: -1, value: 0, rf: 0, relArea: 0  }
+		};
+		let Fstatico1 = 0;
+		let Fstatico2 = 0;
+		
+		// Con queste:
+		
+		
         // Variabili di stato per zoom e pan
         //let isMouseDown = false;
         let startX = 0;
@@ -1254,153 +1573,153 @@
                 playRecord();
              }
         }
-/*
-        function detectJumpThresholds(recordBuffer, sampleRate) {
-            let result = {t1: null, t2: null, t3: null, t4: null, t5: null};
-            let minDerivative = Infinity;
-            let maxDerivative = -Infinity;
-            let precBatchTime;
-            let currBatchTime;
-            let batchLen;
-            let lastForce = null;
-            result.t1 = null;
-            result.t2 = null;
-            result.t3 = null;
-            result.t4 = null;
-            result.t5 = null;
-
-            // Calcolo peso statico
-            let staticWeight = 0;
-            let staticCount = 0;
-            for(let batchIdx = 0; batchIdx < recordBuffer.length && staticCount < 20; batchIdx++) {
-                const batch = recordBuffer[batchIdx];
-                for(let i = 0; i < batch.v.length && staticCount < 20; i++) {
-                    staticWeight +=  calculateValue(batch.v[i]);
-                    staticCount++;
-                }
-            }
-            staticWeight /= staticCount;
-
-            const dt0 = 1/sampleRate;
-            precBatchTime = parseInt(recordBuffer[0].t, 16) / 1000000 - dt0;
-            filterh.predict();
-            lastForce = filterh.update(calculateValue(recordBuffer[0].v[0]));
-            batchLen = recordBuffer[0].v.length;
-            // Analisi principale
-            let lastDerivative = null;            
-            for(let batchIdx = 0; batchIdx < recordBuffer.length; batchIdx++) {
-                const batch = recordBuffer[batchIdx];
-
-                // Calcola dt medio dai primi due batch
-                currBatchTime = parseInt(recordBuffer[batchIdx].t, 16) / 1000000;
-                const dt = (currBatchTime - precBatchTime) / batchLen;
-                
-                for(let i = 0; i < batch.v.length; i++) {                   
-                    filterh.predict();
-                    let force = filterh.update(calculateValue(batch.v[i]));
-                    
-                    const currentTime = batchTime + (i * dt);
-                    const derivative = (force - lastForce) / dt;
-                    
-                    if(result.t1 === null && (derivative > 1000 || derivative < -1000)) {
-                        result.t1 = currentTime;
-                    }
-
-    
-
-                    if(result.t2 == null && result.t1 !== null && derivative > 0 && force > staticWeight && lastForce <= staticWeight) {
-                        result.t2 = currentTime;
-                    }
-                    
-                    if(result.t3 == null && result.t2 !== null && derivative < 0 && force < staticWeight && lastForce >= staticWeight) {
-                        result.t3 = currentTime;
-                    }
-
-                    if(result.t4 == null && result.t3 !== null && result.t4 === null && force < 0.05 * staticWeight && derivative < -100) {
-                        result.t4 = currentTime;
-                    }
-                    
-                    if(result.t5 == null && result.t4 !== null && result.t5 === null && force > 0 && derivative > 10) {
-                        result.t5 = currentTime;
-                    }
-                    
-                    lastForce = force;
-                    lastDerivative = derivative;
-                }
-
-                precBatchTime = currBatchTime;
-            }
-            
-            console.log(`t1: ${result.t1} - t2: ${result.t2} - t3: ${result.t3} - t4: ${result.t4} - t5: ${result.t5}`);
-            return result;
-        }
-*/
 		
-        function analyzeJump(recordBuffer, sampleRate) {
-            const times = detectJumpThresholds(recordBuffer, sampleRate, 1);
-            thresholds = times;
+		function relArea(bidx1, vidx1, bidx2, vidx2){
+			if(bidx1 > bidx2){
+				let app = bidx1;
+				bidx1 = bidx2;
+				bidx2 = app;
+			}
+			if(vidx1 > vidx2){
+				let app = vidx1;
+				vidx1 = vidx2;
+				vidx2 = app;
+			}
+			console.log("bidx1: "+bidx1);
+			console.log("vidx1: "+vidx1);
+			console.log("bidx2: "+bidx2);
+			console.log("vidx2: "+vidx2);
+			
+			const g = 9.81;
+			let vIniziale = 0.0;
+			let dt = 0.0;
+			const dt0 = 1/SAMPLE_RATE;
+			let currBatchTime = 0;
+			Fstatico = (Fstatico1 + Fstatico2) / 2;
+			let precBatchTime = parseInt(recordBuffer[0].t, 16) / 1000000 - dt0;
+			let batchLen = recordBuffer[0].v.length;
+			for(let batchIdx = bidx1; batchIdx <= bidx2 && batchIdx < recordBuffer.length; batchIdx++) {
+				let batch = recordBuffer[batchIdx];
+				currBatchTime = parseInt(batch.t, 16) / 1000000;
+				dt = (currBatchTime - precBatchTime) / batchLen;
+				// Determina gli indici di inizio e fine per questo batch
+                let startIdx = (batchIdx === bidx1) ? vidx1 : 0;
+                let endIdx = (batchIdx === bidx2) ? vidx2 : batch.v.length;
+				for(let i = startIdx; i < endIdx && i < batch.v.length; i++) {
+					let force = calculateValue(batch.v[i]);
+					//console.log("currentTime: "+force);					
+					// Integrazione 
+					vIniziale += (force - Fstatico)*dt0;
+					//vIniziale += (force)*dt;
+				}
+				precBatchTime = currBatchTime;
+			}
+			//console.log("diffForce: "+vIniziale);
+			vIniziale /= Fstatico;
+			vIniziale *= g;
+			
+			// Calcoli finali
+			const h_velocity = (vIniziale * vIniziale) / (2 * g);
+			return h_velocity;
+		}
+		
+        function analyzeJump(recordBuffer, sampleRate, bIdx, vIdx, index, t12, sw2) {
+			const result = detectJumpThresholds(recordBuffer, sampleRate, bIdx, vIdx, t12, sw2);
+			//if(!result.next) return null;
+			console.log('analyzeJump-bIdx: '+bIdx);
+			console.log('analyzeJump-vIdx: '+vIdx);
+			
+			const g = 9.81;
+			Fstatico1 = result.sw1; 
+			Fstatico2 = result.sw2; 
+			const sensitivity = 50000;
+			
+			// Calcolo velocità iniziale (t1->t4)
+			let vIniziale = 0;
+			let vCaduta = 0;
+			let stabilized = false;
+			let tStabilizzazione = result.t5;
+			let precBatchTime = 0;
+			let currBatchTime = 0;
+			let batchLen = recordBuffer[0].v.length;
+			const dt0 = 1/sampleRate;
+			// ✅ PARAMETRI PER STABILIZZAZIONE ROBUSTA
+			const STABILIZATION_TOLERANCE = 0.2;  // ±5% del peso statico (come prima)
+			const MIN_STABLE_TIME = 0.2;           // Richiede 200ms di stabilità continua
+			const MIN_STABLE_SAMPLES = Math.ceil(MIN_STABLE_TIME * sampleRate);
+			let stableCount = 0;                   // Contatore campioni stabili consecutivi
+			let firstStableTime = null;           // Primo momento stabile
+			console.log('sampleRate: '+sampleRate);
+			console.log('Fstatico1: '+Fstatico1);
+			console.log('Fstatico2: '+Fstatico2);
+			
+			let one = true;
+			for(let batchIdx = bIdx; batchIdx < recordBuffer.length; batchIdx++) {
+				const batch = recordBuffer[batchIdx];
+				currBatchTime = parseInt(batch.t, 16) / 1000000;
+				const dt = (currBatchTime - precBatchTime) / batchLen;
 
-            const g = 9.81;
-            const Fstatico = 700; 
-            const sensitivity = 50000;
-            
-            // Calcolo velocità iniziale (t1->t4)
-            let vIniziale = 0;
-            let dt = 1/sampleRate;
-            
-            // Calcolo velocità di caduta (t5->stabilizzazione)
-            let vCaduta = 0;
-            let stabilized = false;
-            let tStabilizzazione = times.t5;
-            
-            for(let batchIdx = 0; batchIdx < recordBuffer.length; batchIdx++) {
-                const batch = recordBuffer[batchIdx];
-                const batchTime = parseInt(batch.t, 16) / 1000000;
-                
-                for(let i = 0; i < batch.v.length; i++) {
-                    let value = calculateValue(batch.v[i]);
-                    
-                    filtera.predict();
-                    value = filtera.update(value);
-                    const force = (value * Fstatico) / sensitivity;
-                    
-                    // Integrazione pre-salto
-                    if(batchTime >= times.t1 && batchTime <= times.t4) {
-                        vIniziale += g * ((force - Fstatico) / Fstatico) * dt;
-                    }
-                    
-                    // Cerca punto di stabilizzazione post-atterraggio
-                    if(batchTime > times.t5 && !stabilized) {
-                        if(Math.abs(force - Fstatico) < Fstatico * 0.05) { // ±5% del peso statico
-                            stabilized = true;
-                            tStabilizzazione = batchTime;
-                        }
-                        // Integra fino alla stabilizzazione
-                        vCaduta += g * ((force - Fstatico) / Fstatico) * dt;
-                    }
-                }
-            }
-
-            const flightTime = times.t5 - times.t4;
-            const h_flight = (g * flightTime * flightTime) / 8;
-            const h_velocity = (vIniziale * vIniziale) / (2 * g);
-            const h_landing = (vCaduta * vCaduta) / (2 * g);
-
-            return {
-                flightTime,
-                height_from_time: h_flight,
-                height_from_velocity: h_velocity,
-                height_from_landing: h_landing,
-                initial_velocity: vIniziale,
-                landing_velocity: vCaduta,
-                stabilization_time: tStabilizzazione - times.t5,
-                thresholdTimes: times
-            };
-        }
+				// Determina gli indici di inizio e fine per questo batch
+                let startIdx = (batchIdx === bIdx) ? vIdx : 0;
+				for(let i = startIdx; i < batch.v.length; i++) {
+					let force = calculateValue(batch.v[i]);
+					
+					//filtera.predict();
+					//value = filtera.update(force);
+					//console.log('force: '+force);
+					
+					const currentTime = currBatchTime + (i * dt0);
+					if(one){
+						one = false;
+						console.log('force: '+force+' - currentTime: '+currentTime+'- result.t1: '+result.t1+'- result.t4: '+result.t4);
+					}
+					
+					// Integrazione pre-salto
+					if(currentTime >= result.t1 && currentTime <= result.t4) {
+						vIniziale += (force - Fstatico1)*dt0;
+						//console.log('currentTime: '+currentTime+' - result.t1: '+result.t1+' - diff: '+(force - Fstatico1));
+					}
+					
+					// ✅ STABILIZZAZIONE POST-ATTERRAGGIO
+					if(currentTime > result.t5 && currentTime <= result.t6) {					
+						vCaduta += (force - Fstatico2)*dt;
+						//console.log('vCaduta: '+vCaduta);
+					}
+				}
+				precBatchTime = currBatchTime;
+			}
+			console.log('vIniziale: '+vIniziale);
+			console.log('vCaduta: '+vCaduta);
+			vIniziale /= Fstatico1;
+			vCaduta /= Fstatico2;
+			console.log('vIniziale: '+vIniziale);
+			console.log('vCaduta: '+vCaduta);
+			vIniziale *= g;
+			vCaduta *= g;
+			
+			// Calcoli finali
+			const flightTime = result.t5 - result.t4;
+			const h_flight = (g * flightTime * flightTime) / 8;
+			const h_velocity = (vIniziale * vIniziale) / (2 * g);
+			const h_landing = (vCaduta * vCaduta) / (2 * g);
+						
+			return {
+				index,
+				flightTime,
+				height_from_time: h_flight,
+				height_from_velocity: h_velocity,
+				height_from_landing: h_landing,
+				initial_velocity: vIniziale,
+				landing_velocity: vCaduta,
+				stabilization_time: tStabilizzazione - result.t5,
+				thresholdTimes: result
+			};
+		}
 
         function printJumpReport(data) {
             // Console report
             console.table({
+				"Jump number": `${(data.index).toFixed(0)}`,
                 "Flight Time": `${(data.flightTime * 1000).toFixed(1)} ms`,
                 "Height (from time)": `${(data.height_from_time * 100).toFixed(1)} cm`,
                 "Height (from velocity)": `${(data.height_from_velocity * 100).toFixed(1)} cm`, 
@@ -1421,7 +1740,7 @@
             const div = document.createElement('div');
             div.innerHTML = `
                 <div class="jump-report" style="font-family: Arial; padding: 20px; max-width: 600px; margin: auto;">
-                    <h2>Jump Analysis Report</h2>
+                    <h2>Jump ${(data.index).toFixed(0)} Analysis Report</h2>
                     
                     <div style="background: #f5f5f5; padding: 15px; border-radius: 5px; margin: 10px 0;">
                         <h3>Jump Heights</h3>
@@ -1452,8 +1771,7 @@
                     </div>
                 </div>
             `;
-            
-            document.body.appendChild(div);
+            document.getElementById('report').appendChild(div);
             return div;
         }
 		// =====================================================
@@ -1489,14 +1807,15 @@
 				}
 				
 				// Carica i batch (saltando la prima riga se contiene metadati)
-				recordBuffer = lines.slice(dataStartIndex).map(line => {
+				loadBuffer.length = 0;
+				loadBuffer = lines.slice(dataStartIndex).map(line => {
 					const hexBatch = JSON.parse(line);
 					return {
 						t: hexBatch.t,
 						v: hexBatch.v
 					};
 				});
-				
+								
 				// Gestione metadati con retrocompatibilità
 				if (hasMetadata) {
 					// File nuovo con metadati: applica i metadati salvati
@@ -1803,6 +2122,8 @@
 
 		// Modifica la funzione playRecord per usare i metadati
 		function playRecordWithMetadata() {
+			updateTimebase();
+			document.getElementById('report').innerHTML = ''; // cancella i report precedenti
 			// Disabilita il modo test se attivo
 			adcSignalEnabled = false;
 			testSignalEnabled0 = false;
@@ -1814,14 +2135,17 @@
 			recordBuffer = recordBuffer.slice(0, maxBufferSize);
 			currPlayIndex = 0;
 			
+			let ofst = Number(document.getElementById('startOffset').value)/1000;
+			
+			recordBuffer.length = 0;
+			recordBuffer = applyEMAFilter(loadBuffer.slice(ofst / 0.005), parseFloat(document.getElementById('emaAlpha').value));
+			const firstBatch = recordBuffer[0];
+			const lastBatch = recordBuffer[recordBuffer.length - 1];
+			const dataStartTime = parseInt(firstBatch.t, 16);
+			const dataEndTime = parseInt(lastBatch.t, 16);
+			const dataCenterTime = (dataStartTime + dataEndTime) / 2;	
 			// Centratura intelligente sui dati (come prima)
-			if (recordBuffer.length > 0) {
-				const firstBatch = recordBuffer[0];
-				const lastBatch = recordBuffer[recordBuffer.length - 1];
-				const dataStartTime = parseInt(firstBatch.t, 16);
-				const dataEndTime = parseInt(lastBatch.t, 16);
-				const dataCenterTime = (dataStartTime + dataEndTime) / 2;
-				
+			if (recordBuffer.length > 0) {				
 				const currentTimeWindow = timebaseDiv * DIVISIONS_X * 1000000;
 				xScale.min = dataCenterTime - currentTimeWindow / 2;
 				xScale.max = dataCenterTime + currentTimeWindow / 2;
@@ -1831,13 +2155,90 @@
 			
 			// I metadati Y sono già stati applicati durante il caricamento
 			// Non fare auto-scaling automatico qui
-			
 			// Analisi del salto e report
-			report = analyzeJump(recordBuffer, SAMPLE_RATE);   
-			printJumpReport(report);  
+			let index = 0;
+			let report = {};
+			let bIdx = 0;
+			let vIdx = 0;
+			let t12 = null;
+			let sw2 = 0;
+			thresholdsList.length = 0;
+			do{
+				report = analyzeJump(recordBuffer, SAMPLE_RATE, bIdx, vIdx, index, t12, sw2); 		
+				printJumpReport(report);  
+				index++;
+				console.log('index: '+index);	
+				bIdx = report.thresholdTimes.t12bidx;
+				vIdx = report.thresholdTimes.t12vidx;
+				t5 = report.thresholdTimes.t5;
+				t12 = report.thresholdTimes.t12;
+				sw2 = report.thresholdTimes.sw2;
+				console.log(`next: `+report.thresholdTimes.next);
+				if(t5 != null){
+					thresholdsList.push(report.thresholdTimes);		
+				}					
+			}while(report.thresholdTimes.next);
 			drawPlot();       
 			scrollView(0);
 		}
+		
+		// Funzione per applicare un filtro EMA a un buffer di batch {t, v}
+		// dove v è un array di stringhe esadecimali
+		// Restituisce una nuova lista con gli stessi t e i valori filtrati
+		function applyEMAFilter(loadBuffer, alpha = 1) {
+			if (!loadBuffer || loadBuffer.length === 0) {
+				return [];
+			}
+			
+			if(alpha == 1) return loadBuffer;
+			
+			const firstBatch = loadBuffer[0];
+	
+			if (!firstBatch.v || !Array.isArray(firstBatch.v)) {
+				return [];
+			}
+			
+			const arrayLength = firstBatch.v.length;
+			const filteredBuffer = [];
+			
+			// Aggiungi il primo batch invariato
+			filteredBuffer.push({
+				t: firstBatch.t,
+				v: [...firstBatch.v]
+			});
+			
+			let emaValue = calculateValue(firstBatch.v[0]);;
+			
+			// Applica il filtro EMA a ogni batch successivo
+			for (let i = 1; i < loadBuffer.length; i++) {
+				const currentBatch = loadBuffer[i];
+				
+				if (!currentBatch.v || !Array.isArray(currentBatch.v) || currentBatch.v.length !== arrayLength) {
+					continue;
+				}
+				
+				const newV = [];
+				
+				// Per ogni elemento dell'array v
+				for (let j = 0; j < arrayLength; j++) {
+					const currentValue = calculateValue(currentBatch.v[j]);
+					
+					// Formula EMA: EMA = alpha * valore_corrente + (1 - alpha) * EMA_precedente
+					emaValue = alpha * currentValue + (1 - alpha) * emaValue;
+					
+					newV.push(Math.round(emaValue).toString(16).padStart(6, '0'));
+				}
+				
+				// Crea un nuovo batch con timestamp originale e valori filtrati
+				filteredBuffer.push({
+					t: currentBatch.t,
+					v: newV
+				});
+			}
+			
+			return filteredBuffer;
+		}
+
 
 		// Funzione per aggiornare i controlli HTML
 		function addSaveLoadControls() {
@@ -1999,49 +2400,55 @@
 			drawPlot();
 		}
 
-        function drawThresholds(times) {
-            if (recordBuffer.length > 0) {
-                ctx.save();
-                
-                // Linee
-                ctx.strokeStyle = 'green';
-                ctx.lineWidth = 2;
-                ctx.setLineDash([5, 5]);
-                
-                // Testo
-                ctx.font = '12px Arial';
-                ctx.fillStyle = 'green';
-                ctx.textAlign = 'left';
-                ctx.setLineDash([]); // Rimuove tratteggio per il testo
-                
-                const labels = {
-                    t1: 'T1: Start',
-                    t2: 'T2: Max Down',
-                    t3: 'T3: Max Up', 
-                    t4: 'T4: Takeoff',
-                    t5: 'T5: Landing'
-                };
-                
-                let count = 0;
-                for (const [key, label] of Object.entries(labels)) {
-                    if (times[key]) {
-                        const x = timeToScreen(times[key] * 1000000);
-                        // Linea
-                        ctx.beginPath();
-                        ctx.moveTo(x, padding);
-                        ctx.lineTo(x, canvas.height - padding);
-                        ctx.stroke();
-                        
-                        // Etichetta
-                        ctx.fillText(label, x + 5, padding + 20 + count);
-                    }
-                    count +=10;
-                }
-                
-                ctx.restore();
-                console.log("Times:", times);
-                console.log("Window:", {min: xScale.min, max: xScale.max});
-            }
+        function drawThresholds() {
+			console.log("timesList: "+thresholdsList );
+			if (recordBuffer.length > 0 && thresholdsList != undefined) {
+				for (const times of thresholdsList) {
+					
+					ctx.save();
+					
+					// Linee
+					ctx.strokeStyle = 'green';
+					ctx.lineWidth = 2;
+					ctx.setLineDash([5, 5]);
+					
+					// Testo
+					ctx.font = '12px Arial';
+					ctx.fillStyle = 'green';
+					ctx.textAlign = 'left';
+					ctx.setLineDash([]); // Rimuove tratteggio per il testo
+					
+					const labels = {
+						t1: 'T1: Start',
+						t2: 'T2: Max Down',
+						t3: 'T3: Max Up', 
+						t4: 'T4: Takeoff',
+						t5: 'T5: Landing',
+						t6: 'T6: End Landing',
+						t12: 'T12: Next Start'
+					};
+					
+					let count = 0;
+					for (const [key, label] of Object.entries(labels)) {
+						if (key in times) {
+							const x = timeToScreen(times[key] * 1000000);
+							// Linea
+							ctx.beginPath();
+							ctx.moveTo(x, padding);
+							ctx.lineTo(x, canvas.height - padding);
+							ctx.stroke();
+							
+							// Etichetta
+							ctx.fillText(label, x + 5, padding + 20 + count);
+						}
+						count +=10;
+					}
+					
+					ctx.restore();
+					console.log("Times:", times);
+					console.log("Window:", {min: xScale.min, max: xScale.max});
+				}
+			}
         }
 
         function drawScrollLimits() {
@@ -2163,85 +2570,120 @@
 //--------------------------------------------------------------------------------------------------------------------------
         // Stampa di un batch
         function drawPlot() {
-            if (animationFrameId) {
-                cancelAnimationFrame(animationFrameId);
-            }
+			if (animationFrameId) {
+				cancelAnimationFrame(animationFrameId);
+			}
 
-            animationFrameId = requestAnimationFrame(() => {
-                // Usa recordBuffer invece di batchBuffer
-                if (recordBuffer.length === 0) return;
+			animationFrameId = requestAnimationFrame(() => {
+				if (recordBuffer.length === 0) return;
 
-                const timeWindow = timebaseDiv * DIVISIONS_X * 1000000;
-                
-                // Clear e disegna griglia
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
-                drawGrid();
-                drawAxes();
+				const timeWindow = timebaseDiv * DIVISIONS_X * 1000000;
+				
+				// Clear e disegna griglia
+				ctx.clearRect(0, 0, canvas.width, canvas.height);
+				drawGrid();
+				drawAxes();
 
-                // Plot dei dati
-                ctx.beginPath();
-                ctx.strokeStyle = 'blue';
-                ctx.lineWidth = 2;
+				// Plot dei dati
+				ctx.beginPath();
+				ctx.strokeStyle = 'blue';
+				ctx.lineWidth = 2;
 
-                let isFirstPoint = true;
-                let lastX = -1;
-                let lastY = -1;
-                let n = 1;
+				let isFirstPoint = true;
+				let lastX = -1;
+				let lastY = -1;
+				let n = 1;
 
-                //xScale.min = recordBuffer[0].t;
-                // Prima trova i batch nella finestra temporale
-                const batchesInWindow = recordBuffer.filter(batch => 
-                    parseInt(batch.t, 16) >= xScale.min && parseInt(batch.t, 16) <= xScale.max
-                );
-                
-                if(batchesInWindow.length < TARGET_POINTS){
-                    n = Math.ceil((TARGET_POINTS - batchesInWindow.length) / batchesInWindow.length)+1;
-                    n = Math.min(n, recordBuffer[0].v.length);
-                }
-                console.log("batchesInWindow.length: " + batchesInWindow.length);
-                console.log("n: " + n);
-                // Disegna tutti i punti nella finestra temporale corrente
-                let count = 0;
-                for (let batch of batchesInWindow) {
-                    for(let j=0; j < n; j++){  
-                        // filtra i campioni                      
-                        //filterh.predict();
-                        //value = filterh.update(calculateValue(batch.v[j]));
+				// Prima trova i batch nella finestra temporale
+				const batchesInWindow = recordBuffer.filter(batch => 
+					parseInt(batch.t, 16) >= xScale.min && parseInt(batch.t, 16) <= xScale.max
+				);
+				
+				if(batchesInWindow.length < TARGET_POINTS){
+					n = Math.ceil((TARGET_POINTS - batchesInWindow.length) / batchesInWindow.length)+1;
+					n = Math.min(n, recordBuffer[0].v.length);
+				}
+				console.log("batchesInWindow.length: " + batchesInWindow.length);
+				console.log("n: " + n);
+				
+				// Disegna tutti i punti nella finestra temporale corrente
+				let count = 0;
+				let highlightPoints = []; // Array per punti da evidenziare
+				
+				for (let batch of batchesInWindow) {
+					for(let j=0; j < n; j++){  
+						// filtra i campioni                      
 						value = calculateValue(batch.v[j]);
-                        
-                        // Calcola il timestamp preciso per questo campione nel batch
-                        const sampleTime = parseInt(batch.t, 16) + (j * (1000000 / SAMPLE_RATE)); // in microsecondi
-                
-                        const x = Math.round(timeToScreen(sampleTime));
-                        const y = Math.round(valueToScreen(value));
+						
+						// Calcola il timestamp preciso per questo campione nel batch
+						const sampleTime = parseInt(batch.t, 16) + (j * (1000000 / SAMPLE_RATE)); // in microsecondi
+				
+						const x = Math.round(timeToScreen(sampleTime));
+						const y = Math.round(valueToScreen(value));
 
-                        if (isFirstPoint) {
-                            ctx.moveTo(x, y);
-                            isFirstPoint = false;
-                        } else {
-                            ctx.lineTo(x, y);
-                        }
-                        
-                        //lastX = x;
-                        //lastY = y;
-                        count++;
-                    }
-                }
-                console.log("count: " + count);
-                ctx.stroke();
+						// Controlla se questo punto è vicino ai cursori trascinabili
+						let isNearCursor = false;
+						if (draggableCursorsActive) {
+							// Controlla entrambi i cursori
+							['cursor1', 'cursor2'].forEach(cursorId => {
+								const cursorData = cursors[cursorId];
+								if (cursorData.time > 0) {
+									const timeDiff = Math.abs(sampleTime - cursorData.time);
+									// 5000 microsecondi = 5ms = 1 batch
+									if (timeDiff < 5000) { 
+										isNearCursor = true;
+										highlightPoints.push({x, y, timeDiff, cursorId});
+									}
+								}
+							});}
 
-                drawScrollLimits();
-                drawThresholds(thresholds);
+						if (isFirstPoint) {
+							ctx.moveTo(x, y);
+							isFirstPoint = false;
+						} else {
+							ctx.lineTo(x, y);
+						}
+						
+						count++;
+					}
+				}
+				console.log("count: " + count);
+				
+				// Disegna la traccia normale
+				ctx.stroke();
+				
+				// Disegna i punti evidenziati
+				if (highlightPoints.length > 0) {
+					['cursor1', 'cursor2'].forEach(cursorId => {
+						if (cursors[cursorId].time > 0) {
+							const segmentX = timeToScreen(cursors[cursorId].time);
+							const color = cursorId === 'cursor1' ? '#dc2626' : '#059669';
+							
+							// Segmento verticale
+							ctx.beginPath();
+							ctx.strokeStyle = color;
+							ctx.lineWidth = 2;
+							ctx.moveTo(segmentX, padding);
+							ctx.lineTo(segmentX, canvas.height - padding);
+							ctx.stroke();
+							
+							// Punto sulla curva
+							const closestPoint = highlightPoints.reduce((closest, point) => 
+								Math.abs(point.x - segmentX) < Math.abs(closest.x - segmentX) ? point : closest
+							);
+							
+							ctx.beginPath();
+							ctx.arc(segmentX, closestPoint.y, 4, 0, 2 * Math.PI);
+							ctx.fillStyle = color;
+							ctx.fill();
+						}
+					});
+				}
 
-                /*
-                // Aggiorna display
-                document.getElementById('xRange').textContent = 
-                    `${((xScale.max - xScale.min)/1000).toFixed(1)}ms`;
-                document.getElementById('yRange').textContent = 
-                    `${yScale.min.toFixed(0)} to ${yScale.max.toFixed(0)}`;
-                    */
-            });
-        }
+				drawScrollLimits();
+				drawThresholds();
+			});
+		}
 //--------------------------------------------------------------------------------------------------------------------------
 
         function drawGrid() {
@@ -2295,6 +2737,7 @@
 			console.log("Nuovo range: " + xScale.min + " - " + xScale.max);
 			
 			if (!inputMode) {
+				//playRecordWithMetadata();
 				drawPlot();
 			}
 		}
@@ -2851,6 +3294,7 @@
 								<option value="0.05" selected>0.05</option>
 								<option value="0.1">0.10</option>
 								<option value="0.2">0.20</option>
+								<option value="1">1</option>
 							</select>
 						</div>
 						
@@ -2862,6 +3306,7 @@
 								<option value="0.2">0.20</option>
 								<option value="0.3">0.30</option>
 								<option value="0.5">0.50</option>
+								<option value="1">1</option>
 							</select>
 						</div>
 						
@@ -2873,6 +3318,7 @@
 								<option value="0.2" selected>0.20</option>
 								<option value="0.3">0.30</option>
 								<option value="0.5">0.50</option>
+								<option value="1">1</option>
 							</select>
 						</div>
 						
@@ -2884,6 +3330,7 @@
 								<option value="0.3" selected>0.30</option>
 								<option value="0.4">0.40</option>
 								<option value="0.5">0.50</option>
+								<option value="1">1</option>
 							</select>
 						</div>
 						
@@ -2895,6 +3342,7 @@
 								<option value="0.4" selected>0.40</option>
 								<option value="0.5">0.50</option>
 								<option value="0.7">0.70</option>
+								<option value="1">1</option>
 							</select>
 						</div>
 						
@@ -2910,6 +3358,7 @@
 								<option value="0.02">0.02</option>
 								<option value="0.05">0.05</option>
 								<option value="0.1">0.10</option>
+								<option value="1">1</option>
 							</select>
 						</div>
 					</div>
@@ -2920,6 +3369,7 @@
 					</div>
 					
 					<div style="margin: 5px 0;">
+						<button onclick="resetEMAToFlat()" style="background: #6b7280; color: white; border: none; padding: 3px 8px; border-radius: 3px; cursor: pointer; margin-right: 5px;">Reset to flat</button>
 						<button onclick="resetEMAToDefaults()" style="background: #6b7280; color: white; border: none; padding: 3px 8px; border-radius: 3px; cursor: pointer; margin-right: 5px;">Reset Default</button>
 						<button onclick="setEMAForHighNoise()" style="background: #dc2626; color: white; border: none; padding: 3px 8px; border-radius: 3px; cursor: pointer; margin-right: 5px;">Alto Rumore</button>
 						<button onclick="setEMAForFastJumps()" style="background: #059669; color: white; border: none; padding: 3px 8px; border-radius: 3px; cursor: pointer; margin-right: 5px;">Salti Veloci</button>
@@ -2937,7 +3387,15 @@
 		// =====================================================
 		// 2. FUNZIONI PRESET EMA (come hai già)
 		// =====================================================
-
+		function resetEMAToFlat() {
+			document.getElementById('emaAlphaStatic').value = '1';
+			document.getElementById('emaAlphaT1').value = '1';
+			document.getElementById('emaAlphaT2T3').value = '1';
+			document.getElementById('emaAlphaT4').value = '1';
+			document.getElementById('emaAlphaT5').value = '1';
+			console.log('🔄 EMA reset ai valori di default (derivata=0.0001)');
+		}
+		
 		function resetEMAToDefaults() {
 			document.getElementById('emaAlphaStatic').value = '0.05';
 			document.getElementById('emaAlphaT1').value = '0.1';
@@ -2987,28 +3445,36 @@
 			btn.disabled = true;
 			btn.style.background = '#f59e0b';
 			
-			try {
-				// Ricalcola le soglie con i valori EMA correnti
-				console.log('🔄 Ricalcolo soglie con EMA correnti...');
-				const result = detectJumpThresholds(recordBuffer, SAMPLE_RATE);
-				
-				// Aggiorna le soglie globali
-				thresholds = result;
-				
+			try {							
 				// Ridisegna il grafico se siamo in modalità playback
 				if(!inputMode && recordBuffer.length > 0) {
-					drawPlot();
-				}
-				
-				// Conta eventi trovati
-				const eventsFound = [result.t1, result.t2, result.t3, result.t4, result.t5].filter(t => t !== null).length;
-				
-				// Feedback successo
-				btn.innerHTML = `✅ ${eventsFound}/5`;
-				btn.style.background = eventsFound === 5 ? '#059669' : '#f59e0b';
-				
-				console.log(`✅ Ricalcolo completato: ${eventsFound}/5 eventi trovati`);
-				
+					// Analisi del salto e report
+					let index = 0;
+					let report = {};
+					let bIdx = 0;
+					let vIdx = 0;
+					let t12 = null;
+					let sw2 = 0;
+					thresholdsList.length = 0;
+					do{
+						report = analyzeJump(recordBuffer, SAMPLE_RATE, bIdx, vIdx, index, t12, sw2); 
+						printJumpReport(report);  
+						index++;
+						console.log('index: '+index);	
+						bIdx = report.thresholdTimes.t12bidx;
+						vIdx = report.thresholdTimes.t12vidx;
+						t5 = report.thresholdTimes.t5;
+						t12 = report.thresholdTimes.t12;
+						sw2 = report.thresholdTimes.sw2;
+						console.log(`next: `+report.thresholdTimes.next);
+						if(t5 != null){
+							thresholdsList.push(report.thresholdTimes);		
+						}					
+					}while(report.thresholdTimes.next);
+					drawPlot();       
+					scrollView(0);
+				}		
+								
 				// Ripristina pulsante dopo 2 secondi
 				setTimeout(() => {
 					btn.innerHTML = originalText;
@@ -3032,17 +3498,22 @@
 		}
 
 		// =====================================================
-		// 4. ALGORITMO DETECTJUMPTHRESHOLDS (come hai già)
+		// 4. ALGORITMO DETECTJUMPTHRESHOLDS
 		// =====================================================
+		function detectJumpThresholds(recordBuffer, sampleRate, bIdx, vIdx, t12, sw2) {	
+			console.log('detectJumpThresholds-bIdx: '+bIdx);
+			console.log('detectJumpThresholds-vIdx: '+vIdx);
 
-		function detectJumpThresholds(recordBuffer, sampleRate) {
-			let result = {t1: null, t2: null, t3: null, t4: null, t5: null};
+			let result = {t1: t12, t2: null, t3: null, t4: null, t5: null, t6: null, t12: null, sw1: sw2, sw2: null, t12bidx: null, t12vidx: null, next: false};
 			let minDerivative = Infinity;
 			let maxDerivative = -Infinity;
 			let precBatchTime;
 			let currBatchTime;
 			let batchLen;
 			let lastForce = null;
+			let staticCount = 0;
+			let diffWeight = 0;
+			let staticWeights = [];
 			
 			// ✅ LEGGI TUTTI I VALORI EMA DAI MENU (INCLUSA DERIVATA)
 			const emaAlphas = {
@@ -3055,32 +3526,16 @@
 				derivative: parseFloat(document.getElementById('emaAlphaDerivative')?.value || 0.0001)
 			};
 			
+			let betaRawEMA = 0.25;
+			let betaRawRun = 0.25;
+			let betaEmaRun = 0.95;
+			
 			console.log(`🎛️ EMA multi-fase: Statico=${emaAlphas.static}, T1=${emaAlphas.t1}, T2-T3=${emaAlphas.t2t3}, T4=${emaAlphas.t4}, T5=${emaAlphas.t5}, Derivata=${emaAlphas.derivative}`);
 			
 			// CALCOLO PESO STATICO (con EMA dedicato)
-			let staticWeight = 0;
-			let staticCount = 0;
+			
 			let staticEmaValue = null;
 			
-			for(let batchIdx = 0; batchIdx < recordBuffer.length && staticCount < 50; batchIdx++) {
-				const batch = recordBuffer[batchIdx];
-				
-				for(let i = 0; i < batch.v.length && staticCount < 1000; i++) {
-					const rawValue = calculateValue(batch.v[i]);
-					
-					if(staticEmaValue === null) {
-						staticEmaValue = rawValue;
-					} else {
-						staticEmaValue = emaAlphas.static * rawValue + (1 - emaAlphas.static) * staticEmaValue;
-					}
-					
-					staticWeight += staticEmaValue;
-					staticCount++;
-				}
-			}
-			staticWeight /= staticCount;
-			
-			console.log(`📊 Peso statico (EMA α=${emaAlphas.static}): ${staticWeight.toFixed(0)} da ${staticCount} campioni`);
 			
 			// INIZIALIZZAZIONE PRINCIPALE
 			const dt0 = 1/sampleRate;
@@ -3092,19 +3547,27 @@
 				t1: null,      
 				t2t3: null,
 				t4: null,
-				t5: null
+				t5: null,
+				t6: null,
+				dev1: null,
+				dev2: null
 			};
 			
 			// ✅ EMA per la derivata (configurabile)
 			let derivativeEma = null;
+			let staticDerivativeEma = null;
 			
 			// Inizializza tutti gli EMA con il primo valore
-			const firstRawValue = calculateValue(recordBuffer[0].v[0]);
+			const firstRawValue = calculateValue(recordBuffer[bIdx].v[vIdx]);
 			emaValues.t1 = firstRawValue;
 			emaValues.t2t3 = firstRawValue;
 			emaValues.t4 = firstRawValue;
 			emaValues.t5 = firstRawValue;
 			emaValues.current = firstRawValue;
+			emaValues.devRawEMA = firstRawValue;
+			emaValues.devRawRun = firstRawValue;
+			emaValues.devEmaRun = firstRawValue;
+			let staticWeight = firstRawValue;
 			
 			filterh.predict();
 			lastForce = filterh.update(emaValues.current);
@@ -3113,14 +3576,16 @@
 			// ANALISI PRINCIPALE CON EMA DINAMICO PER FASE
 			let lastDerivative = null;
 			let sampleIndex = 0;
-			
-			for(let batchIdx = 0; batchIdx < recordBuffer.length; batchIdx++) {
+			staticDerivativeAlpha = 0.0001;
+			staticWeights.length = 0;
+			let esci = false;
+			for(let batchIdx = bIdx; batchIdx < recordBuffer.length && !esci; batchIdx++) {
 				const batch = recordBuffer[batchIdx];
-				
 				currBatchTime = parseInt(recordBuffer[batchIdx].t, 16) / 1000000;
 				const dt = (currBatchTime - precBatchTime) / batchLen;
-				
-				for(let i = 0; i < batch.v.length; i++) {
+				// Determina gli indici di inizio e fine per questo batch
+                let startIdx = (batchIdx === bIdx) ? vIdx : 0;
+				for(let i = startIdx; i < batch.v.length && !esci; i++) {
 					if(batchIdx === 0 && i === 0) {
 						sampleIndex++;
 						continue;
@@ -3146,10 +3611,15 @@
 						selectedEmaValue = emaValues.t5;        // Fase T5: atterraggio
 					} else {
 						selectedEmaValue = emaValues.t2t3;      // Default: transizioni
-					}
+						//selectedEmaValue = rawValue;  
+					}					
 					
 					filterh.predict();
 					let force = filterh.update(selectedEmaValue);
+					
+					emaValues.devRawEMA = betaRawEMA * Math.abs(rawValue - force) + (1 - betaRawEMA) * emaValues.devRawEMA;// deviazione standard raw da media EMA
+					emaValues.devRawRun = betaRawRun * Math.abs(rawValue - staticWeight) + (1 - betaRawRun) * emaValues.devRawRun;// deviazione standard raw da media running
+					emaValues.devEmaRun = betaEmaRun * Math.abs(force - staticWeight) + (1 - betaEmaRun) * emaValues.devEmaRun;// deviazione standard EMA da media running
 					
 					const currentTime = currBatchTime + (i * dt);
 					
@@ -3177,51 +3647,364 @@
 					t3: max upward speed
 					t4: take off
 					t5: touch down
+					t6: end landing
 					*/
 					
 					// ✅ USA DERIVATA SMOOTHED CONFIGURABILE NELLE SOGLIE
 					
 					//t1: start downward movement
-					if(result.t1 === null && (smoothedDerivative < 0 && force < staticWeight && lastForce >= staticWeight)) {
-						result.t1 = currentTime;
-						console.log(`✅ T1 trovato (EMA α=${emaAlphas.t1}, derivata α=${emaAlphas.derivative}): time=${currentTime.toFixed(3)}, derivata_raw=${rawDerivative.toFixed(0)}, derivata_smooth=${smoothedDerivative.toFixed(2)}`);
-					}
-					
+					if(result.t1 === null) {
+						//if(smoothedDerivative < -200 && force < staticWeight && lastForce >= staticWeight) {
+						if( Math.abs(force) < 0.95 * staticWeight && smoothedDerivative < 0) {
+							result.t1 = currentTime - 0.005*40;
+							console.log(`✅ T1 trovato Force: ${force}, (EMA α=${emaAlphas.t1}, derivata α=${emaAlphas.derivative}): time=${currentTime.toFixed(3)}, force= derivata_raw=${rawDerivative.toFixed(0)}, derivata_smooth=${smoothedDerivative.toFixed(2)}`);					
+				
+							result.sw1 = staticWeights[staticWeights.length - 41];// scarta fStatico degli ultimi 12 campioni
+							staticWeights.length = 0;
+							console.log(`📊 Peso statico 1 (EMA α=${emaAlphas.static}): ${staticWeight.toFixed(0)} da ${staticCount} campioni`);
+						}else{
+							//if(staticDerivativeEma === null) {
+							//	staticDerivativeEma = rawDerivative;  // Inizializza con la prima derivata
+							//} else {
+							//	staticDerivativeEma = staticDerivativeAlpha * rawDerivative + (1 - staticDerivativeAlpha) * staticDerivativeEma;
+							//}
+							staticCount++;
+							diffWeight = (force - staticWeight) / staticCount;
+							staticWeight += diffWeight;
+						}	
+					}						
+
 					//t2: max downward speed
-					if(result.t2 == null && result.t1 !== null && smoothedDerivative > 0 && force > staticWeight && lastForce <= staticWeight) {
+					if(result.t2 == null && result.t1 !== null && smoothedDerivative > 0 && force > result.sw1 && lastForce <= result.sw1) {
 						result.t2 = currentTime;
-						console.log(`✅ T2 trovato (derivata α=${emaAlphas.derivative}): time=${currentTime.toFixed(3)}, derivata_smooth=${smoothedDerivative.toFixed(2)}`);
+						console.log(`✅ T2 trovato Force: ${force}, (derivata α=${emaAlphas.derivative}): time=${currentTime.toFixed(3)}, derivata_smooth=${smoothedDerivative.toFixed(2)}`);
 					}
 					
 					// t3: max upward speed
-					if(result.t3 == null && result.t2 !== null && smoothedDerivative < 0 && force < staticWeight && lastForce >= staticWeight) {
+					if(result.t3 == null && result.t2 !== null && smoothedDerivative < 0 && force < result.sw1 && lastForce >= result.sw1) {
 						result.t3 = currentTime;
-						console.log(`✅ T3 trovato (derivata α=${emaAlphas.derivative}): time=${currentTime.toFixed(3)}, derivata_smooth=${smoothedDerivative.toFixed(2)}`);
+						console.log(`✅ T3 trovato Force: ${force}, (derivata α=${emaAlphas.derivative}): time=${currentTime.toFixed(3)}, derivata_smooth=${smoothedDerivative.toFixed(2)}`);
 					}
 					
 					// t4: take off
-					if(result.t4 == null && force < 0.05 * staticWeight && smoothedDerivative < -100) {
+					if(result.t4 == null && force < 0.00005 && smoothedDerivative < -100) {
 						result.t4 = currentTime;
-						console.log(`✅ T4 trovato (derivata α=${emaAlphas.derivative}): time=${currentTime.toFixed(3)}, derivata_smooth=${smoothedDerivative.toFixed(2)}`);
+						console.log(`✅ T4 trovato Force: ${force}, derivata α=${emaAlphas.derivative}): time=${currentTime.toFixed(3)}, derivata_smooth=${smoothedDerivative.toFixed(2)}`);
 					}
 					
 					// t5: touch down
-					if(result.t5 == null && result.t4 !== null && force > 0 * staticWeight && smoothedDerivative > 10) {
+					if(result.t5 == null && result.t4 !== null && rawDerivative > 0) {
 						result.t5 = currentTime;
-						console.log(`✅ T5 trovato (derivata α=${emaAlphas.derivative}): time=${currentTime.toFixed(3)}, derivata_smooth=${smoothedDerivative.toFixed(2)}`);
+						console.log(`✅ T5 trovato Force: ${force}, (derivata α=${emaAlphas.derivative}): time=${currentTime.toFixed(3)}, derivata_smooth=${smoothedDerivative.toFixed(2)}`);
 					}
+					
+					// t6: end landing
+					//if(result.t6 == null && result.t5 !== null && Math.abs(force) < 1.5 * result.sw1 && smoothedDerivative < 0.05 && smoothedDerivative > -0.05) {
+					if(result.t6 == null && result.t5 !== null && Math.abs(force) < 1.1 * result.sw1 && smoothedDerivative < 0.03 && smoothedDerivative > -0.03) {	
+						result.t6 = currentTime;
+						//staticWeight = 0;
+						staticWeight = force;
+						staticCount = 0;
+						console.log(`✅ T6 trovato Force: ${force}, (derivata α=${emaAlphas.derivative}): time=${currentTime.toFixed(3)}, derivata_smooth=${smoothedDerivative.toFixed(2)}`);
+					}
+					
+					if(result.t12 === null && result.t6 !== null) {
+						if(Math.abs(force) < 0.90 * staticWeight || !(Math.abs(force) < 0.90 * staticWeight) && staticWeights.length > 700) {
+						//if( Math.abs(force) > staticWeight + 2*emaValues.devEmaRun) {
+							//console.log('devEmaRunstop: '+ (-Math.abs(force) + staticWeight + 4*emaValues.devEmaRun));
+							console.log('staticWeights.length: '+staticWeights.length);
+							if(Math.abs(force) < 0.90 * staticWeight){
+								result.t12 = currentTime - 0.005*40;
+								console.log(`✅ T12 trovato Force: ${force}, (EMA α=${emaAlphas.t1}, derivata α=${emaAlphas.derivative}): time=${result.t12.toFixed(3)}, force= derivata_raw=${rawDerivative.toFixed(0)}, derivata_smooth=${smoothedDerivative.toFixed(2)}`);						
+								result.sw2 = staticWeights[staticWeights.length -41];// scarta fStatico degli ultimi 12 campioni	
+								console.log('fStatico2-12: '+result.sw2);
+								result.t12bidx = batchIdx-24;
+								result.t12vidx = 0;
+								staticWeights.length = 0;
+								staticWeight = force;
+								console.log(`📊 Peso statico 2 (EMA α=${emaAlphas.static}): ${staticWeight.toFixed(0)} da ${staticCount} campioni`);
+								result.next = true;
+							}else{
+								result.t12 = currentTime;
+								result.sw2 = staticWeights[staticWeights.length-1];
+								console.log('fStatico2: '+result.sw2);
+								staticWeight = force;
+								result.t12bidx = null;
+								result.t12vidx = null;
+								result.next = false;
+							}
+							esci = true;
+						}else{
+							//console.log('devEmaRun: '+ (-Math.abs(force) + staticWeight + 4*emaValues.devEmaRun));
+							staticCount++;
+							diffWeight = (force - staticWeight) / staticCount;
+							staticWeight += diffWeight;
+						}	
+					}		
 					
 					lastForce = force;
 					lastDerivative = smoothedDerivative;
 					sampleIndex++;
 				}
 				precBatchTime = currBatchTime;
+				staticWeights.push(staticWeight);// salva fStatico ad ogni campione
 			}
 			
-			console.log(`t1: ${result.t1} - t2: ${result.t2} - t3: ${result.t3} - t4: ${result.t4} - t5: ${result.t5}`);
+			console.log(`t1: ${result.t1} - t2: ${result.t2} - t3: ${result.t3} - t4: ${result.t4} - t5: ${result.t5} - t6: ${result.t6} - sw1: ${result.sw1} - sw2: ${result.sw2} - bidx: ${result.t12bidx} - vidx: ${result.t12vidx}`);
 			console.log(`📊 Derivata finale smoothed (α=${emaAlphas.derivative}): ${derivativeEma?.toFixed(2)}`);
 			return result;
 		}		
     </script>
+	<script>
+			// =====================================================
+			// SISTEMA CURSORI DI MISURAZIONE - CODICE COMPLETO
+			// =====================================================
+
+			// Trova il valore più vicino sulla curva al tempo specificato
+			function findValueAtTime(targetTime) {
+				if (recordBuffer.length === 0) return null;
+				
+				let closestDistance = Infinity;
+				let closestData = null;
+				
+				// Scansiona tutti i batch e campioni
+				for (let batchIndex = 0; batchIndex < recordBuffer.length; batchIndex++) {
+					const batch = recordBuffer[batchIndex];
+					const batchStartTime = parseInt(batch.t, 16);
+					
+					for (let sampleIndex = 0; sampleIndex < batch.v.length; sampleIndex++) {
+						// Calcola il tempo preciso di questo campione
+						const sampleTime = batchStartTime + (sampleIndex * (1000000 / SAMPLE_RATE));
+						const distance = Math.abs(sampleTime - targetTime);
+						
+						if (distance < closestDistance) {
+							closestDistance = distance;
+							
+							// Calcola il valore usando la tua funzione calculateValue
+							const value = calculateValue(batch.v[sampleIndex]);
+							const Fstatico = (Fstatico1 + Fstatico2) / 2;
+							
+							closestData = {
+								time: sampleTime,
+								batchIndex: batchIndex,
+								sampleIndex: sampleIndex,
+								value: value,
+								distance: distance,
+								rf: (value - Fstatico) / Fstatico * 100
+							};
+						}
+					}
+				}
+				
+				return closestData;
+			}
+
+			// Aggiorna display misurazioni
+			function updateMeasurementDisplay() {
+				const c1 = cursors.cursor1;
+				const c2 = cursors.cursor2;
+						
+				const timeDiff = Math.abs(c2.time - c1.time);
+				const batchDiff = Math.abs(c2.batchIndex - c1.batchIndex);
+				const samplesPerBatch = Math.floor(SAMPLE_RATE / EXPECTED_BATCH_RATE);
+				const sampleDiff = Math.abs(c2.sampleIndex - c1.sampleIndex) + batchDiff * samplesPerBatch;
+				const valueDiff = c2.value - c1.value;
+				
+				if(cursors['cursor1'].time > 0 && cursors['cursor2'].time > 0){
+					let rarea = relArea(cursors['cursor1'].batchIndex, cursors['cursor1'].sampleIndex, cursors['cursor2'].batchIndex, cursors['cursor2'].sampleIndex);
+					console.log('rarea: '+rarea);
+					cursors['cursor1'].relArea = rarea;
+					cursors['cursor2'].relArea = rarea;
+					
+					
+					document.getElementById('timeDiff').textContent = formatTime(timeDiff);
+					document.getElementById('batchDiff').textContent = `${batchDiff} batch`;
+					document.getElementById('sampleDiff').textContent = `${sampleDiff.toLocaleString()} campioni`;
+					document.getElementById('valueDiff').textContent = `${valueDiff > 0 ? '+' : ''}${valueDiff.toLocaleString()}`;
+					document.getElementById('timeDiff').textContent = formatTime(timeDiff);
+					document.getElementById('relArea').textContent = `${rarea}`;
+					
+					console.log(`📏 Misurazioni: Δt=${formatTime(timeDiff)}, Δbatch=${batchDiff}, Δsample=${sampleDiff}, Δvalue=${valueDiff}, relArea=${rarea}`);
+				}
+			}
+
+			// Formatta il tempo in modo leggibile
+			function formatTime(microseconds) {
+				if (microseconds >= 1000000) {
+					return `${(microseconds / 1000000).toFixed(3)}s`;
+				} else if (microseconds >= 1000) {
+					return `${(microseconds / 1000).toFixed(3)}ms`;
+				} else {
+					return `${microseconds.toFixed(1)}μs`;
+				}
+			}
+
+			// =====================================================
+			// EVENT LISTENER PER CLICK SUL CANVAS
+			// =====================================================
+			
+			// =====================================================
+			// SISTEMA CURSORE TRASCINABILE
+			// =====================================================
+						
+			// Sostituisci toggleDraggableCursor():
+			function toggleDraggableCursor() {
+				draggableCursorsActive = !draggableCursorsActive;
+				const btn = document.getElementById('toggleDraggableCursor');
+				const cursor1 = document.getElementById('draggableCursor1');
+				const cursor2 = document.getElementById('draggableCursor2');
+				const infoPanel1 = document.getElementById('cursorInfoPanel1');
+				const infoPanel2 = document.getElementById('cursorInfoPanel2');
+				const measurePanel = document.getElementById('measurementPanel');
+				
+				
+				if (draggableCursorsActive) {
+					if (recordBuffer.length === 0) {
+						alert('⚠️ Carica prima un file con i dati per usare i cursori trascinabili!');
+						draggableCursorsActive = false;
+						return;
+					}
+					
+					btn.textContent = 'Disattiva Cursori Trascinabili';
+					btn.style.background = '#dc2626';
+					cursor1.style.display = 'block';
+					cursor2.style.display = 'block';
+					infoPanel1.style.display = 'block';
+					infoPanel2.style.display = 'block';
+					measurePanel.style.display = 'block';
+					
+					const centerX = canvas.width / 2;
+					updateDraggableCursorPosition('cursor1', centerX - 50);
+					updateDraggableCursorPosition('cursor2', centerX + 50);
+					
+					console.log('🎯 Cursori trascinabili ATTIVATI');
+				} else {
+					btn.textContent = 'Attiva Cursori Trascinabili';
+					btn.style.background = '#0ea5e9';
+					cursor1.style.display = 'none';
+					cursor2.style.display = 'none';
+					infoPanel1.style.display = 'none';
+					infoPanel2.style.display = 'none';
+					measurePanel.style.display = 'none';
+					
+					cursors.cursor1 = { x: 0, time: 0, batchIndex: -1, sampleIndex: -1, value: 0, rf: 0 };
+					cursors.cursor2 = { x: 0, time: 0, batchIndex: -1, sampleIndex: -1, value: 0, rf: 0 };
+					
+					if (!inputMode && recordBuffer.length > 0) {
+						drawPlot();
+					}
+					
+					console.log('❌ Cursori trascinabili DISATTIVATI');
+				}
+			}
+
+			// Nuova funzione per aggiornare entrambi i pannelli:
+			function updateDraggableCursorInfo() {
+				['cursor1', 'cursor2'].forEach(cursorId => {
+					const data = cursors[cursorId];
+					const panelNum = cursorId.charAt(cursorId.length - 1); // Estrae '1' o '2'
+					
+					if (data.time > 0) {
+						document.getElementById(`cursorTime${panelNum}`).textContent = formatTime(data.time);
+						document.getElementById(`cursorBatch${panelNum}`).textContent = data.batchIndex.toString();
+						document.getElementById(`cursorSampleIndex${panelNum}`).textContent = data.sampleIndex.toString();
+						document.getElementById(`cursorValue${panelNum}`).textContent = data.value.toLocaleString();
+						document.getElementById(`cursorPosition${panelNum}`).textContent = `${data.x.toFixed(1)}px`;
+						document.getElementById(`relativeForce${panelNum}`).textContent = `${data.rf.toFixed(1)}%`;
+					} else {
+						// Mostra valori vuoti se il cursore non è posizionato
+						document.getElementById(`cursorTime${panelNum}`).textContent = '-';
+						document.getElementById(`cursorBatch${panelNum}`).textContent = '-';
+						document.getElementById(`cursorSampleIndex${panelNum}`).textContent = '-';
+						document.getElementById(`cursorValue${panelNum}`).textContent = '-';
+						document.getElementById(`cursorPosition${panelNum}`).textContent = '-';
+						document.getElementById(`relativeForce${panelNum}`).textContent = '-';
+					}
+				});
+				updateMeasurementDisplay();
+			}
+			
+			function updateDraggableCursorPosition(cursorId, x) {
+				const cursor = document.getElementById(`draggable${cursorId.charAt(0).toUpperCase() + cursorId.slice(1)}`);
+				
+				// Limita la posizione X ai bordi del canvas
+				const minX = padding;
+				const maxX = canvas.width - padding;
+				x = Math.max(minX, Math.min(maxX, x));
+				// CORREZIONE: Posiziona relativamente al canvas, non al documento
+				cursor.style.left = x + 'px';
+				cursor.style.bottom = '0px';
+				// Calcola il tempo corrispondente
+				const time = screenToTime(x);
+				// Trova il valore più vicino sulla curva
+				const cursorData = findValueAtTime(time);
+				
+				if (cursorData) {
+					cursors[cursorId] = {
+						x: x,
+						time: cursorData.time,
+						batchIndex: cursorData.batchIndex,
+						sampleIndex: cursorData.sampleIndex,
+						value: cursorData.value,
+						rf: cursorData.rf, 
+						relArea: 0
+					};
+					
+					updateDraggableCursorInfo();
+					// Ridisegna il plot per aggiornare l'evidenziazione
+					if (!inputMode && recordBuffer.length > 0) {
+						drawPlot();
+					}
+				}
+			}
+
+			// Sostituisci gli event listeners esistenti con:
+			document.addEventListener('DOMContentLoaded', function() {
+				['cursor1', 'cursor2'].forEach(cursorId => {
+					const cursor = document.getElementById(`draggable${cursorId.charAt(0).toUpperCase() + cursorId.slice(1)}`);
+					
+					cursor.addEventListener('mousedown', function(e) {
+						if (draggableCursorsActive) {
+							isDragging = cursorId;
+							e.preventDefault();
+						}
+					});
+					
+					cursor.addEventListener('touchstart', function(e) {
+						if (draggableCursorsActive) {
+							isDragging = cursorId;
+							e.preventDefault();
+						}
+					});
+				});
+				
+				canvas.addEventListener('mousedown', function(e) {
+					if (draggableCursorsActive && !cursorMode) {
+						const rect = canvas.getBoundingClientRect();
+						const x = e.clientX - rect.left;
+						// Determina quale cursore è più vicino
+						const dist1 = Math.abs(x - cursors.cursor1.x);
+						const dist2 = Math.abs(x - cursors.cursor2.x);
+						isDragging = dist1 < dist2 ? 'cursor1' : 'cursor2';
+						updateDraggableCursorPosition(isDragging, x);
+						e.preventDefault();
+					}
+				});
+				
+				document.addEventListener('mousemove', function(e) {
+					if (isDragging && draggableCursorsActive) {
+						const canvasRect = canvas.getBoundingClientRect();
+						const x = e.clientX - canvasRect.left;
+						updateDraggableCursorPosition(isDragging, x);
+					}
+				});
+				
+				document.addEventListener('mouseup', function() {
+					if (isDragging) {
+						isDragging = null;
+					}
+				});
+			});
+		</script>
 </body>
 </html>
