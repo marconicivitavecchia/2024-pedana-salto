@@ -1653,7 +1653,7 @@
 			console.log('Fstatico1: '+Fstatico1);
 			console.log('Fstatico2: '+Fstatico2);
 			
-			let one = true;
+			let Fstatico = (Fstatico1 + Fstatico2) / 2;
 			for(let batchIdx = bIdx; batchIdx < recordBuffer.length; batchIdx++) {
 				const batch = recordBuffer[batchIdx];
 				currBatchTime = parseInt(batch.t, 16) / 1000000;
@@ -1669,20 +1669,16 @@
 					//console.log('force: '+force);
 					
 					const currentTime = currBatchTime + (i * dt0);
-					if(one){
-						one = false;
-						console.log('force: '+force+' - currentTime: '+currentTime+'- result.t1: '+result.t1+'- result.t4: '+result.t4);
-					}
 					
 					// Integrazione pre-salto
 					if(currentTime >= result.t1 && currentTime <= result.t4) {
-						vIniziale += (force - Fstatico1)*dt0;
+						vIniziale += (force - Fstatico1);
 						//console.log('currentTime: '+currentTime+' - result.t1: '+result.t1+' - diff: '+(force - Fstatico1));
 					}
 					
 					// ✅ STABILIZZAZIONE POST-ATTERRAGGIO
 					if(currentTime > result.t5 && currentTime <= result.t6) {					
-						vCaduta += (force - Fstatico2)*dt;
+						vCaduta += (force - Fstatico2);
 						//console.log('vCaduta: '+vCaduta);
 					}
 				}
@@ -1690,6 +1686,8 @@
 			}
 			console.log('vIniziale: '+vIniziale);
 			console.log('vCaduta: '+vCaduta);
+			vIniziale *= dt0;
+			vCaduta *= dt0;
 			vIniziale /= Fstatico1;
 			vCaduta /= Fstatico2;
 			console.log('vIniziale: '+vIniziale);
