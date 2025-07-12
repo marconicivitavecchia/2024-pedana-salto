@@ -85,7 +85,7 @@
 <img src="img\interface.png" alt="alt text" width="1000">
 
 ## Report:
-<img src="img\report.png" alt="alt text" width="400">
+<img src="img\report.png" alt="alt text" width="500">
 
 **Materiale**:
 - ADC ADS1232 https://it.aliexpress.com/item/1005007195802960.html?spm=a2g0o.order_list.order_list_main.5.31183696R6xAH9&gatewayAdapt=glo2ita
