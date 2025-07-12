@@ -596,8 +596,16 @@
                 <div id="valueDiff" class="measurement-value">-</div>
             </div>
 			<div class="measurement-item">
-                <div class="measurement-label">Velocità</div>
-                <div id="relArea" class="measurement-value">-</div>
+                <div class="measurement-label">Altezza da velocità</div>
+                <div id="hv" class="measurement-value">-</div>
+            </div>
+			<div class="measurement-item">
+                <div class="measurement-label">Heel lift</div>
+                <div id="hl" class="measurement-value">-</div>
+            </div>
+			<div class="measurement-item">
+                <div class="measurement-label">Altezza combinata</div>
+                <div id="ht" class="measurement-value">-</div>
             </div>
         </div>
     </div>
@@ -665,17 +673,12 @@
         let isAtLeftLimit = false;  // flag per limite sinistro
 		// Variabili cursori (aggiungi dopo le tue variabili globali)
 		let cursorMode = false;
-		//let cursors = {
-		//	cursor1: { active: false, x: 0, time: 0, batchIndex: -1, sampleIndex: -1, value: 0, relArea: 0 },
-		//	cursor2: { active: false, x: 0, time: 0, batchIndex: -1, sampleIndex: -1, value: 0, relArea: 0 }
-		//};
-		//let nextCursorToPlace = 1;
 		// NUOVO: Variabili per il cursore trascinabile
 		let draggableCursorsActive = false;
 		let isDragging = null; // Memorizza quale cursore si sta trascinando
 		let cursors = {
-			cursor1: { x: 0, time: 0, batchIndex: -1, sampleIndex: -1, value: 0, rf: 0, relArea: 0  },
-			cursor2: { x: 0, time: 0, batchIndex: -1, sampleIndex: -1, value: 0, rf: 0, relArea: 0  }
+			cursor1: { x: 0, time: 0, batchIndex: -1, sampleIndex: -1, value: 0, rf: 0, relArea: 0, hv: 0, hl: 0, ht: 0 },
+			cursor2: { x: 0, time: 0, batchIndex: -1, sampleIndex: -1, value: 0, rf: 0, relArea: 0, hv: 0, hl: 0, ht: 0 }
 		};
 		let Fstatico1 = 0;
 		let Fstatico2 = 0;
@@ -1573,164 +1576,144 @@
                 playRecord();
              }
         }
-		
-		function relArea(bidx1, vidx1, bidx2, vidx2){
-			if(bidx1 > bidx2){
+				
+		function relArea(bidx1, vidx1, bidx2, vidx2, fbody1, fbody2){
+			/*if(bidx1 > bidx2){
 				let app = bidx1;
 				bidx1 = bidx2;
 				bidx2 = app;
-			}
-			if(vidx1 > vidx2){
+			}*/
+			/*if(vidx1 > vidx2){
 				let app = vidx1;
 				vidx1 = vidx2;
 				vidx2 = app;
-			}
-			console.log("bidx1: "+bidx1);
-			console.log("vidx1: "+vidx1);
-			console.log("bidx2: "+bidx2);
-			console.log("vidx2: "+vidx2);
+			}*/
+			console.log("relArea: bidx1: "+bidx1);
+			console.log("relArea: vidx1: "+vidx1);
+			console.log("relArea: bidx2: "+bidx2);
+			console.log("relArea: vidx2: "+vidx2);
+			console.log("relArea: fbody1: "+fbody1);
+			console.log("relArea: fbody2: "+fbody2);
 			
 			const g = 9.81;
-			let vIniziale = 0.0;
-			let dt = 0.0;
+			let v = 0;
+			let s = 0;
+			let dt = 0;
 			const dt0 = 1/SAMPLE_RATE;
-			let currBatchTime = 0;
-			Fstatico = (Fstatico1 + Fstatico2) / 2;
-			let precBatchTime = parseInt(recordBuffer[0].t, 16) / 1000000 - dt0;
-			let batchLen = recordBuffer[0].v.length;
-			for(let batchIdx = bidx1; batchIdx <= bidx2 && batchIdx < recordBuffer.length; batchIdx++) {
-				let batch = recordBuffer[batchIdx];
-				currBatchTime = parseInt(batch.t, 16) / 1000000;
-				dt = (currBatchTime - precBatchTime) / batchLen;
-				// Determina gli indici di inizio e fine per questo batch
-                let startIdx = (batchIdx === bidx1) ? vidx1 : 0;
-                let endIdx = (batchIdx === bidx2) ? vidx2 : batch.v.length;
-				for(let i = startIdx; i < endIdx && i < batch.v.length; i++) {
-					let force = calculateValue(batch.v[i]);
-					//console.log("currentTime: "+force);					
-					// Integrazione 
-					vIniziale += (force - Fstatico)*dt0;
-					//vIniziale += (force)*dt;
+			let currBatchTime = 0;			
+
+			let fbody;
+			const firstRawValue = calculateValue(recordBuffer[bidx1].v[vidx1]);
+			let precForce = firstRawValue;
+			let force;
+			let precv = 0;// parte da fermo sia in FDI che in BDI
+			if(bidx1 < bidx2){
+				fbody = fbody1;
+				console.log("relArea: direct ");
+				let batchLen = recordBuffer[0].v.length;
+				let precBatchTime = parseInt(recordBuffer[0].t, 16) / 1000000 - dt0;
+				for(let batchIdx = bidx1; batchIdx <= bidx2 && batchIdx < recordBuffer.length; batchIdx++) {
+					let batch = recordBuffer[batchIdx];
+					currBatchTime = parseInt(batch.t, 16) / 1000000;
+					dt = (currBatchTime - precBatchTime) / batchLen;
+					// Determina gli indici di inizio e fine per questo batch
+					let startIdx = (batchIdx === bidx1) ? vidx1+1 : 0;
+					let endIdx = (batchIdx === bidx2) ? vidx2 : batch.v.length;
+					for(let i = startIdx; i < endIdx && i < batch.v.length; i++) {					
+						force = calculateValue(batch.v[i]);
+						//console.log("relArea: force: "+force+ ", v: "+v+", s: "+s);
+						v = v + (force + precForce - 2*fbody);
+						s = s + v + precv;
+						precForce = force;
+						precv = v;
+					}
+					precBatchTime = currBatchTime;
 				}
-				precBatchTime = currBatchTime;
+			}else{
+				fbody = fbody2;
+				console.log("relArea: reverse ");
+				let batchLen = recordBuffer[recordBuffer.length - 1].v.length;
+				let precBatchTime = parseInt(recordBuffer[recordBuffer.length - 1].t, 16) / 1000000 - dt0;
+				for(let batchIdx = bidx1; batchIdx >= bidx2 && batchIdx >= 0; batchIdx--) {
+					let batch = recordBuffer[batchIdx];
+					currBatchTime = parseInt(batch.t, 16) / 1000000;
+					dt = (precBatchTime - currBatchTime) / batchLen;
+					// Determina gli indici di inizio e fine per questo batch
+					let startIdx = (batchIdx === bidx1) ? vidx1-1 : batchLen - 1;
+					let endIdx = (batchIdx === bidx2) ? vidx2 : 0;
+					for(let i = startIdx; i >= endIdx && i >= 0; i--) {					
+						force = calculateValue(batch.v[i]);
+						
+						v = v + (force + precForce - 2*fbody);
+						s = s + v + precv;
+						//console.log("relArea: force: "+force+", precForce: "+precForce+ ", v: "+v+", s: "+s, "fbody: "+fbody, "fbody2: "+fbody2);
+						precForce = force;
+						precv = v;
+					}
+					precBatchTime = currBatchTime;
+				}
 			}
 			//console.log("diffForce: "+vIniziale);
-			vIniziale /= Fstatico;
-			vIniziale *= g;
-			
-			// Calcoli finali
-			const h_velocity = (vIniziale * vIniziale) / (2 * g);
-			return h_velocity;
+			v =  v*dt0/2/fbody*g;
+			console.log("relArea: v: "+v);
+			let h_velocity = (v * v) / (2 * g);console.log("relArea: h_velocity: "+h_velocity);
+			heelLift = s*dt0*dt0/4/fbody*g;// air distance + heel-lift distance	
+			console.log("relArea: heelLift: "+heelLift);
+			return {hv: h_velocity, hl: heelLift, ht: h_velocity + heelLift, v: v};
 		}
 		
         function analyzeJump(recordBuffer, sampleRate, bIdx, vIdx, index, t12, sw2) {
 			const result = detectJumpThresholds(recordBuffer, sampleRate, bIdx, vIdx, t12, sw2);
+			Fstatico1 = result.sw1;
+			Fstatico2 = result.sw2;
+			Fstatico = (result.sw1 + result.sw2) / 2;
 			//if(!result.next) return null;
 			console.log('analyzeJump-bIdx: '+bIdx);
 			console.log('analyzeJump-vIdx: '+vIdx);
-			
-			const g = 9.81;
-			Fstatico1 = result.sw1; 
-			Fstatico2 = result.sw2; 
-			const sensitivity = 50000;
-			
-			// Calcolo velocità iniziale (t1->t4)
-			let vIniziale = 0;
-			let vCaduta = 0;
-			let stabilized = false;
-			let tStabilizzazione = result.t5;
-			let precBatchTime = 0;
-			let currBatchTime = 0;
-			let batchLen = recordBuffer[0].v.length;
-			const dt0 = 1/sampleRate;
-			// ✅ PARAMETRI PER STABILIZZAZIONE ROBUSTA
-			const STABILIZATION_TOLERANCE = 0.2;  // ±5% del peso statico (come prima)
-			const MIN_STABLE_TIME = 0.2;           // Richiede 200ms di stabilità continua
-			const MIN_STABLE_SAMPLES = Math.ceil(MIN_STABLE_TIME * sampleRate);
-			let stableCount = 0;                   // Contatore campioni stabili consecutivi
-			let firstStableTime = null;           // Primo momento stabile
-			console.log('sampleRate: '+sampleRate);
-			console.log('Fstatico1: '+Fstatico1);
-			console.log('Fstatico2: '+Fstatico2);
-			
-			let Fstatico = (Fstatico1 + Fstatico2) / 2;
-			for(let batchIdx = bIdx; batchIdx < recordBuffer.length; batchIdx++) {
-				const batch = recordBuffer[batchIdx];
-				currBatchTime = parseInt(batch.t, 16) / 1000000;
-				const dt = (currBatchTime - precBatchTime) / batchLen;
-
-				// Determina gli indici di inizio e fine per questo batch
-                let startIdx = (batchIdx === bIdx) ? vIdx : 0;
-				for(let i = startIdx; i < batch.v.length; i++) {
-					let force = calculateValue(batch.v[i]);
-					
-					//filtera.predict();
-					//value = filtera.update(force);
-					//console.log('force: '+force);
-					
-					const currentTime = currBatchTime + (i * dt0);
-					
-					// Integrazione pre-salto
-					if(currentTime >= result.t1 && currentTime <= result.t4) {
-						vIniziale += (force - Fstatico1);
-						//console.log('currentTime: '+currentTime+' - result.t1: '+result.t1+' - diff: '+(force - Fstatico1));
-					}
-					
-					// ✅ STABILIZZAZIONE POST-ATTERRAGGIO
-					if(currentTime > result.t5 && currentTime <= result.t6) {					
-						vCaduta += (force - Fstatico2);
-						//console.log('vCaduta: '+vCaduta);
-					}
-				}
-				precBatchTime = currBatchTime;
-			}
-			console.log('vIniziale: '+vIniziale);
-			console.log('vCaduta: '+vCaduta);
-			vIniziale *= dt0;
-			vCaduta *= dt0;
-			vIniziale /= Fstatico1;
-			vCaduta /= Fstatico2;
-			console.log('vIniziale: '+vIniziale);
-			console.log('vCaduta: '+vCaduta);
-			vIniziale *= g;
-			vCaduta *= g;
-			
 			// Calcoli finali
-			const flightTime = result.t5 - result.t4;
-			const h_flight = (g * flightTime * flightTime) / 8;
-			const h_velocity = (vIniziale * vIniziale) / (2 * g);
-			const h_landing = (vCaduta * vCaduta) / (2 * g);
+			const g = 9.81;
+			const flightTime = result.t5.time - result.t4.time;
+			const h_flight = (g * flightTime * flightTime) / 8;// altezza da tempo di volo
+			
+			if(result.t1.bidx != null && result.t4.bidx != null && result.t5.bidx != null && result.t6.bidx != null){
+				r1 = relArea(result.t1.bidx, result.t1.vidx, result.t4.bidx, result.t4.vidx, result.sw1, result.sw2);	
+				r2 = relArea(result.t6.bidx, result.t6.vidx, result.t5.bidx, result.t5.vidx, result.sw1, result.sw2);
+			}
 						
 			return {
 				index,
 				flightTime,
 				height_from_time: h_flight,
-				height_from_velocity: h_velocity,
-				height_from_landing: h_landing,
-				initial_velocity: vIniziale,
-				landing_velocity: vCaduta,
-				stabilization_time: tStabilizzazione - result.t5,
+				height_from_takeoff_velocity: r1.hv,
+				height_from_landing_velocity: r2.hv,
+				takeoff_heelLift: r1.hl,
+				landing_heelLift: r2.hl,
+				takeoff_total_height: r1.hv + r1.hl,
+				landing_total_height: r2.hv + r2.hl,
+				takeoff_velocity: r1.v,
+				landing_velocity: r2.v,				
 				thresholdTimes: result
 			};
 		}
-
+		
         function printJumpReport(data) {
             // Console report
             console.table({
-				"Jump number": `${(data.index).toFixed(0)}`,
-                "Flight Time": `${(data.flightTime * 1000).toFixed(1)} ms`,
-                "Height (from time)": `${(data.height_from_time * 100).toFixed(1)} cm`,
-                "Height (from velocity)": `${(data.height_from_velocity * 100).toFixed(1)} cm`, 
-                "Height (from landing)": `${(data.height_from_landing * 100).toFixed(1)} cm`,
-                "Initial Velocity": `${data.initial_velocity.toFixed(2)} m/s`,
-                "Landing Velocity": `${data.landing_velocity.toFixed(2)} m/s`,
-                "Stabilization Time": `${(data.stabilization_time * 1000).toFixed(1)} ms`,
+				"Jump number": `${(data.index+1).toFixed(0)}`,
+                "Flight Time": `${(data.flightTime * 1000).toFixed(3)} ms`,
+                "Height from flyght time: ": `${(data.height_from_time * 100).toFixed(3)} cm`,
+                "Height from takeoff velocity (FDI)": `${(data.height_from_takeoff_velocity * 100).toFixed(3)} cm`, 
+				"Takeoff heelLift: ": `${(data.takeoff_heelLift * 100).toFixed(3)} cm`, 
+				"Total height from takeoff (FDI + heel lift): ": `${(data.takeoff_total_height * 100).toFixed(3)} cm`, 
+                "Height from landing velocity (BDI)": `${(data.height_from_landing_velocity * 100).toFixed(3)} cm`, 
+				"Landing heelLift: ": `${(data.landing_heelLift * 100).toFixed(3)} cm`, 
+				"Total height from landing (BDI + heel lift): ": `${(data.landing_total_height * 100).toFixed(3)} cm`, 
                 "Time Events": {
-                    "Start of Movement (t1)": `${(data.thresholdTimes.t1 * 1000).toFixed(1)} ms`,
-                    "Max Descent Speed (t2)": `${(data.thresholdTimes.t2 * 1000).toFixed(1)} ms`, 
-                    "Max Ascent Speed (t3)": `${(data.thresholdTimes.t3 * 1000).toFixed(1)} ms`,
-                    "Takeoff (t4)": `${(data.thresholdTimes.t4 * 1000).toFixed(1)} ms`,
-                    "Landing (t5)": `${(data.thresholdTimes.t5 * 1000).toFixed(1)} ms`
+                    "Start of Movement (t1)": `${((data.thresholdTimes.t1.time - parseInt(recordBuffer[0].t, 16)/1000000)*1000).toFixed(3)} ms`,
+                    "Max Descent Speed (t2)": `${((data.thresholdTimes.t2.time - parseInt(recordBuffer[0].t, 16)/1000000)*1000).toFixed(3)} ms`, 
+                    "Max Ascent Speed (t3)": `${((data.thresholdTimes.t3.time - parseInt(recordBuffer[0].t, 16)/1000000)*1000).toFixed(3)} ms`,
+                    "Takeoff (t4)": `${((data.thresholdTimes.t4.time - parseInt(recordBuffer[0].t, 16)/1000000)*1000).toFixed(3)} ms`,
+                    "Landing (t5)": `${((data.thresholdTimes.t5.time - parseInt(recordBuffer[0].t, 16)/1000000)).toFixed(3)*1000} ms`
                 }
             });
 
@@ -1742,30 +1725,33 @@
                     
                     <div style="background: #f5f5f5; padding: 15px; border-radius: 5px; margin: 10px 0;">
                         <h3>Jump Heights</h3>
-                        <p>From Flight Time: <strong>${(data.height_from_time * 100).toFixed(1)} cm</strong></p>
-                        <p>From Initial Velocity: <strong>${(data.height_from_velocity * 100).toFixed(1)} cm</strong></p>
-                        <p>From Landing Force: <strong>${(data.height_from_landing * 100).toFixed(1)} cm</strong></p>
+                        <p>From Flight Time: <strong>${(data.height_from_time * 100).toFixed(3)} cm</strong></p>
+                        <p>From takeoff velocity: <strong>${(data.height_from_takeoff_velocity * 100).toFixed(3)} cm</strong></p>
+						<p>Takeoff heel lift displacement: <strong>${(data.takeoff_heelLift * 100).toFixed(3)} cm</strong></p>
+						<p>From displacement and takeoff velocity: <strong>${(data.takeoff_total_height * 100).toFixed(3)} cm</strong></p>
+                        <p>From landing velocity: <strong>${(data.height_from_landing_velocity * 100).toFixed(3)} cm</strong></p>
+						<p>Landing heel lift displacement: <strong>${(data.landing_heelLift * 100).toFixed(3)} cm</strong></p>
+						<p>From displacement and landing velocity: <strong>${(data.landing_total_height * 100).toFixed(3)} cm</strong></p>
                     </div>
 
                     <div style="background: #f5f5f5; padding: 15px; border-radius: 5px; margin: 10px 0;">
                         <h3>Time Metrics</h3>
                         <p>Flight Time: <strong>${(data.flightTime * 1000).toFixed(1)} ms</strong></p>
-                        <p>Stabilization Time: <strong>${(data.stabilization_time * 1000).toFixed(1)} ms</strong></p>
                     </div>
 
                     <div style="background: #f5f5f5; padding: 15px; border-radius: 5px; margin: 10px 0;">
                         <h3>Velocity Metrics</h3>
-                        <p>Initial Velocity: <strong>${data.initial_velocity.toFixed(2)} m/s</strong></p>
+                        <p>Takeoff Velocity: <strong>${data.takeoff_velocity.toFixed(2)} m/s</strong></p>
                         <p>Landing Velocity: <strong>${data.landing_velocity.toFixed(2)} m/s</strong></p>
                     </div>
 
                     <div style="background: #f5f5f5; padding: 15px; border-radius: 5px; margin: 10px 0;">
                         <h3>Time Events</h3>
-                        <p>Start of Movement (t1): <strong>${(data.thresholdTimes.t1 * 1000).toFixed(1)} ms</strong></p>
-                        <p>Max Descent Speed (t2): <strong>${(data.thresholdTimes.t2 * 1000).toFixed(1)} ms</strong></p>
-                        <p>Max Ascent Speed (t3): <strong>${(data.thresholdTimes.t3 * 1000).toFixed(1)} ms</strong></p>
-                        <p>Takeoff (t4): <strong>${(data.thresholdTimes.t4 * 1000).toFixed(1)} ms</strong></p>
-                        <p>Landing (t5): <strong>${(data.thresholdTimes.t5 * 1000).toFixed(1)} ms</strong></p>
+                        <p>Start of Movement (t1): <strong>${((data.thresholdTimes.t1.time - parseInt(recordBuffer[0].t, 16)/1000000)*1000).toFixed(3)} ms</strong></p>
+                        <p>Max Descent Speed (t2): <strong>${((data.thresholdTimes.t2.time - parseInt(recordBuffer[0].t, 16)/1000000)*1000).toFixed(3)} ms</strong></p>
+                        <p>Max Ascent Speed (t3): <strong>${((data.thresholdTimes.t3.time - parseInt(recordBuffer[0].t, 16)/1000000)*1000).toFixed(3)} ms</strong></p>
+                        <p>Takeoff (t4): <strong>${((data.thresholdTimes.t4.time - parseInt(recordBuffer[0].t, 16)/1000000)*1000).toFixed(3)} ms</strong></p>
+                        <p>Landing (t5): <strong>${((data.thresholdTimes.t5.time - parseInt(recordBuffer[0].t, 16)/1000000)*1000).toFixed(3)} ms</strong></p>
                     </div>
                 </div>
             `;
@@ -2170,6 +2156,7 @@
 				vIdx = report.thresholdTimes.t12vidx;
 				t5 = report.thresholdTimes.t5;
 				t12 = report.thresholdTimes.t12;
+				console.log(`playRecordWithMetadata: t12: `+t12.time);
 				sw2 = report.thresholdTimes.sw2;
 				console.log(`next: `+report.thresholdTimes.next);
 				if(t5 != null){
@@ -2401,7 +2388,9 @@
         function drawThresholds() {
 			console.log("timesList: "+thresholdsList );
 			if (recordBuffer.length > 0 && thresholdsList != undefined) {
+				console.log("thresholdsList.length: "+thresholdsList.length );
 				for (const times of thresholdsList) {
+					console.log("rrr: "+thresholdsList );
 					
 					ctx.save();
 					
@@ -2429,15 +2418,17 @@
 					let count = 0;
 					for (const [key, label] of Object.entries(labels)) {
 						if (key in times) {
-							const x = timeToScreen(times[key] * 1000000);
-							// Linea
-							ctx.beginPath();
-							ctx.moveTo(x, padding);
-							ctx.lineTo(x, canvas.height - padding);
-							ctx.stroke();
-							
-							// Etichetta
-							ctx.fillText(label, x + 5, padding + 20 + count);
+							if(times[key] != null){
+								const x = timeToScreen(times[key].time * 1000000);
+								// Linea
+								ctx.beginPath();
+								ctx.moveTo(x, padding);
+								ctx.lineTo(x, canvas.height - padding);
+								ctx.stroke();
+								
+								// Etichetta
+								ctx.fillText(label, x + 5, padding + 20 + count);
+							}
 						}
 						count +=10;
 					}
@@ -3502,7 +3493,7 @@
 			console.log('detectJumpThresholds-bIdx: '+bIdx);
 			console.log('detectJumpThresholds-vIdx: '+vIdx);
 
-			let result = {t1: t12, t2: null, t3: null, t4: null, t5: null, t6: null, t12: null, sw1: sw2, sw2: null, t12bidx: null, t12vidx: null, next: false};
+			let result = {t1: (t12 != null)? {time: t12.time, bidx: t12.bidx, vidx: t12.vidx}: null, t2: null, t3: null, t4: null, t5: null, t6: null, t12: null, sw1: sw2, sw2: null, t12bidx: null, t12vidx: null, next: false};
 			let minDerivative = Infinity;
 			let maxDerivative = -Infinity;
 			let precBatchTime;
@@ -3511,8 +3502,8 @@
 			let lastForce = null;
 			let staticCount = 0;
 			let diffWeight = 0;
-			let staticWeights = [];
-			
+			let staticWeights = [];	
+					
 			// ✅ LEGGI TUTTI I VALORI EMA DAI MENU (INCLUSA DERIVATA)
 			const emaAlphas = {
 				static: parseFloat(document.getElementById('emaAlphaStatic')?.value || 0.05),
@@ -3579,7 +3570,7 @@
 			let esci = false;
 			for(let batchIdx = bIdx; batchIdx < recordBuffer.length && !esci; batchIdx++) {
 				const batch = recordBuffer[batchIdx];
-				currBatchTime = parseInt(recordBuffer[batchIdx].t, 16) / 1000000;
+				currBatchTime = parseInt(recordBuffer[batchIdx].t, 16) / 1000000;// t in sec
 				const dt = (currBatchTime - precBatchTime) / batchLen;
 				// Determina gli indici di inizio e fine per questo batch
                 let startIdx = (batchIdx === bIdx) ? vIdx : 0;
@@ -3654,7 +3645,7 @@
 					if(result.t1 === null) {
 						//if(smoothedDerivative < -200 && force < staticWeight && lastForce >= staticWeight) {
 						if( Math.abs(force) < 0.95 * staticWeight && smoothedDerivative < 0) {
-							result.t1 = currentTime - 0.005*40;
+							result.t1 = {time:currentTime - 0.005*40, bidx: batchIdx - 40, vidx: 0};
 							console.log(`✅ T1 trovato Force: ${force}, (EMA α=${emaAlphas.t1}, derivata α=${emaAlphas.derivative}): time=${currentTime.toFixed(3)}, force= derivata_raw=${rawDerivative.toFixed(0)}, derivata_smooth=${smoothedDerivative.toFixed(2)}`);					
 				
 							result.sw1 = staticWeights[staticWeights.length - 41];// scarta fStatico degli ultimi 12 campioni
@@ -3674,32 +3665,32 @@
 
 					//t2: max downward speed
 					if(result.t2 == null && result.t1 !== null && smoothedDerivative > 0 && force > result.sw1 && lastForce <= result.sw1) {
-						result.t2 = currentTime;
+						result.t2 = {time:currentTime, bidx: batchIdx, vidx: i};
 						console.log(`✅ T2 trovato Force: ${force}, (derivata α=${emaAlphas.derivative}): time=${currentTime.toFixed(3)}, derivata_smooth=${smoothedDerivative.toFixed(2)}`);
 					}
 					
 					// t3: max upward speed
 					if(result.t3 == null && result.t2 !== null && smoothedDerivative < 0 && force < result.sw1 && lastForce >= result.sw1) {
-						result.t3 = currentTime;
+						result.t3 = {time:currentTime, bidx: batchIdx, vidx: i};
 						console.log(`✅ T3 trovato Force: ${force}, (derivata α=${emaAlphas.derivative}): time=${currentTime.toFixed(3)}, derivata_smooth=${smoothedDerivative.toFixed(2)}`);
 					}
 					
 					// t4: take off
 					if(result.t4 == null && force < 0.00005 && smoothedDerivative < -100) {
-						result.t4 = currentTime;
+						result.t4 = {time:currentTime, bidx: batchIdx, vidx: i};
 						console.log(`✅ T4 trovato Force: ${force}, derivata α=${emaAlphas.derivative}): time=${currentTime.toFixed(3)}, derivata_smooth=${smoothedDerivative.toFixed(2)}`);
 					}
 					
 					// t5: touch down
 					if(result.t5 == null && result.t4 !== null && rawDerivative > 0) {
-						result.t5 = currentTime;
+						result.t5 = {time:currentTime, bidx: batchIdx, vidx: i};
 						console.log(`✅ T5 trovato Force: ${force}, (derivata α=${emaAlphas.derivative}): time=${currentTime.toFixed(3)}, derivata_smooth=${smoothedDerivative.toFixed(2)}`);
 					}
 					
 					// t6: end landing
 					//if(result.t6 == null && result.t5 !== null && Math.abs(force) < 1.5 * result.sw1 && smoothedDerivative < 0.05 && smoothedDerivative > -0.05) {
 					if(result.t6 == null && result.t5 !== null && Math.abs(force) < 1.1 * result.sw1 && smoothedDerivative < 0.03 && smoothedDerivative > -0.03) {	
-						result.t6 = currentTime;
+						result.t6 = {time:currentTime, bidx: batchIdx, vidx: i};
 						//staticWeight = 0;
 						staticWeight = force;
 						staticCount = 0;
@@ -3712,18 +3703,18 @@
 							//console.log('devEmaRunstop: '+ (-Math.abs(force) + staticWeight + 4*emaValues.devEmaRun));
 							console.log('staticWeights.length: '+staticWeights.length);
 							if(Math.abs(force) < 0.90 * staticWeight){
-								result.t12 = currentTime - 0.005*40;
-								console.log(`✅ T12 trovato Force: ${force}, (EMA α=${emaAlphas.t1}, derivata α=${emaAlphas.derivative}): time=${result.t12.toFixed(3)}, force= derivata_raw=${rawDerivative.toFixed(0)}, derivata_smooth=${smoothedDerivative.toFixed(2)}`);						
-								result.sw2 = staticWeights[staticWeights.length -41];// scarta fStatico degli ultimi 12 campioni	
+								result.t12 = {time:currentTime - 0.005*30, bidx: batchIdx - 30, vidx: 0};
+								console.log(`✅ T12 trovato Force: ${force}, (EMA α=${emaAlphas.t1}, derivata α=${emaAlphas.derivative}): time=${result.t12.time.toFixed(3)}, force= derivata_raw=${rawDerivative.toFixed(0)}, derivata_smooth=${smoothedDerivative.toFixed(2)}`);						
+								result.sw2 = staticWeights[staticWeights.length -31];// scarta fStatico degli ultimi 12 campioni	
 								console.log('fStatico2-12: '+result.sw2);
-								result.t12bidx = batchIdx-24;
+								result.t12bidx = batchIdx - 30;
 								result.t12vidx = 0;
 								staticWeights.length = 0;
 								staticWeight = force;
 								console.log(`📊 Peso statico 2 (EMA α=${emaAlphas.static}): ${staticWeight.toFixed(0)} da ${staticCount} campioni`);
 								result.next = true;
 							}else{
-								result.t12 = currentTime;
+								result.t12 = {time:currentTime, bidx: batchIdx, vidx: i};
 								result.sw2 = staticWeights[staticWeights.length-1];
 								console.log('fStatico2: '+result.sw2);
 								staticWeight = force;
@@ -3748,7 +3739,7 @@
 				staticWeights.push(staticWeight);// salva fStatico ad ogni campione
 			}
 			
-			console.log(`t1: ${result.t1} - t2: ${result.t2} - t3: ${result.t3} - t4: ${result.t4} - t5: ${result.t5} - t6: ${result.t6} - sw1: ${result.sw1} - sw2: ${result.sw2} - bidx: ${result.t12bidx} - vidx: ${result.t12vidx}`);
+			console.log(`t1: ${(t12 != null)? t12.time: null} - t2: ${result.t2.time} - t3: ${result.t3.time} - t4: ${result.t4.time} - t5: ${result.t5.time} - t6: ${result.t6.time} - sw1: ${result.sw1} - sw2: ${result.sw2} - bidx: ${result.t12bidx} - vidx: ${result.t12vidx}`);
 			console.log(`📊 Derivata finale smoothed (α=${emaAlphas.derivative}): ${derivativeEma?.toFixed(2)}`);
 			return result;
 		}		
@@ -3809,10 +3800,14 @@
 				const valueDiff = c2.value - c1.value;
 				
 				if(cursors['cursor1'].time > 0 && cursors['cursor2'].time > 0){
-					let rarea = relArea(cursors['cursor1'].batchIndex, cursors['cursor1'].sampleIndex, cursors['cursor2'].batchIndex, cursors['cursor2'].sampleIndex);
+					let rarea = relArea(cursors['cursor1'].batchIndex, cursors['cursor1'].sampleIndex, cursors['cursor2'].batchIndex, cursors['cursor2'].sampleIndex, Fstatico1, Fstatico2);
 					console.log('rarea: '+rarea);
-					cursors['cursor1'].relArea = rarea;
-					cursors['cursor2'].relArea = rarea;
+					cursors['cursor1'].hv = rarea.hv;
+					cursors['cursor2'].hv = rarea.hv;
+					cursors['cursor1'].hl = rarea.hl;
+					cursors['cursor2'].hl = rarea.hl;
+					cursors['cursor1'].ht = rarea.ht;
+					cursors['cursor2'].ht = rarea.ht;
 					
 					
 					document.getElementById('timeDiff').textContent = formatTime(timeDiff);
@@ -3820,9 +3815,11 @@
 					document.getElementById('sampleDiff').textContent = `${sampleDiff.toLocaleString()} campioni`;
 					document.getElementById('valueDiff').textContent = `${valueDiff > 0 ? '+' : ''}${valueDiff.toLocaleString()}`;
 					document.getElementById('timeDiff').textContent = formatTime(timeDiff);
-					document.getElementById('relArea').textContent = `${rarea}`;
+					document.getElementById('hv').textContent = `${rarea.hv}`;
+					document.getElementById('hl').textContent = `${rarea.hl}`;
+					document.getElementById('ht').textContent = `${rarea.ht}`;
 					
-					console.log(`📏 Misurazioni: Δt=${formatTime(timeDiff)}, Δbatch=${batchDiff}, Δsample=${sampleDiff}, Δvalue=${valueDiff}, relArea=${rarea}`);
+					console.log(`📏 Misurazioni: Δt=${formatTime(timeDiff)}, Δbatch=${batchDiff}, Δsample=${sampleDiff}, Δvalue=${valueDiff}`);
 				}
 			}
 
