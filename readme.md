@@ -81,6 +81,8 @@
 - [Streaming dei campioni ADC](adcstreaming.md)
 - [Progetto con ESP32](ads1256.md)
 
+## Interfaccia:
+<img src="img\interface.png" alt="alt text" width="1000">
 
 **Materiale**:
 - ADC ADS1232 https://it.aliexpress.com/item/1005007195802960.html?spm=a2g0o.order_list.order_list_main.5.31183696R6xAH9&gatewayAdapt=glo2ita
