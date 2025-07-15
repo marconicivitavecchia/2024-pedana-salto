@@ -659,7 +659,7 @@
         const MIN_PLOT_INTERVAL = 5;
         const MIN_PIXEL_DELTA = 2;
         const padding = 10;
-        const TARGET_POINTS = 3000;
+        const TARGET_POINTS = 10000;
 
         // Oscilloscope specific variables
         // Variabili di stato per la vista
@@ -1588,12 +1588,12 @@
 				vidx1 = vidx2;
 				vidx2 = app;
 			}*/
-			console.log("relArea: bidx1: "+bidx1);
-			console.log("relArea: vidx1: "+vidx1);
-			console.log("relArea: bidx2: "+bidx2);
-			console.log("relArea: vidx2: "+vidx2);
-			console.log("relArea: fbody1: "+fbody1);
-			console.log("relArea: fbody2: "+fbody2);
+			//console.log("relArea: bidx1: "+bidx1);
+			//console.log("relArea: vidx1: "+vidx1);
+			//console.log("relArea: bidx2: "+bidx2);
+			//console.log("relArea: vidx2: "+vidx2);
+			//console.log("relArea: fbody1: "+fbody1);
+			//console.log("relArea: fbody2: "+fbody2);
 			
 			const g = 9.81;
 			let v = 0;
@@ -1609,7 +1609,7 @@
 			let precv = 0;// parte da fermo sia in FDI che in BDI
 			if(bidx1 < bidx2){
 				fbody = fbody1;
-				console.log("relArea: direct ");
+				//console.log("relArea: direct ");
 				let batchLen = recordBuffer[0].v.length;
 				let precBatchTime = parseInt(recordBuffer[0].t, 16) / 1000000 - dt0;
 				for(let batchIdx = bidx1; batchIdx <= bidx2 && batchIdx < recordBuffer.length; batchIdx++) {
@@ -1631,7 +1631,7 @@
 				}
 			}else{
 				fbody = fbody2;
-				console.log("relArea: reverse ");
+				//console.log("relArea: reverse ");
 				let batchLen = recordBuffer[recordBuffer.length - 1].v.length;
 				let precBatchTime = parseInt(recordBuffer[recordBuffer.length - 1].t, 16) / 1000000 - dt0;
 				for(let batchIdx = bidx1; batchIdx >= bidx2 && batchIdx >= 0; batchIdx--) {
@@ -1655,10 +1655,10 @@
 			}
 			//console.log("diffForce: "+vIniziale);
 			v =  v*dt0/2/fbody*g;
-			console.log("relArea: v: "+v);
-			let h_velocity = (v * v) / (2 * g);console.log("relArea: h_velocity: "+h_velocity);
+			//console.log("relArea: v: "+v);
+			let h_velocity = (v * v) / (2 * g);//console.log("relArea: h_velocity: "+h_velocity);
 			heelLift = s*dt0*dt0/4/fbody*g;// air distance + heel-lift distance	
-			console.log("relArea: heelLift: "+heelLift);
+			//console.log("relArea: heelLift: "+heelLift);
 			return {hv: h_velocity, hl: heelLift, ht: h_velocity + heelLift, v: v};
 		}
 		
@@ -2386,11 +2386,11 @@
 		}
 
         function drawThresholds() {
-			console.log("timesList: "+thresholdsList );
+			//console.log("timesList: "+thresholdsList );
 			if (recordBuffer.length > 0 && thresholdsList != undefined) {
-				console.log("thresholdsList.length: "+thresholdsList.length );
+				//console.log("thresholdsList.length: "+thresholdsList.length );
 				for (const times of thresholdsList) {
-					console.log("rrr: "+thresholdsList );
+					//console.log("rrr: "+thresholdsList );
 					
 					ctx.save();
 					
@@ -2434,8 +2434,8 @@
 					}
 					
 					ctx.restore();
-					console.log("Times:", times);
-					console.log("Window:", {min: xScale.min, max: xScale.max});
+					//console.log("Times:", times);
+					//console.log("Window:", {min: xScale.min, max: xScale.max});
 				}
 			}
         }
@@ -2557,48 +2557,41 @@
             }
         }
 //--------------------------------------------------------------------------------------------------------------------------
-        // Stampa di un batch
         function drawPlot() {
 			if (animationFrameId) {
 				cancelAnimationFrame(animationFrameId);
 			}
-
 			animationFrameId = requestAnimationFrame(() => {
 				if (recordBuffer.length === 0) return;
-
 				const timeWindow = timebaseDiv * DIVISIONS_X * 1000000;
 				
 				// Clear e disegna griglia
 				ctx.clearRect(0, 0, canvas.width, canvas.height);
 				drawGrid();
 				drawAxes();
-
+				
 				// Plot dei dati
 				ctx.beginPath();
 				ctx.strokeStyle = 'blue';
 				ctx.lineWidth = 2;
-
 				let isFirstPoint = true;
 				let lastX = -1;
 				let lastY = -1;
 				let n = 1;
-
+				
 				// Prima trova i batch nella finestra temporale
 				const batchesInWindow = recordBuffer.filter(batch => 
 					parseInt(batch.t, 16) >= xScale.min && parseInt(batch.t, 16) <= xScale.max
 				);
 				
+				// Calcolo Risoluzione Dinamica
 				if(batchesInWindow.length < TARGET_POINTS){
 					n = Math.ceil((TARGET_POINTS - batchesInWindow.length) / batchesInWindow.length)+1;
 					n = Math.min(n, recordBuffer[0].v.length);
 				}
-				console.log("batchesInWindow.length: " + batchesInWindow.length);
-				console.log("n: " + n);
 				
 				// Disegna tutti i punti nella finestra temporale corrente
-				let count = 0;
-				let highlightPoints = []; // Array per punti da evidenziare
-				
+				let count = 0;				
 				for (let batch of batchesInWindow) {
 					for(let j=0; j < n; j++){  
 						// filtra i campioni                      
@@ -2609,46 +2602,39 @@
 				
 						const x = Math.round(timeToScreen(sampleTime));
 						const y = Math.round(valueToScreen(value));
-
-						// Controlla se questo punto è vicino ai cursori trascinabili
-						let isNearCursor = false;
-						if (draggableCursorsActive) {
-							// Controlla entrambi i cursori
-							['cursor1', 'cursor2'].forEach(cursorId => {
-								const cursorData = cursors[cursorId];
-								if (cursorData.time > 0) {
-									const timeDiff = Math.abs(sampleTime - cursorData.time);
-									// 5000 microsecondi = 5ms = 1 batch
-									if (timeDiff < 5000) { 
-										isNearCursor = true;
-										highlightPoints.push({x, y, timeDiff, cursorId});
-									}
-								}
-							});}
-
-						if (isFirstPoint) {
+						
+						if (isFirstPoint) {// Primo punto: sposta il "pennello" (moveTo)
 							ctx.moveTo(x, y);
 							isFirstPoint = false;
-						} else {
+						} else {// Altri punti: traccia linea (lineTo)
 							ctx.lineTo(x, y);
 						}
 						
 						count++;
 					}
 				}
-				console.log("count: " + count);
+				//console.log("count: " + count);
 				
-				// Disegna la traccia normale
+				// Disegno Finale Curva
 				ctx.stroke();
 				
-				// Disegna i punti evidenziati
-				if (highlightPoints.length > 0) {
+				// Disegna i cursori e trova i punti più vicini
+				if (draggableCursorsActive) {
 					['cursor1', 'cursor2'].forEach(cursorId => {
 						if (cursors[cursorId].time > 0) {
-							const segmentX = timeToScreen(cursors[cursorId].time);
+							const cursorTime = cursors[cursorId].time;
+							const segmentX = timeToScreen(cursorTime);
 							const color = cursorId === 'cursor1' ? '#dc2626' : '#059669';
+							//console.log("cursorTime: "+cursorTime);
+							//console.log("segmentX: "+segmentX);
 							
-							// Segmento verticale
+							// Trova il punto più vicino al cursore
+							const xx = Math.round(segmentX);
+							const yy = Math.round(valueToScreen(cursors[cursorId].value));
+							//console.log("xx: "+xx);
+							//console.log("yy: "+yy);				
+							
+							// Disegna il segmento verticale del cursore
 							ctx.beginPath();
 							ctx.strokeStyle = color;
 							ctx.lineWidth = 2;
@@ -2656,19 +2642,16 @@
 							ctx.lineTo(segmentX, canvas.height - padding);
 							ctx.stroke();
 							
-							// Punto sulla curva
-							const closestPoint = highlightPoints.reduce((closest, point) => 
-								Math.abs(point.x - segmentX) < Math.abs(closest.x - segmentX) ? point : closest
-							);
-							
+							// Disegna il punto sulla curva (se trovato)
 							ctx.beginPath();
-							ctx.arc(segmentX, closestPoint.y, 4, 0, 2 * Math.PI);
+							ctx.arc(xx, yy, 4, 0, 2 * Math.PI);
 							ctx.fillStyle = color;
 							ctx.fill();
 						}
 					});
 				}
-
+				
+				// Disegna limiti di scroll e soglie
 				drawScrollLimits();
 				drawThresholds();
 			});
@@ -3278,11 +3261,17 @@
 						<div style="text-align: center;">
 							<label style="font-size: 11px; color: #059669; font-weight: bold;">T1: Peso Statico</label>
 							<select id="emaAlphaStatic" style="width: 100%;">
+								<option value="0.0001">0.0001</option>
+								<option value="0.0005">0.0005</option>
+								<option value="0.001">0.001</option>
+								<option value="0.005">0.005</option>
 								<option value="0.01">0.01</option>
 								<option value="0.02">0.02</option>
 								<option value="0.05" selected>0.05</option>
 								<option value="0.1">0.10</option>
 								<option value="0.2">0.20</option>
+								<option value="0.3">0.30</option>
+								<option value="0.3">0.50</option>
 								<option value="1">1</option>
 							</select>
 						</div>
@@ -3290,11 +3279,17 @@
 						<div style="text-align: center;">
 							<label style="font-size: 11px; color: #dc2626; font-weight: bold;">T1: Movimento</label>
 							<select id="emaAlphaT1" style="width: 100%;">
-								<option value="0.05">0.05</option>
-								<option value="0.1" selected>0.10</option>
+								<option value="0.0001">0.0001</option>
+								<option value="0.0005">0.0005</option>
+								<option value="0.001">0.001</option>
+								<option value="0.005">0.005</option>
+								<option value="0.01">0.01</option>
+								<option value="0.02">0.02</option>
+								<option value="0.05" selected>0.05</option>
+								<option value="0.1">0.10</option>
 								<option value="0.2">0.20</option>
 								<option value="0.3">0.30</option>
-								<option value="0.5">0.50</option>
+								<option value="0.3">0.50</option>
 								<option value="1">1</option>
 							</select>
 						</div>
@@ -3302,11 +3297,17 @@
 						<div style="text-align: center;">
 							<label style="font-size: 11px; color: #0369a1; font-weight: bold;">T2-T3: Transizioni</label>
 							<select id="emaAlphaT2T3" style="width: 100%;">
-								<option value="0.05">0.05</option>
+								<option value="0.0001">0.0001</option>
+								<option value="0.0005">0.0005</option>
+								<option value="0.001">0.001</option>
+								<option value="0.005">0.005</option>
+								<option value="0.01">0.01</option>
+								<option value="0.02">0.02</option>
+								<option value="0.05" selected>0.05</option>
 								<option value="0.1">0.10</option>
-								<option value="0.2" selected>0.20</option>
+								<option value="0.2">0.20</option>
 								<option value="0.3">0.30</option>
-								<option value="0.5">0.50</option>
+								<option value="0.3">0.50</option>
 								<option value="1">1</option>
 							</select>
 						</div>
@@ -3314,11 +3315,17 @@
 						<div style="text-align: center;">
 							<label style="font-size: 11px; color: #7c3aed; font-weight: bold;">T4: Stacco</label>
 							<select id="emaAlphaT4" style="width: 100%;">
+								<option value="0.0001">0.0001</option>
+								<option value="0.0005">0.0005</option>
+								<option value="0.001">0.001</option>
+								<option value="0.005">0.005</option>
+								<option value="0.01">0.01</option>
+								<option value="0.02">0.02</option>
+								<option value="0.05" selected>0.05</option>
 								<option value="0.1">0.10</option>
 								<option value="0.2">0.20</option>
-								<option value="0.3" selected>0.30</option>
-								<option value="0.4">0.40</option>
-								<option value="0.5">0.50</option>
+								<option value="0.3">0.30</option>
+								<option value="0.3">0.50</option>
 								<option value="1">1</option>
 							</select>
 						</div>
@@ -3326,11 +3333,17 @@
 						<div style="text-align: center;">
 							<label style="font-size: 11px; color: #ea580c; font-weight: bold;">T5: Atterraggio</label>
 							<select id="emaAlphaT5" style="width: 100%;">
+								<option value="0.0001">0.0001</option>
+								<option value="0.0005">0.0005</option>
+								<option value="0.001">0.001</option>
+								<option value="0.005">0.005</option>
+								<option value="0.01">0.01</option>
+								<option value="0.02">0.02</option>
+								<option value="0.05" selected>0.05</option>
+								<option value="0.1">0.10</option>
 								<option value="0.2">0.20</option>
 								<option value="0.3">0.30</option>
-								<option value="0.4" selected>0.40</option>
-								<option value="0.5">0.50</option>
-								<option value="0.7">0.70</option>
+								<option value="0.3">0.50</option>
 								<option value="1">1</option>
 							</select>
 						</div>
@@ -3491,7 +3504,7 @@
 		// =====================================================
 		function detectJumpThresholds(recordBuffer, sampleRate, bIdx, vIdx, t12, sw2) {	
 			console.log('detectJumpThresholds-bIdx: '+bIdx);
-			console.log('detectJumpThresholds-vIdx: '+vIdx);
+			console.log('detectJumpThresholds-vIdx: '+vIdx);								
 
 			let result = {t1: (t12 != null)? {time: t12.time, bidx: t12.bidx, vidx: t12.vidx}: null, t2: null, t3: null, t4: null, t5: null, t6: null, t12: null, sw1: sw2, sw2: null, t12bidx: null, t12vidx: null, next: false};
 			let minDerivative = Infinity;
@@ -3500,9 +3513,37 @@
 			let currBatchTime;
 			let batchLen;
 			let lastForce = null;
+			let force = 0;
 			let staticCount = 0;
 			let diffWeight = 0;
+			let diffWeight2 = 0;
+			let sd = 0;
 			let staticWeights = [];	
+			let minForce = +Infinity;
+			
+			// nested functions 
+			function calculateMeans(){
+				staticCount++;
+				diffWeight = (force - staticWeight) / staticCount;
+				staticWeight += diffWeight;
+				diffWeight2 = Math.abs(force - staticWeight) / staticCount;
+				sd += diffWeight2;
+			}
+			
+			function getMean() {
+				return staticWeight;
+			}
+			
+			function getSD() {
+				return sd;
+			}
+			
+			function initRunningMeans(force, deviation) {
+				staticWeight = force;
+				sd = deviation;
+				staticCount = 0;
+				console.log('initForce: '+force+' initDev: '+deviation);
+			}
 					
 			// ✅ LEGGI TUTTI I VALORI EMA DAI MENU (INCLUSA DERIVATA)
 			const emaAlphas = {
@@ -3557,29 +3598,26 @@
 			emaValues.devRawRun = firstRawValue;
 			emaValues.devEmaRun = firstRawValue;
 			let staticWeight = firstRawValue;
+			initRunningMeans(firstRawValue, 0);
 			
 			filterh.predict();
 			lastForce = filterh.update(emaValues.current);
-			batchLen = recordBuffer[0].v.length;
-			
+			batchLen = recordBuffer[0].v.length;			
 			// ANALISI PRINCIPALE CON EMA DINAMICO PER FASE
 			let lastDerivative = null;
 			let sampleIndex = 0;
 			staticDerivativeAlpha = 0.0001;
 			staticWeights.length = 0;
 			let esci = false;
+			let cont = 0;
 			for(let batchIdx = bIdx; batchIdx < recordBuffer.length && !esci; batchIdx++) {
 				const batch = recordBuffer[batchIdx];
 				currBatchTime = parseInt(recordBuffer[batchIdx].t, 16) / 1000000;// t in sec
 				const dt = (currBatchTime - precBatchTime) / batchLen;
 				// Determina gli indici di inizio e fine per questo batch
                 let startIdx = (batchIdx === bIdx) ? vIdx : 0;
-				for(let i = startIdx; i < batch.v.length && !esci; i++) {
-					if(batchIdx === 0 && i === 0) {
-						sampleIndex++;
-						continue;
-					}
-					
+				let k = 1;
+				for(let i = startIdx; i < batch.v.length && !esci; i++) {					
 					const rawValue = calculateValue(batch.v[i]);
 					
 					// AGGIORNA TUTTI GLI EMA CONTEMPORANEAMENTE
@@ -3603,8 +3641,9 @@
 						//selectedEmaValue = rawValue;  
 					}					
 					
-					filterh.predict();
-					let force = filterh.update(selectedEmaValue);
+					//filterh.predict();
+					//force = filterh.update(selectedEmaValue);
+					force = selectedEmaValue;
 					
 					emaValues.devRawEMA = betaRawEMA * Math.abs(rawValue - force) + (1 - betaRawEMA) * emaValues.devRawEMA;// deviazione standard raw da media EMA
 					emaValues.devRawRun = betaRawRun * Math.abs(rawValue - staticWeight) + (1 - betaRawRun) * emaValues.devRawRun;// deviazione standard raw da media running
@@ -3627,7 +3666,8 @@
 					
 					// ✅ DEBUG: Confronto derivata raw vs smoothed (ogni 2000 campioni)
 					if(sampleIndex % 2000 === 0) {
-						console.log(`📈 Derivata #${sampleIndex}: Raw=${rawDerivative.toFixed(0)}, Smoothed=${smoothedDerivative.toFixed(2)}, Alpha=${emaAlphas.derivative}`);
+						//console.log(`📈 Derivata #${sampleIndex}: Raw=${rawDerivative.toFixed(0)}, Smoothed=${smoothedDerivative.toFixed(2)}, Alpha=${emaAlphas.derivative}`);
+						//console.log('i: '+i+', esci: '+esci);
 					}
 					
 					/*
@@ -3644,7 +3684,8 @@
 					//t1: start downward movement
 					if(result.t1 === null) {
 						//if(smoothedDerivative < -200 && force < staticWeight && lastForce >= staticWeight) {
-						if( Math.abs(force) < 0.95 * staticWeight && smoothedDerivative < 0) {
+						//if( Math.abs(force) < 0.95 * staticWeight && smoothedDerivative < 0) {
+						if( Math.abs(force) < 0.95 * staticWeight && Math.abs(force-getMean())>getSD()) {
 							result.t1 = {time:currentTime - 0.005*40, bidx: batchIdx - 40, vidx: 0};
 							console.log(`✅ T1 trovato Force: ${force}, (EMA α=${emaAlphas.t1}, derivata α=${emaAlphas.derivative}): time=${currentTime.toFixed(3)}, force= derivata_raw=${rawDerivative.toFixed(0)}, derivata_smooth=${smoothedDerivative.toFixed(2)}`);					
 				
@@ -3652,18 +3693,13 @@
 							staticWeights.length = 0;
 							console.log(`📊 Peso statico 1 (EMA α=${emaAlphas.static}): ${staticWeight.toFixed(0)} da ${staticCount} campioni`);
 						}else{
-							//if(staticDerivativeEma === null) {
-							//	staticDerivativeEma = rawDerivative;  // Inizializza con la prima derivata
-							//} else {
-							//	staticDerivativeEma = staticDerivativeAlpha * rawDerivative + (1 - staticDerivativeAlpha) * staticDerivativeEma;
-							//}
-							staticCount++;
-							diffWeight = (force - staticWeight) / staticCount;
-							staticWeight += diffWeight;
+							calculateMeans();
+							//console.log(`force: ${force}, , mean: ${getMean()}, SD: ${getSD()}`);
 						}	
 					}						
 
 					//t2: max downward speed
+					//if(result.t2 == null && result.t1 !== null && smoothedDerivative > 0  && Math.abs(force-getMean())<getSD()) {
 					if(result.t2 == null && result.t1 !== null && smoothedDerivative > 0 && force > result.sw1 && lastForce <= result.sw1) {
 						result.t2 = {time:currentTime, bidx: batchIdx, vidx: i};
 						console.log(`✅ T2 trovato Force: ${force}, (derivata α=${emaAlphas.derivative}): time=${currentTime.toFixed(3)}, derivata_smooth=${smoothedDerivative.toFixed(2)}`);
@@ -3676,15 +3712,21 @@
 					}
 					
 					// t4: take off
-					if(result.t4 == null && force < 0.00005 && smoothedDerivative < -100) {
+					//if(result.t4 == null && result.t3 !== null && force < 0.05 && smoothedDerivative < -100) {
+					//if(result.t4 == null && force < 0 && lastForce > 0) {
+					if(result.t4 == null && result.t3 !== null && force < 0.05) {
+						console.log(`Force: ${force}, lastForce: ${lastForce}`);
 						result.t4 = {time:currentTime, bidx: batchIdx, vidx: i};
 						console.log(`✅ T4 trovato Force: ${force}, derivata α=${emaAlphas.derivative}): time=${currentTime.toFixed(3)}, derivata_smooth=${smoothedDerivative.toFixed(2)}`);
 					}
 					
 					// t5: touch down
-					if(result.t5 == null && result.t4 !== null && rawDerivative > 0) {
-						result.t5 = {time:currentTime, bidx: batchIdx, vidx: i};
-						console.log(`✅ T5 trovato Force: ${force}, (derivata α=${emaAlphas.derivative}): time=${currentTime.toFixed(3)}, derivata_smooth=${smoothedDerivative.toFixed(2)}`);
+					if(result.t5 == null && result.t4 !== null && force > result.sw1 / 3) {
+						console.log(`avanti: ${currentTime}, Force: ${force}, batchIdx: ${batchIdx}, vidx: ${i}`);
+						const sample = gobackUntilLower(batchIdx, i, 0.05, batchLen);
+						console.log(`indietro: ${sample.time}, Force ${sample.value}, batchIdx: ${sample.bidx}, vidx: ${sample.vidx}`);
+						result.t5 = {time:sample.time, bidx: sample.bidx, vidx: sample.vidx};
+						console.log(`✅ T5 trovato Force: ${sample.value}, (derivata α=${emaAlphas.derivative}): time=${currentTime.toFixed(3)}, derivata_smooth=${smoothedDerivative.toFixed(2)}`);
 					}
 					
 					// t6: end landing
@@ -3692,8 +3734,7 @@
 					if(result.t6 == null && result.t5 !== null && Math.abs(force) < 1.1 * result.sw1 && smoothedDerivative < 0.03 && smoothedDerivative > -0.03) {	
 						result.t6 = {time:currentTime, bidx: batchIdx, vidx: i};
 						//staticWeight = 0;
-						staticWeight = force;
-						staticCount = 0;
+						initRunningMeans(force, 0);
 						console.log(`✅ T6 trovato Force: ${force}, (derivata α=${emaAlphas.derivative}): time=${currentTime.toFixed(3)}, derivata_smooth=${smoothedDerivative.toFixed(2)}`);
 					}
 					
@@ -3710,7 +3751,7 @@
 								result.t12bidx = batchIdx - 30;
 								result.t12vidx = 0;
 								staticWeights.length = 0;
-								staticWeight = force;
+								initRunningMeans(force, 0);
 								console.log(`📊 Peso statico 2 (EMA α=${emaAlphas.static}): ${staticWeight.toFixed(0)} da ${staticCount} campioni`);
 								result.next = true;
 							}else{
@@ -3725,9 +3766,7 @@
 							esci = true;
 						}else{
 							//console.log('devEmaRun: '+ (-Math.abs(force) + staticWeight + 4*emaValues.devEmaRun));
-							staticCount++;
-							diffWeight = (force - staticWeight) / staticCount;
-							staticWeight += diffWeight;
+							calculateMeans();
 						}	
 					}		
 					
@@ -3742,51 +3781,48 @@
 			console.log(`t1: ${(t12 != null)? t12.time: null} - t2: ${result.t2.time} - t3: ${result.t3.time} - t4: ${result.t4.time} - t5: ${result.t5.time} - t6: ${result.t6.time} - sw1: ${result.sw1} - sw2: ${result.sw2} - bidx: ${result.t12bidx} - vidx: ${result.t12vidx}`);
 			console.log(`📊 Derivata finale smoothed (α=${emaAlphas.derivative}): ${derivativeEma?.toFixed(2)}`);
 			return result;
-		}		
+		}	
+
+		function getPrecValue(bidx, vidx, len) {
+			vidx = (vidx - 1 + len) % len;// decremento modulo len
+			if (vidx === 0 && bidx > 1) {
+				bidx-=1; // se siamo a 0 e torniamo indietro, scaliamo il batch
+			}	
+			const batch = recordBuffer[bidx];
+			const value = calculateValue(batch.v[vidx]);
+			//console.log('value: '+value);
+			const actualTime = parseInt(batch.t, 16) + (vidx * 0.005/len*1000000);
+			return {value: value, bidx: bidx, vidx: vidx, time: actualTime/1000000};	
+		}
+		
+		function gobackUntilLower(bidx, vidx, val, len, nmax = 10000){
+			let sample = {bidx: bidx, vidx: bidx};
+			for(let k=0; k<nmax; k++){
+				sample = getPrecValue(sample.bidx, sample.vidx, len);
+				console.log(`giro prima: ${sample.value}, cont: ${k}`);
+				if(sample.value < val){
+					break;
+				}
+			}
+			return sample;
+		}
+		
+		function gobackUntilUpper(bidx, vidx, val, len, nmax = 10000){
+			let sample = {bidx: bidx, vidx: bidx};
+			for(let k=0; k<nmax; k++){
+				sample = getPrecValue(sample.bidx, sample.vidx, len);
+				console.log(`giro prima: ${sample.value}, cont: ${k}`);
+				if(sample.value > val){
+					break;
+				}
+			}
+			return sample;
+		}
     </script>
 	<script>
 			// =====================================================
 			// SISTEMA CURSORI DI MISURAZIONE - CODICE COMPLETO
 			// =====================================================
-
-			// Trova il valore più vicino sulla curva al tempo specificato
-			function findValueAtTime(targetTime) {
-				if (recordBuffer.length === 0) return null;
-				
-				let closestDistance = Infinity;
-				let closestData = null;
-				
-				// Scansiona tutti i batch e campioni
-				for (let batchIndex = 0; batchIndex < recordBuffer.length; batchIndex++) {
-					const batch = recordBuffer[batchIndex];
-					const batchStartTime = parseInt(batch.t, 16);
-					
-					for (let sampleIndex = 0; sampleIndex < batch.v.length; sampleIndex++) {
-						// Calcola il tempo preciso di questo campione
-						const sampleTime = batchStartTime + (sampleIndex * (1000000 / SAMPLE_RATE));
-						const distance = Math.abs(sampleTime - targetTime);
-						
-						if (distance < closestDistance) {
-							closestDistance = distance;
-							
-							// Calcola il valore usando la tua funzione calculateValue
-							const value = calculateValue(batch.v[sampleIndex]);
-							const Fstatico = (Fstatico1 + Fstatico2) / 2;
-							
-							closestData = {
-								time: sampleTime,
-								batchIndex: batchIndex,
-								sampleIndex: sampleIndex,
-								value: value,
-								distance: distance,
-								rf: (value - Fstatico) / Fstatico * 100
-							};
-						}
-					}
-				}
-				
-				return closestData;
-			}
 
 			// Aggiorna display misurazioni
 			function updateMeasurementDisplay() {
@@ -3801,7 +3837,7 @@
 				
 				if(cursors['cursor1'].time > 0 && cursors['cursor2'].time > 0){
 					let rarea = relArea(cursors['cursor1'].batchIndex, cursors['cursor1'].sampleIndex, cursors['cursor2'].batchIndex, cursors['cursor2'].sampleIndex, Fstatico1, Fstatico2);
-					console.log('rarea: '+rarea);
+					//console.log('rarea: '+rarea);
 					cursors['cursor1'].hv = rarea.hv;
 					cursors['cursor2'].hv = rarea.hv;
 					cursors['cursor1'].hl = rarea.hl;
@@ -3819,7 +3855,7 @@
 					document.getElementById('hl').textContent = `${rarea.hl}`;
 					document.getElementById('ht').textContent = `${rarea.ht}`;
 					
-					console.log(`📏 Misurazioni: Δt=${formatTime(timeDiff)}, Δbatch=${batchDiff}, Δsample=${sampleDiff}, Δvalue=${valueDiff}`);
+					//console.log(`📏 Misurazioni: Δt=${formatTime(timeDiff)}, Δbatch=${batchDiff}, Δsample=${sampleDiff}, Δvalue=${valueDiff}`);
 				}
 			}
 
@@ -4000,6 +4036,46 @@
 					}
 				});
 			});
+			
+			function findValueAtTime(targetTime) {
+				if (recordBuffer.length === 0) return null;
+				
+				const BATCH_INTERVAL = 5000; // 5ms
+				const firstBatchTime = parseInt(recordBuffer[0].t, 16);
+				const batchLen = recordBuffer[0].v.length;
+				const SAMPLE_INTERVAL = 0.005 / batchLen;  // 33μs
+				//console.log('batchLen: '+batchLen);
+				// Calcola offset totale dal primo batch
+				const totalOffset = targetTime - firstBatchTime;
+				//console.log('totalOffset: '+totalOffset);
+				
+				// Usa divisione e resto per trovare batch e sample
+				const batchIndex = Math.floor(totalOffset / BATCH_INTERVAL);
+				const timeInBatch = totalOffset % BATCH_INTERVAL;
+				const sampleIndex = Math.floor(timeInBatch / SAMPLE_INTERVAL/1000000);
+				//console.log('batchIndex: '+batchIndex);
+				//console.log('timeInBatch: '+timeInBatch);
+				//console.log('sampleIndex: '+sampleIndex);
+				// Bounds check
+				if (batchIndex < 0 || batchIndex >= recordBuffer.length) return null;
+				if (sampleIndex >= recordBuffer[batchIndex].v.length) return null;
+				
+				const batch = recordBuffer[batchIndex];
+				const value = calculateValue(batch.v[sampleIndex]);
+				//console.log('value: '+value);
+				const actualTime = parseInt(batch.t, 16) + (sampleIndex * SAMPLE_INTERVAL*1000000);
+				//console.log('actualTime: '+actualTime);
+				const Fstatico = (Fstatico1 + Fstatico2) / 2;
+				
+				return {
+					time: actualTime,
+					batchIndex: batchIndex,
+					sampleIndex: sampleIndex,
+					value: value,
+					distance: Math.abs(actualTime - targetTime),
+					rf: (value - Fstatico) / Fstatico * 100
+				};	
+			}
 		</script>
 </body>
 </html>
