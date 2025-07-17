@@ -690,7 +690,8 @@
 		};
 		let Fstatico1 = 0;
 		let Fstatico2 = 0;
-		let sd = 0;
+		let Fstatico = 0;
+		let globalSDMean = 0;
 		
 		// Con queste:
 		
@@ -1671,23 +1672,32 @@
 			return {hv: h_velocity, hl: heelLift, ht: h_velocity + heelLift, v: v};
 		}
 		
-        function analyzeJump(recordBuffer, sampleRate, bIdx, vIdx, index, t12, sw2) {
-			const result = detectJumpThresholds(recordBuffer, sampleRate, bIdx, vIdx, t12, sw2, sd);
-			Fstatico1 = result.sw1;
-			Fstatico2 = result.sw2;
-			Fstatico = (result.sw1 + result.sw2) / 2;
-			sd = result.sd;
+        function analyzeJump(recordBuffer, sampleRate, bIdx, vIdx, index, t12, sw2, sd) {
+			const result = detectJumpThresholds(recordBuffer, sampleRate, bIdx, vIdx, t12, sw2, sd);	
 			//if(!result.next) return null;
+			console.log('------------------------------------------------------------');
 			console.log('analyzeJump-bIdx: '+bIdx);
 			console.log('analyzeJump-vIdx: '+vIdx);
+			console.log('analyzeJump-Fstatico: '+Fstatico);
+			//
+			console.log('analyzeJump-sd: '+sd);
+			console.log('------------------------------------------------------------');
 			// Calcoli finali
 			const g = 9.81;
 			let flightTime = 0;
 			let h_flight = 0;
 			
 			if(result.t4){
-				const flightTime = result.t5.time - result.t4.time;
-				const h_flight = (g * flightTime * flightTime) / 8;// altezza da tempo di volo
+				Fstatico1 = result.sw1;
+				Fstatico2 = result.sw2;
+				Fstatico = (result.sw1 + result.sw2) / 2;
+				if(result.sd){
+					globalSDMean = result.sd;
+					console.log('analyzeJump-sd: '+sd);
+				}		
+				flightTime = result.t5.time - result.t4.time;
+				h_flight = (g * flightTime * flightTime) / 8;// altezza da tempo di volo
+				//console.log('h_flight: '+h_flight);
 			}
 			
 			if(result.t1 != null && result.t4 != null && result.t5 != null && result.t6 != null){
@@ -1724,11 +1734,11 @@
 				"Landing heelLift: ": `${(data.landing_heelLift * 100).toFixed(3)} cm`, 
 				"Total height from landing (BDI + heel lift): ": `${(data.landing_total_height * 100).toFixed(3)} cm`, 
                 "Time Events": {
-                    "Start of Movement (t1)": `${((data.thresholdTimes.t1.time - parseInt(recordBuffer[0].t, 16)/1000000)*1000).toFixed(3)} ms`,
-                    "Max Descent Speed (t2)": `${((data.thresholdTimes.t2.time - parseInt(recordBuffer[0].t, 16)/1000000)*1000).toFixed(3)} ms`, 
-                    "Max Ascent Speed (t3)": `${((data.thresholdTimes.t3.time - parseInt(recordBuffer[0].t, 16)/1000000)*1000).toFixed(3)} ms`,
-                    "Takeoff (t4)": `${((data.thresholdTimes.t4.time - parseInt(recordBuffer[0].t, 16)/1000000)*1000).toFixed(3)} ms`,
-                    "Landing (t5)": `${((data.thresholdTimes.t5.time - parseInt(recordBuffer[0].t, 16)/1000000)).toFixed(3)*1000} ms`
+                    "Start of Movement (t1)": `${data.thresholdTimes.t1.time.toFixed(3)} ms`,
+                    "Max Descent Speed (t2)": `${data.thresholdTimes.t2.time.toFixed(3)} ms`, 
+                    "Max Ascent Speed (t3)": `${data.thresholdTimes.t3.time.toFixed(3)} ms`,
+                    "Takeoff (t4)": `${data.thresholdTimes.t4.time.toFixed(3)} ms`,
+                    "Landing (t5)": `${data.thresholdTimes.t5.time.toFixed(3)} ms`
                 }
             });
 
@@ -1762,11 +1772,11 @@
 
                     <div style="background: #f5f5f5; padding: 15px; border-radius: 5px; margin: 10px 0;">
                         <h3>Time Events</h3>
-                        <p>Start of Movement (t1): <strong>${((data.thresholdTimes.t1.time - parseInt(recordBuffer[0].t, 16)/1000000)*1000).toFixed(3)} ms</strong></p>
-                        <p>Max Descent Speed (t2): <strong>${((data.thresholdTimes.t2.time - parseInt(recordBuffer[0].t, 16)/1000000)*1000).toFixed(3)} ms</strong></p>
-                        <p>Max Ascent Speed (t3): <strong>${((data.thresholdTimes.t3.time - parseInt(recordBuffer[0].t, 16)/1000000)*1000).toFixed(3)} ms</strong></p>
-                        <p>Takeoff (t4): <strong>${((data.thresholdTimes.t4.time - parseInt(recordBuffer[0].t, 16)/1000000)*1000).toFixed(3)} ms</strong></p>
-                        <p>Landing (t5): <strong>${((data.thresholdTimes.t5.time - parseInt(recordBuffer[0].t, 16)/1000000)*1000).toFixed(3)} ms</strong></p>
+                        <p>Start of Movement (t1): <strong>${data.thresholdTimes.t1.time.toFixed(3)} ms</strong></p>
+                        <p>Max Descent Speed (t2): <strong>${data.thresholdTimes.t2.time.toFixed(3)} ms</strong></p>
+                        <p>Max Ascent Speed (t3): <strong>${data.thresholdTimes.t3.time.toFixed(3)} ms</strong></p>
+                        <p>Takeoff (t4): <strong>${data.thresholdTimes.t4.time.toFixed(3)} ms</strong></p>
+                        <p>Landing (t5): <strong>${data.thresholdTimes.t5.time.toFixed(3)} ms</strong></p>
                     </div>
                 </div>
             `;
@@ -2175,7 +2185,7 @@
 				sd = report.thresholdTimes.sd;
 				console.log(`next: `+report.thresholdTimes.next);
 				if(t5 != null){
-					//printJumpReport(report);
+					printJumpReport(report);
 					thresholdsList.push(report.thresholdTimes);		
 				}					
 			}while(report.thresholdTimes.next);
@@ -3473,6 +3483,7 @@
 					let vIdx = 0;
 					let t12 = null;
 					let sw2 = 0;
+					let sd = 0;
 					thresholdsList.length = 0;
 					do{
 						report = analyzeJump(recordBuffer, SAMPLE_RATE, bIdx, vIdx, index, t12, sw2, sd); 		  
@@ -3486,7 +3497,7 @@
 						sd = report.thresholdTimes.sd;
 						console.log(`next: `+report.thresholdTimes.next);
 						if(t5 != null){
-							//printJumpReport(report);
+							printJumpReport(report);
 							thresholdsList.push(report.thresholdTimes);		
 						}					
 					}while(report.thresholdTimes.next);
@@ -3733,13 +3744,13 @@
 
 					//t2: max downward speed
 					//if(result.t2 == null && result.t1 !== null && smoothedDerivative > 0  && Math.abs(force-getMean())<getSDMean()) {
-					if(result.t2 == null && result.t1 !== null && smoothedDerivative > 0 && force > result.sw1 && lastForce <= result.sw1) {
+					if(result.t2 == null && result.t1 !== null && smoothedDerivative > 1000 && force > result.sw1-5*getSDMean() && lastForce <= result.sw1+5*getSDMean()) {
 						result.t2 = {time:currentTime, bidx: batchIdx, vidx: i};
-						console.log(`✅ T2 trovato Force: ${force}, (derivata α=${emaAlphas.derivative}): time=${currentTime.toFixed(3)}, derivata_smooth=${smoothedDerivative.toFixed(2)}`);
+						console.log(`✅ T2 trovato Force: ${force}, (sdmean: ${getSDMean()}): time=${currentTime.toFixed(3)}, derivata_smooth=${smoothedDerivative.toFixed(2)}`);
 					}
 					
 					// t3: max upward speed
-					if(result.t3 == null && result.t2 !== null && smoothedDerivative < 0 && force < result.sw1 && lastForce >= result.sw1) {
+					if(result.t3 == null && result.t2 !== null && smoothedDerivative < 100 && force < result.sw1+5*getSDMean() && lastForce >= result.sw1-5*getSDMean()) {
 						result.t3 = {time:currentTime, bidx: batchIdx, vidx: i};
 						console.log(`✅ T3 trovato Force: ${force}, (derivata α=${emaAlphas.derivative}): time=${currentTime.toFixed(3)}, derivata_smooth=${smoothedDerivative.toFixed(2)}`);
 					}
@@ -4102,12 +4113,12 @@
 				
 				const batch = recordBuffer[batchIndex];
 				const value = calculateValue(batch.v[sampleIndex]);
-				console.log('value: '+value);
+				//console.log('value: '+value);
 				const actualTime = parseInt(batch.t, 16) + (sampleIndex * SAMPLE_INTERVAL*1000000);
 				//console.log('actualTime: '+actualTime);
 				const Fstatico = (Fstatico1 + Fstatico2) / 2;
-				console.log('sd: '+sd);
-				console.log('sdratio: '+(value / sd));
+				console.log('findValueAtTime -> sd: '+globalSDMean);
+				//console.log('sdratio: '+(value / sd));
 				
 				
 				return {
@@ -4117,8 +4128,8 @@
 					value: value,
 					distance: Math.abs(actualTime - targetTime),
 					rf: (value - Fstatico) / Fstatico * 100,
-					sdRatio: value / sd,
-					sdRatio2: (value - Fstatico) / sd
+					sdRatio: value / globalSDMean,
+					sdRatio2: (value - Fstatico) / globalSDMean
 				};	
 			}
 		</script>
