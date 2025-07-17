@@ -383,5 +383,6 @@ Se vuoi, posso aiutarti a scrivere una versione del tuo script che lavora dirett
 Sitografia:
 - http://lia.deis.unibo.it/Courses/InfoChim0910/lucidi/4-integrazioneDifferenziali(1x).pdf
 - https://nsa.readthedocs.io/en/latest/03_integrali/docs/source/09_int_numerici.html
+- https://www.tandfonline.com/doi/epdf/10.1080/02640414.2022.2059319
 
 >[Torna all'indice](readme.md#fasi-progetto)
