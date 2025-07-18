@@ -513,4 +513,8 @@ La loro separazione permette di:
 
 Ignorare una delle due componenti significa perdere informazioni cruciali sulla biomeccanica del salto e sulle capacità neuromuscolari dell'atleta.
 
+## Sitografia
+
+- https://www.tandfonline.com/doi/epdf/10.1080/02640414.2022.2059319
+
 >[Torna all'indice](readme.md#fasi-progetto)
