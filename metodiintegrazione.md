@@ -1,4 +1,4 @@
-
+>[Torna a metodi di calcolo salti](calcstrategies.md)
 
 # Metodi FDI, BDI e FT+C per il Calcolo dell'Altezza del Salto Verticale
 
@@ -910,3 +910,5 @@ Solo il metodo **FDI** permette di analizzare il contributo di ogni fase alle co
 - **Variabilità inter-individuale**: Strategie motorie diverse
 - **Effetti dell'allenamento**: Cambiamenti nelle proporzioni componenti
 - **Condizioni di test**: Influenza calzature, superficie, istruzioni
+
+>[Torna a metodi di calcolo salti](calcstrategies.md)
