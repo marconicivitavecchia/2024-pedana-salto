@@ -1,4 +1,4 @@
->[Torna a metodi di calcolo salti](cslcstrategies.md)
+>[Torna a metodi di calcolo salti](calcstrategies.md)
 
 # Parte II: Implementazione Pratica e Esempi Software
 
@@ -420,4 +420,4 @@ class SignalProcessor {
         // Step 3: Rimozione drift
         const driftCorrected = this.removeDrift(filtered);
 
->[Torna a metodi di calcolo salti](cslcstrategies.md)
+>[Torna a metodi di calcolo salti](calcstrategies.md)
