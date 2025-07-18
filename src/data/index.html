@@ -370,7 +370,7 @@
 				<option value="0.01">0.01</option>
 				<option value="0.02">0.02</option>
 				<option value="0.03">0.03</option>
-				<option value="0.04">0.05</option>
+				<option value="0.04">0.04</option>
                 <option value="0.05">0.05</option>
 				<option value="0.06">0.06</option>
 				<option value="0.07">0.07</option>
@@ -3567,7 +3567,7 @@
 			}
 			
 			function getSDMean() {
-				console.log('getSDMean -> sdValue: '+sdValue);
+				//console.log('getSDMean -> sdValue: '+sdValue);
 				return sdValue
 				
 			}
@@ -3767,7 +3767,7 @@
 					// t5: touch down
 					if(result.t5 == null && result.t4 !== null && force > result.sw1 *2/3) {
 						console.log(`avanti: ${currentTime}, Force: ${force}, result.sw1 *2/3: ${result.sw1 *2/3}, getSDMean() ${getSDMean()}, batchIdx: ${batchIdx}, vidx: ${i}`);
-						const sample = gobackUntilLower(batchIdx, i, getSDMean(), batchLen);
+						const sample = goBackUntilLower(batchIdx, i, getSDMean(), batchLen);
 						console.log(`indietro: ${sample.time}, SD: ${getSDMean()}, Force ${sample.value}, batchIdx: ${sample.bidx}, vidx: ${sample.vidx}`);
 						result.t5 = {time:sample.time, bidx: sample.bidx, vidx: sample.vidx};
 						console.log(`✅ T5 trovato Force: ${sample.value}, (derivata α=${emaAlphas.derivative}): time=${currentTime.toFixed(3)}, derivata_smooth=${smoothedDerivative.toFixed(2)}`);
@@ -3775,11 +3775,13 @@
 					
 					// t6: end landing
 					//if(result.t6 == null && result.t5 !== null && Math.abs(force) < 1.5 * result.sw1 && smoothedDerivative < 0.05 && smoothedDerivative > -0.05) {
-					if(result.t6 == null && result.t5 !== null && Math.abs(force) < 1.1 * result.sw1 && smoothedDerivative < 0.03 && smoothedDerivative > -0.03) {	
+					// result.sw1 è misurato sul takeoff e non è uguale a quello sul landing per cui funziona meglio la derivata rispetto alla DS
+					if(result.t6 == null && result.t5 !== null && (force < 1.05 * result.sw1 && force > 0.95 * result.sw1  && smoothedDerivative < 0.07 && smoothedDerivative > -0.07)) {	
+					//if(result.t6 == null && result.t5 !== null && Math.abs(force - result.sw1) < 20*getSDMean()  && Math.abs(force - result.sw1) > 0.01*getSDMean()) {	
 						result.t6 = {time:currentTime, bidx: batchIdx, vidx: i};
 						//staticWeight = 0;
 						console.log(`✅ T6 trovato Force: ${force}, (derivata α=${emaAlphas.derivative}): time=${currentTime.toFixed(3)}, derivata_smooth=${smoothedDerivative.toFixed(2)}`);
-						initRunningMeans(force, 0);
+						initRunningMeans(force, getSDMean());
 					}
 					
 					if(result.t12 === null && result.t6 !== null) {
@@ -3807,7 +3809,11 @@
 								result.t12bidx = null;
 								result.t12vidx = null;
 								result.next = false;
-							}							
+							}	
+							const sample = goBackUntilUpperNorm(result.t6.bidx, result.t6.vidx, 0.8*getSDMean(), result.sw2, batchLen);
+							console.log(`✅ T6 prima time=${result.t6.time.toFixed(3)}, getSDMean=${getSDMean()}, bidx=${result.t6.bidx.toFixed(3)}, vidx=${result.t6.vidx.toFixed(3)}`);
+							result.t6 = {time:sample.time, bidx: sample.bidx, vidx: sample.vidx};
+							console.log(`✅ T6 prima time=${result.t6.time.toFixed(3)}, getSDMean=${getSDMean()}, bidx=${result.t6.bidx.toFixed(3)}, vidx=${result.t6.vidx.toFixed(3)}`);
 							esci = true;
 						}else{
 							//console.log('devEmaRun: '+ (-Math.abs(force) + staticWeight + 4*emaValues.devEmaRun));
@@ -3829,19 +3835,30 @@
 		}	
 
 		function getPrecValue(bidx, vidx, len) {
-			vidx = (vidx - 1 + len) % len;// decremento modulo len
-			if (vidx === 0 && bidx > 1) {
-				bidx-=1; // se siamo a 0 e torniamo indietro, scaliamo il batch
-			}	
+			//console.log('getPrecValue -> bidx: '+bidx+', vidx: '+vidx);
+			let stop = false;
+			if (vidx === 0) {
+				if(bidx > 0){
+					bidx-=1; // se siamo a 0 e torniamo indietro, scaliamo il batch
+				}else{
+					stop = true;
+				}
+			}
+			if(!stop){
+				vidx = (vidx - 1 + len) % len;// decremento modulo len
+			}
+			
 			const batch = recordBuffer[bidx];
 			const value = calculateValue(batch.v[vidx]);
 			//console.log('value: '+value);
 			const actualTime = parseInt(batch.t, 16) + (vidx * 0.005/len*1000000);
+			//console.log('actualTime: '+actualTime+', bidx: '+bidx+', vidx: '+vidx);
+			
 			return {value: value, bidx: bidx, vidx: vidx, time: actualTime/1000000};	
-		}
-		
-		function gobackUntilLower(bidx, vidx, val, len, nmax = 10000){
-			let sample = {bidx: bidx, vidx: bidx};
+		}	
+
+		function goBackUntilLower(bidx, vidx, val, len, nmax = 50000){
+			let sample = {bidx: bidx, vidx: vidx};
 			for(let k=0; k<nmax; k++){
 				sample = getPrecValue(sample.bidx, sample.vidx, len);
 				//console.log(`giro prima: ${sample.value}, cont: ${k}`);
@@ -3852,12 +3869,36 @@
 			return sample;
 		}
 		
-		function gobackUntilUpper(bidx, vidx, val, len, nmax = 10000){
-			let sample = {bidx: bidx, vidx: bidx};
+		function goBackUntilLowerNorm(bidx, vidx, val, offset = 0, len, nmax = 50000){
+			let sample = {bidx: bidx, vidx: vidx};
+			for(let k=0; k<nmax; k++){
+				sample = getPrecValue(sample.bidx, sample.vidx, len);
+				//console.log(`sample.value - offset: ${sample.value - offset}, val: ${val}`);
+				if(Math.abs(sample.value - offset) < val){
+					break;
+				}
+			}
+			return sample;
+		}
+		
+		function goBackUntilUpper(bidx, vidx, val, len, nmax = 50000){
+			let sample = {bidx: bidx, vidx: vidx};
 			for(let k=0; k<nmax; k++){
 				sample = getPrecValue(sample.bidx, sample.vidx, len);
 				//console.log(`giro prima: ${sample.value}, cont: ${k}`);
 				if(sample.value > val){
+					break;
+				}
+			}
+			return sample;
+		}
+		
+		function goBackUntilUpperNorm(bidx, vidx, val, offset = 0, len, nmax = 50000){
+			let sample = {bidx: bidx, vidx: vidx};
+			for(let k=0; k<nmax; k++){
+				sample = getPrecValue(sample.bidx, sample.vidx, len);
+				//console.log(`sample.value - offset: ${sample.value - offset}, val: ${val}`);
+				if(Math.abs(sample.value - offset) > val){
 					break;
 				}
 			}
