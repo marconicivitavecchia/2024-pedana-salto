@@ -74,6 +74,7 @@
 - [Filtro antialiasing](aliasing.md)
 - [Calibrazione statica](calibrazione_statica.md)
 - [Calcolo altezza](accelerazione.md)
+- [Metodi FDI, BDI e FT+C](accelerazione.md)
 - [Definizione soglie](soglie.md)
 - [Filtri per Motion Tracking](filtri.md)
 - [Filtro di Kalman da accelerazione](kalman_accelerazione.md)
