@@ -438,8 +438,8 @@ Solo il metodo **FDI** permette di analizzare il contributo di ogni fase alle co
 - **Effetti dell'allenamento**: Cambiamenti nelle proporzioni componenti
 - **Condizioni di test**: Influenza calzature, superficie, istruzioni
 
-[Esempi di calcolo in JS](metodisaltojs.md)
-[Metodi di integrazione](metodiintegrazione.md)
+- [Esempi di calcolo in JS](metodisaltojs.md)
+- [Metodi di integrazione](metodiintegrazione.md)
 
 ## Sitografia
 
