@@ -1,3 +1,5 @@
+>[Torna all'indice](readme.md#fasi-progetto)
+
 # Significato Fisico delle Due Altezze nel Salto Verticale
 
 ## Le Due Componenti dell'Altezza del Salto
@@ -510,3 +512,5 @@ La loro separazione permette di:
 - **Diagnosticare** eventuali disfunzioni del movimento
 
 Ignorare una delle due componenti significa perdere informazioni cruciali sulla biomeccanica del salto e sulle capacità neuromuscolari dell'atleta.
+
+>[Torna all'indice](readme.md#fasi-progetto)
