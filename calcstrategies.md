@@ -285,6 +285,9 @@ Solo il metodo **FDI** permette di analizzare il contributo di ogni fase alle co
 - **Variabilità inter-individuale**: Strategie motorie diverse
 - **Effetti dell'allenamento**: Cambiamenti nelle proporzioni componenti
 - **Condizioni di test**: Influenza calzature, superficie, istruzioni
+
+[Esempi di calcolo in JS](metodisaltojs.md)
+
 ## Sitografia
 
 - https://www.tandfonline.com/doi/epdf/10.1080/02640414.2022.2059319
