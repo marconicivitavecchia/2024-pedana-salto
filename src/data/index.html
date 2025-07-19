@@ -3549,13 +3549,21 @@
 			let minForce = +Infinity;
 			let sdValue = 0;
 			let sdCount = 0;
-			
-			// nested functions 
+			let staticVariance = 0;
+						
 			function calculateMeans(){
 				staticCount++;
-				staticWeight = staticWeight + (force - staticWeight) / staticCount; // calcolo media running peso corporeo
-				let sdSample = Math.abs(force - staticWeight);
-				staticWeightSD = staticWeightSD + (sdSample - staticWeightSD) / staticCount; // calcolo varianza running peso corporeo
+				
+				// ✅ WELFORD'S algorithm
+				const oldMean = staticWeight;
+				const delta = force - oldMean;
+				staticWeight = oldMean + delta / staticCount;
+				const delta2 = force - staticWeight;
+				staticVariance += delta * delta2;
+				
+				if(staticCount > 1) {
+					staticWeightSD = Math.sqrt(staticVariance / (staticCount - 1));
+				}
 			}
 			
 			function getSD() {
@@ -3586,6 +3594,7 @@
 				sdValue = deviation;
 				staticCount = 0;
 				console.log('initRunningMeans ->initForce: '+force+' initDev: '+deviation);
+				staticVariance = 0;  // Per Welford's algorithm
 			}
 					
 			// ✅ LEGGI TUTTI I VALORI EMA DAI MENU (INCLUSA DERIVATA)
@@ -3785,13 +3794,14 @@
 					}
 					
 					if(result.t12 === null && result.t6 !== null) {
+						//if(Math.abs(force) < 0.90 * staticWeight || !(Math.abs(force) < 0.90 * staticWeight) && staticWeights.length > 700) {
 						if(Math.abs(force) < 0.90 * staticWeight || !(Math.abs(force) < 0.90 * staticWeight) && staticWeights.length > 700) {
 						//if( Math.abs(force) > staticWeight + 2*emaValues.devEmaRun) {
 							//console.log('devEmaRunstop: '+ (-Math.abs(force) + staticWeight + 4*emaValues.devEmaRun));
 							console.log('staticWeights.length: '+staticWeights.length);
-							if(Math.abs(force) < staticWeight - 2*getSDMean()){
+							if(Math.abs(force) < staticWeight - getSDMean()){
 								result.sd = calculateSDMean();
-								result.t12 = {time:currentTime - 0.005*30, bidx: batchIdx - 30, vidx: 0, sd: getSDMean()};								
+								result.t12 = {time:currentTime - 0.005*30, bidx: batchIdx - 30, vidx: 0, sd: result.sd};								
 								console.log(`✅ T12 trovato Force: ${force}, (EMA α=${emaAlphas.t1}, derivata α=${emaAlphas.derivative}): time=${result.t12.time.toFixed(3)}, force= derivata_raw=${rawDerivative.toFixed(0)}, derivata_smooth=${smoothedDerivative.toFixed(2)}`);						
 								result.sw2 = staticWeights[staticWeights.length -31];// scarta fStatico degli ultimi 12 campioni	
 								console.log('fStatico2-12: '+result.sw2);
@@ -3802,7 +3812,7 @@
 								result.next = true;
 							}else{
 								result.sd = calculateSDMean();
-								result.t12 = {time:currentTime, bidx: batchIdx, vidx: i, sd: getSDMean()};								
+								result.t12 = {time:currentTime, bidx: batchIdx, vidx: i, sd: result.sd};								
 								result.sw2 = staticWeights[staticWeights.length-1];
 								console.log('fStatico2: '+result.sw2);
 								//staticWeight = force;
@@ -3810,7 +3820,7 @@
 								result.t12vidx = null;
 								result.next = false;
 							}	
-							const sample = goBackUntilUpperNorm(result.t6.bidx, result.t6.vidx, 0.8*getSDMean(), result.sw2, batchLen);
+							const sample = goBackUntilUpperNorm(result.t6.bidx, result.t6.vidx, 0.5*result.sd, result.sw2, batchLen);
 							console.log(`✅ T6 prima time=${result.t6.time.toFixed(3)}, getSDMean=${getSDMean()}, bidx=${result.t6.bidx.toFixed(3)}, vidx=${result.t6.vidx.toFixed(3)}`);
 							result.t6 = {time:sample.time, bidx: sample.bidx, vidx: sample.vidx};
 							console.log(`✅ T6 prima time=${result.t6.time.toFixed(3)}, getSDMean=${getSDMean()}, bidx=${result.t6.bidx.toFixed(3)}, vidx=${result.t6.vidx.toFixed(3)}`);
