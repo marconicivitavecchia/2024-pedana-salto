@@ -3801,11 +3801,11 @@
 							console.log('staticWeights.length: '+staticWeights.length);
 							if(Math.abs(force) < staticWeight - getSDMean()){
 								result.sd = calculateSDMean();
-								result.t12 = {time:currentTime - 0.005*30, bidx: batchIdx - 30, vidx: 0, sd: result.sd};								
+								result.t12 = {time:currentTime - 0.005*40, bidx: batchIdx - 40, vidx: 0, sd: result.sd};								
 								console.log(`✅ T12 trovato Force: ${force}, (EMA α=${emaAlphas.t1}, derivata α=${emaAlphas.derivative}): time=${result.t12.time.toFixed(3)}, force= derivata_raw=${rawDerivative.toFixed(0)}, derivata_smooth=${smoothedDerivative.toFixed(2)}`);						
-								result.sw2 = staticWeights[staticWeights.length -31];// scarta fStatico degli ultimi 12 campioni	
+								result.sw2 = staticWeights[staticWeights.length -41];// scarta fStatico degli ultimi 12 campioni	
 								console.log('fStatico2-12: '+result.sw2);
-								result.t12bidx = batchIdx - 30;
+								result.t12bidx = batchIdx - 40;
 								result.t12vidx = 0;
 								staticWeights.length = 0;
 								console.log(`📊 Peso statico 2 (EMA α=${emaAlphas.static}): ${staticWeight.toFixed(0)} da ${staticCount} campioni`);
