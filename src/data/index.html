@@ -3550,6 +3550,8 @@
 			let sdValue = 0;
 			let sdCount = 0;
 			let staticVariance = 0;
+			let maxDiff = -Infinity;
+			let minDiff = Infinity;
 						
 			function calculateMeans(){
 				staticCount++;
@@ -3559,11 +3561,25 @@
 				const delta = force - oldMean;
 				staticWeight = oldMean + delta / staticCount;
 				const delta2 = force - staticWeight;
+				
+				if(delta2 > maxDiff){
+					maxDiff = delta2;
+				}else if(delta2 < minDiff){
+					minDiff = delta2;
+				}
 				staticVariance += delta * delta2;
 				
 				if(staticCount > 1) {
 					staticWeightSD = Math.sqrt(staticVariance / (staticCount - 1));
 				}
+			}
+			
+			function getMaxDelta() {
+				return maxDiff;
+			}
+			
+			function getMinDelta() {
+				return minDiff;
 			}
 			
 			function getSD() {
@@ -3595,6 +3611,8 @@
 				staticCount = 0;
 				console.log('initRunningMeans ->initForce: '+force+' initDev: '+deviation);
 				staticVariance = 0;  // Per Welford's algorithm
+				maxDiff = -Infinity;
+				minDiff = Infinity;
 			}
 					
 			// ✅ LEGGI TUTTI I VALORI EMA DAI MENU (INCLUSA DERIVATA)
@@ -3776,7 +3794,7 @@
 					// t5: touch down
 					if(result.t5 == null && result.t4 !== null && force > result.sw1 *2/3) {
 						console.log(`avanti: ${currentTime}, Force: ${force}, result.sw1 *2/3: ${result.sw1 *2/3}, getSDMean() ${getSDMean()}, batchIdx: ${batchIdx}, vidx: ${i}`);
-						const sample = goBackUntilLower(batchIdx, i, getSDMean(), batchLen);
+						const sample = goBackUntilLower(batchIdx, i, 0.05, batchLen);
 						console.log(`indietro: ${sample.time}, SD: ${getSDMean()}, Force ${sample.value}, batchIdx: ${sample.bidx}, vidx: ${sample.vidx}`);
 						result.t5 = {time:sample.time, bidx: sample.bidx, vidx: sample.vidx};
 						console.log(`✅ T5 trovato Force: ${sample.value}, (derivata α=${emaAlphas.derivative}): time=${currentTime.toFixed(3)}, derivata_smooth=${smoothedDerivative.toFixed(2)}`);
@@ -3801,14 +3819,20 @@
 							console.log('staticWeights.length: '+staticWeights.length);
 							if(Math.abs(force) < staticWeight - getSDMean()){
 								result.sd = calculateSDMean();
-								result.t12 = {time:currentTime - 0.005*40, bidx: batchIdx - 40, vidx: 0, sd: result.sd};								
+								//result.t12 = {time:currentTime - 0.005*40, bidx: batchIdx - 40, vidx: 0, sd: result.sd};
+								result.t12 = {time:currentTime, bidx: batchIdx, vidx: 0, sd: result.sd};								
 								console.log(`✅ T12 trovato Force: ${force}, (EMA α=${emaAlphas.t1}, derivata α=${emaAlphas.derivative}): time=${result.t12.time.toFixed(3)}, force= derivata_raw=${rawDerivative.toFixed(0)}, derivata_smooth=${smoothedDerivative.toFixed(2)}`);						
-								result.sw2 = staticWeights[staticWeights.length -41];// scarta fStatico degli ultimi 12 campioni	
+								result.sw2 = staticWeights[staticWeights.length -1];// scarta fStatico degli ultimi 12 campioni	
 								console.log('fStatico2-12: '+result.sw2);
 								result.t12bidx = batchIdx - 40;
 								result.t12vidx = 0;
 								staticWeights.length = 0;
+								// raffinamento t12 backward
 								console.log(`📊 Peso statico 2 (EMA α=${emaAlphas.static}): ${staticWeight.toFixed(0)} da ${staticCount} campioni`);
+								let sample = goBackUntilUpperNorm(result.t12.bidx, result.t12.vidx, 0, result.sw2, batchLen);
+								console.log(`✅ T12 prima time=${result.t12.time.toFixed(3)}, getSDMean=${getSDMean()}, bidx=${result.t12.bidx.toFixed(3)}, vidx=${result.t12.vidx.toFixed(3)}`);
+								result.t12 = {time:sample.time, bidx: sample.bidx, vidx: sample.vidx};
+								console.log(`✅ T12 dopo time=${result.t12.time.toFixed(3)}, getSDMean=${getSDMean()}, bidx=${result.t12.bidx.toFixed(3)}, vidx=${result.t12.vidx.toFixed(3)}`);
 								result.next = true;
 							}else{
 								result.sd = calculateSDMean();
@@ -3819,11 +3843,26 @@
 								result.t12bidx = null;
 								result.t12vidx = null;
 								result.next = false;
-							}	
-							const sample = goBackUntilUpperNorm(result.t6.bidx, result.t6.vidx, 0.5*result.sd, result.sw2, batchLen);
+							}
+							// inizio
+							// raffinamento t6 backward (Working backwards from the end of the trial, the first value that exceeded the maximum + one SD or the 
+							// minimum – one SD was obtained.)
+							sample = goBackUntilOutNorm(result.t6.bidx, result.t6.vidx, getMinDelta(), getMaxDelta(), result.sw2, batchLen);
+							console.log(`✅ T6back prima time=${result.t6.time.toFixed(3)}, getSDMean=${getSDMean()}, bidx=${result.t6.bidx.toFixed(3)}, vidx=${result.t6.vidx.toFixed(3)}`);
+							console.log(`✅ T6back dopo time=${sample.time.toFixed(3)}, getSDMean=${getSDMean()}, bidx=${sample.bidx.toFixed(3)}, vidx=${sample.vidx.toFixed(3)}`);
+							// raffinamento t6 forward (Then, moving forward, the last point that exceeded 0 N (positive or negative) was identified as the end of the landing phase)
+							console.log(`✅ T6forward prima time=${sample.time.toFixed(3)}, getSDMean=${getSDMean()}, bidx=${sample.bidx.toFixed(3)}, vidx=${sample.vidx.toFixed(3)}`);
+							sample = goForwardUntilEqualNorm(sample.bidx, sample.vidx, 0, result.sw2, batchLen);
+							sample = getPrecValue(sample.bidx, sample.vidx, batchLen);
+							result.t6 = {time:sample.time, bidx: sample.bidx, vidx: sample.vidx};
+							console.log(`✅ T6forward dopo time=${result.t6.time.toFixed(3)}, getSDMean=${getSDMean()}, bidx=${result.t6.bidx.toFixed(3)}, vidx=${result.t6.vidx.toFixed(3)}`);
+							// fine
+							// metodo alternativo con le derivate
+							/*const sample = goBackUntilUpperNorm(result.t6.bidx, result.t6.vidx, 0.5*result.sd, result.sw2, batchLen);
 							console.log(`✅ T6 prima time=${result.t6.time.toFixed(3)}, getSDMean=${getSDMean()}, bidx=${result.t6.bidx.toFixed(3)}, vidx=${result.t6.vidx.toFixed(3)}`);
 							result.t6 = {time:sample.time, bidx: sample.bidx, vidx: sample.vidx};
 							console.log(`✅ T6 prima time=${result.t6.time.toFixed(3)}, getSDMean=${getSDMean()}, bidx=${result.t6.bidx.toFixed(3)}, vidx=${result.t6.vidx.toFixed(3)}`);
+							*/// fine metodo alternativo
 							esci = true;
 						}else{
 							//console.log('devEmaRun: '+ (-Math.abs(force) + staticWeight + 4*emaValues.devEmaRun));
@@ -3843,13 +3882,46 @@
 			//console.log(`📊 Derivata finale smoothed (α=${emaAlphas.derivative}): ${derivativeEma?.toFixed(2)}`);
 			return result;
 		}	
+		
+		function getNextValue(bidx, vidx, len) {
+			//console.log('getPrecValue -> bidx: '+bidx+', vidx: '+vidx);
+			let vidxNew = (vidx + 1) % len;// incremento modulo len
+			if (vidxNew === 0) {
+				if(bidx + 1 < recordBuffer.length){
+					bidx++; // se siamo prima dell'ultimo batch, lo incrementiamo
+					vidx = vidxNew;
+				}
+			}else{
+				vidx = vidxNew;
+			}
+			
+			const batch = recordBuffer[bidx];
+			const value = calculateValue(batch.v[vidx]);
+			//console.log('value: '+value);
+			const actualTime = parseInt(batch.t, 16) + (vidx * 0.005/len*1000000);
+			//console.log('actualTime: '+actualTime+', bidx: '+bidx+', vidx: '+vidx);
+			
+			return {value: value, bidx: bidx, vidx: vidx, time: actualTime/1000000};	
+		}	
+		
+		function goForwardUntilEqualNorm(bidx, vidx, val, offset = 0, len, nmax = 50000){
+			let sample = {bidx: bidx, vidx: vidx};
+			for(let k=0; k<nmax; k++){
+				sample = getNextValue(sample.bidx, sample.vidx, len);
+				//console.log(`sample.value - offset: ${sample.value - offset}, val: ${val}`);
+				if(sample.value - offset < val){
+					break;
+				}
+			}
+			return sample;
+		}
 
 		function getPrecValue(bidx, vidx, len) {
 			//console.log('getPrecValue -> bidx: '+bidx+', vidx: '+vidx);
 			let stop = false;
 			if (vidx === 0) {
 				if(bidx > 0){
-					bidx-=1; // se siamo a 0 e torniamo indietro, scaliamo il batch
+					bidx--; // se siamo a 0 e torniamo indietro, scaliamo il batch
 				}else{
 					stop = true;
 				}
@@ -3879,12 +3951,36 @@
 			return sample;
 		}
 		
+		function goBackUntilLowerNormUnsigned(bidx, vidx, val, offset = 0, len, nmax = 50000){
+			let sample = {bidx: bidx, vidx: vidx};
+			for(let k=0; k<nmax; k++){
+				sample = getPrecValue(sample.bidx, sample.vidx, len);
+				console.log(`sample.value - offset: ${sample.value - offset}, val: ${val}`);
+				if(Math.abs(sample.value - offset) < val){
+					break;
+				}
+			}
+			return sample;
+		}
+		
 		function goBackUntilLowerNorm(bidx, vidx, val, offset = 0, len, nmax = 50000){
 			let sample = {bidx: bidx, vidx: vidx};
 			for(let k=0; k<nmax; k++){
 				sample = getPrecValue(sample.bidx, sample.vidx, len);
-				//console.log(`sample.value - offset: ${sample.value - offset}, val: ${val}`);
-				if(Math.abs(sample.value - offset) < val){
+				console.log(`sample.value - offset: ${sample.value - offset}, val: ${val}`);
+				if(sample.value - offset < val){
+					break;
+				}
+			}
+			return sample;
+		}
+		
+		function goBackUntilLowerEqualNorm(bidx, vidx, val, offset = 0, len, nmax = 50000){
+			let sample = {bidx: bidx, vidx: vidx};
+			for(let k=0; k<nmax; k++){
+				sample = getPrecValue(sample.bidx, sample.vidx, len);
+				console.log(`sample.value - offset: ${sample.value - offset}, val: ${val}`);
+				if(sample.value - offset <= val){
 					break;
 				}
 			}
@@ -3903,12 +3999,48 @@
 			return sample;
 		}
 		
-		function goBackUntilUpperNorm(bidx, vidx, val, offset = 0, len, nmax = 50000){
+		function goBackUntilUpperNormUnsigned(bidx, vidx, val, offset = 0, len, nmax = 50000){
 			let sample = {bidx: bidx, vidx: vidx};
 			for(let k=0; k<nmax; k++){
 				sample = getPrecValue(sample.bidx, sample.vidx, len);
 				//console.log(`sample.value - offset: ${sample.value - offset}, val: ${val}`);
 				if(Math.abs(sample.value - offset) > val){
+					break;
+				}
+			}
+			return sample;
+		}
+		
+		function goBackUntilUpperNorm(bidx, vidx, val, offset = 0, len, nmax = 50000){
+			let sample = {bidx: bidx, vidx: vidx};
+			for(let k=0; k<nmax; k++){
+				sample = getPrecValue(sample.bidx, sample.vidx, len);
+				//console.log(`sample.value - offset: ${sample.value - offset}, val: ${val}`);
+				if(sample.value - offset > val){
+					break;
+				}
+			}
+			return sample;
+		}
+		
+		function goBackUntilUpperEqualNorm(bidx, vidx, val, offset = 0, len, nmax = 50000){
+			let sample = {bidx: bidx, vidx: vidx};
+			for(let k=0; k<nmax; k++){
+				sample = getPrecValue(sample.bidx, sample.vidx, len);
+				//console.log(`sample.value - offset: ${sample.value - offset}, val: ${val}`);
+				if(sample.value - offset >= val){
+					break;
+				}
+			}
+			return sample;
+		}
+		
+		function goBackUntilOutNorm(bidx, vidx, lower, upper, offset = 0, len, nmax = 50000){
+			let sample = {bidx: bidx, vidx: vidx};
+			for(let k=0; k<nmax; k++){
+				sample = getPrecValue(sample.bidx, sample.vidx, len);
+				//console.log(`sample.value - offset: ${sample.value - offset}, min: ${lower}, max: ${upper}`);
+				if(sample.value - offset < lower || sample.value - offset > upper){
 					break;
 				}
 			}
