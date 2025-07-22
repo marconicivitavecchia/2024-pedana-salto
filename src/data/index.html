@@ -3547,6 +3547,8 @@
 			let diffWeight = 0;
 			let diffWeightSD = 0;
 			let staticWeights = [];	
+			let derivativeWindow = [];
+			const windowSize = 200 // Ultimi 100 campioni
 			let minForce = +Infinity;
 			let sdValue = 0;
 			let sdCount = 0;
@@ -3554,6 +3556,19 @@
 			let maxDiff = -Infinity;
 			let minDiff = Infinity;
 			let quietStandingExitCounter = 0;
+			
+			function updateRollingWindow(derivative) {
+				derivativeWindow.push(Math.abs(derivative));
+				if(derivativeWindow.length > windowSize) {
+					derivativeWindow.shift(); // Rimuove il più vecchio
+				}
+			} 
+			
+			function getRollingPercentile(percentile) {
+				if(derivativeWindow.length < 20) return 1000; // Fallback iniziale
+				const sorted = derivativeWindow.slice().sort((a,b) => a-b);
+				return sorted[Math.floor(sorted.length * percentile / 100)];
+			}
 						
 			function calculateMeans(){
 				staticCount++;
@@ -3740,6 +3755,7 @@
 						derivativeEma = emaAlphas.derivative * rawDerivative + (1 - emaAlphas.derivative) * derivativeEma;
 						smoothedDerivative = derivativeEma;
 					}
+					updateRollingWindow(smoothedDerivative);
 					
 					// ✅ DEBUG: Confronto derivata raw vs smoothed (ogni 2000 campioni)
 					if(sampleIndex % 2000 === 0) {
@@ -3777,13 +3793,13 @@
 
 					//t2: max downward speed
 					//if(result.t2 == null && result.t1 !== null && smoothedDerivative > 0  && Math.abs(force-getMean())<getSDMean()) {
-					if(result.t2 == null && result.t1 !== null && smoothedDerivative > 1000 && force > result.sw1-5*getSDMean() && lastForce <= result.sw1+5*getSDMean()) {
+					if(result.t2 == null && result.t1 !== null && smoothedDerivative > getRollingPercentile(95) && force > result.sw1-5*getSDMean() && lastForce <= result.sw1+5*getSDMean()) {
 						result.t2 = {time:currentTime, bidx: batchIdx, vidx: i};
 						console.log(`✅ T2 trovato Force: ${force}, (sdmean: ${getSDMean()}): time=${currentTime.toFixed(3)}, derivata_smooth=${smoothedDerivative.toFixed(2)}`);
 					}
 					
 					// t3: max upward speed
-					if(result.t3 == null && result.t2 !== null && smoothedDerivative < 100 && force < result.sw1+5*getSDMean() && lastForce >= result.sw1-5*getSDMean()) {
+					if(result.t3 == null && result.t2 !== null && smoothedDerivative < getRollingPercentile(20) && force < result.sw1+5*getSDMean() && lastForce >= result.sw1-5*getSDMean()) {
 						result.t3 = {time:currentTime, bidx: batchIdx, vidx: i};
 						console.log(`✅ T3 trovato Force: ${force}, (derivata α=${emaAlphas.derivative}): time=${currentTime.toFixed(3)}, derivata_smooth=${smoothedDerivative.toFixed(2)}`);
 					}
@@ -3809,7 +3825,7 @@
 					// t6: end landing
 					//if(result.t6 == null && result.t5 !== null && Math.abs(force) < 1.5 * result.sw1 && smoothedDerivative < 0.05 && smoothedDerivative > -0.05) {
 					// result.sw1 è misurato sul takeoff e non è uguale a quello sul landing per cui funziona meglio la derivata rispetto alla DS
-					if(result.t6 == null && result.t5 !== null && (force < 1.05 * result.sw1 && force > 0.95 * result.sw1  && smoothedDerivative < 0.04 && smoothedDerivative > -0.04)) {	
+					if(result.t6 == null && result.t5 !== null && (force < 1.05 * result.sw1 && force > 0.95 * result.sw1  && smoothedDerivative < 0.05 && smoothedDerivative > -0.05)) {	
 					//if(result.t6 == null && result.t5 !== null && Math.abs(force - result.sw1) < 20*getSDMean()  && Math.abs(force - result.sw1) > 0.01*getSDMean()) {	
 						result.t6 = {time:currentTime, bidx: batchIdx, vidx: i};
 						//staticWeight = 0;
@@ -3824,9 +3840,9 @@
 						   smoothedDerivative < -0.05 || smoothedDerivative > 0.05) {
 							quietStandingExitCounter++;
 							
-							if(quietStandingExitCounter >= 5) { // 5 campioni consecutivi
+							if(quietStandingExitCounter >= 15) { // 5 campioni consecutivi
 								const quietDuration = currentTime - result.t6.time;
-								if(quietDuration >= 0.5) { // Almeno 500ms di quiet standing
+								if(quietDuration >= 0.45) { // Almeno 500ms di quiet standing
 									//calculateSDMean();
 									result.t7 = {time:currentTime, bidx: batchIdx, vidx: i};
 									result.sw2 = staticWeights[staticWeights.length -1];
@@ -3887,6 +3903,7 @@
 							// inizio
 							// raffinamento t6 backward (Working backwards from the end of the trial, the first value that exceeded the maximum + one SD or the 
 							// minimum – one SD was obtained.)
+							console.log(`✅ getMinDelta=${getMinDelta()},  getMaxDelta=${ getMaxDelta()}, getLocalSD()=${getLocalSD()}`);
 							sample = goBackUntilOutNorm(result.t6.bidx, result.t6.vidx, getMinDelta() - getLocalSD(), getMaxDelta() + getLocalSD(), result.sw2, batchLen);
 							console.log(`✅ T6back prima time=${result.t6.time.toFixed(3)}, getLocalSD=${getLocalSD()}, bidx=${result.t6.bidx.toFixed(3)}, vidx=${result.t6.vidx.toFixed(3)}`);
 							console.log(`✅ T6back dopo time=${sample.time.toFixed(3)}, getLocalSD=${getLocalSD()}, bidx=${sample.bidx.toFixed(3)}, vidx=${sample.vidx.toFixed(3)}`);
