@@ -305,13 +305,13 @@
 		/* Posizionamento specifico per ogni pannello */
 		.cursor-info-panel-1 {
 			top: -145px;
-			right: 10px;
+			right: 290px;
 			border-left: 4px solid #f59e0b; /* Bordo arancione */
 		}
 
 		.cursor-info-panel-2 {
 			top: -145px;
-			right: 280px; /* Spostato a sinistra per non sovrapporsi */
+			right: 10px; /* Spostato a sinistra per non sovrapporsi */
 			border-left: 4px solid #10b981; /* Bordo verde */
 		}
 
@@ -1681,6 +1681,7 @@
 			console.log('analyzeJump-Fstatico: '+Fstatico);
 			//
 			console.log('analyzeJump-sd: '+sd);
+			console.log('result.next: '+result.next);
 			console.log('------------------------------------------------------------');
 			// Calcoli finali
 			const g = 9.81;
@@ -1703,22 +1704,38 @@
 			if(result.t1 != null && result.t4 != null && result.t5 != null && result.t6 != null){
 				r1 = relArea(result.t1.bidx, result.t1.vidx, result.t4.bidx, result.t4.vidx, result.sw1, result.sw2);	
 				r2 = relArea(result.t6.bidx, result.t6.vidx, result.t5.bidx, result.t5.vidx, result.sw1, result.sw2);
-			}
+				
+				return {
+					index,
+					flightTime,
+					height_from_time: h_flight,
+					height_from_takeoff_velocity: r1.hv,
+					height_from_landing_velocity: r2.hv,
+					takeoff_heelLift: r1.hl,
+					landing_heelLift: r2.hl,
+					takeoff_total_height: r1.hv + r1.hl,
+					landing_total_height: r2.hv + r2.hl,
+					takeoff_velocity: r1.v,
+					landing_velocity: r2.v,				
+					thresholdTimes: result
+				};
+			}else{
 						
-			return {
-				index,
-				flightTime,
-				height_from_time: h_flight,
-				height_from_takeoff_velocity: r1.hv,
-				height_from_landing_velocity: r2.hv,
-				takeoff_heelLift: r1.hl,
-				landing_heelLift: r2.hl,
-				takeoff_total_height: r1.hv + r1.hl,
-				landing_total_height: r2.hv + r2.hl,
-				takeoff_velocity: r1.v,
-				landing_velocity: r2.v,				
-				thresholdTimes: result
-			};
+				return {
+					index,
+					flightTime,
+					height_from_time: null,
+					height_from_takeoff_velocity: null,
+					height_from_landing_velocity: null,
+					takeoff_heelLift: null,
+					landing_heelLift: null,
+					takeoff_total_height: null,
+					landing_total_height: null,
+					takeoff_velocity: null,
+					landing_velocity: null,				
+					thresholdTimes: result
+				};
+			}
 		}
 		
         function printJumpReport(data) {
@@ -3379,6 +3396,8 @@
 						<div style="text-align: center;">
 							<label style="font-size: 11px; color: #92400e; font-weight: bold;">Derivata Smooth</label>
 							<select id="emaAlphaDerivative" style="width: 100%;">
+								<option value="0.0001" >0.00001</option>
+								<option value="0.0001">0.00005</option>
 								<option value="0.0001" selected>0.0001</option>
 								<option value="0.0005">0.0005</option>
 								<option value="0.001">0.001</option>
@@ -3533,9 +3552,10 @@
 		// =====================================================
 		function detectJumpThresholds(recordBuffer, sampleRate, bIdx, vIdx, t12, sw2, sd) {	
 			console.log('detectJumpThresholds-bIdx: '+bIdx);
-			console.log('detectJumpThresholds-vIdx: '+vIdx);								
+			console.log('detectJumpThresholds-vIdx: '+vIdx);
+			console.log('t12.time: '+((t12!=null)?t12.time:null));	
 
-			let result = {t1: (t12 != null)? {time: t12.time, bidx: t12.bidx, vidx: t12.vidx}: null, t2: null, t3: null, t4: null, t5: null, t6: null, t7: null, t12: null, sw1: sw2, sw2: null, sd: null, t12bidx: null, t12vidx: null, next: false};
+			let result = {t1: (t12 != null)? {time: t12.time, bidx: t12.bidx, vidx: t12.vidx}: null, t2: null, t3: null, t4: null, t5: null, t6: null, t7: null, t12: null, sw1: sw2, sw2: null, sd: sd, t12bidx: null, t12vidx: null, next: false};
 			let minDerivative = Infinity;
 			let maxDerivative = -Infinity;
 			let precBatchTime;
@@ -3556,19 +3576,16 @@
 			let maxDiff = -Infinity;
 			let minDiff = Infinity;
 			let quietStandingExitCounter = 0;
-			
-			function updateRollingWindow(derivative) {
-				derivativeWindow.push(Math.abs(derivative));
-				if(derivativeWindow.length > windowSize) {
-					derivativeWindow.shift(); // Rimuove il più vecchio
-				}
-			} 
-			
-			function getRollingPercentile(percentile) {
-				if(derivativeWindow.length < 20) return 1000; // Fallback iniziale
-				const sorted = derivativeWindow.slice().sort((a,b) => a-b);
-				return sorted[Math.floor(sorted.length * percentile / 100)];
-			}
+			// Inizializza tutti gli EMA con il primo valore
+			const firstRawValue = calculateValue(recordBuffer[bIdx].v[vIdx]);
+			const firstTime =  parseInt(recordBuffer[bIdx].t, 16) / 1000000;// t in sec
+			let currentMax = firstRawValue;
+			let currentMin = firstRawValue;
+			//let maxIndex = 0;
+			//let minIndex = 0;
+			let maxValidated = false;
+			let minValidated = false;
+			let amplitude = Infinity;
 						
 			function calculateMeans(){
 				staticCount++;
@@ -3586,9 +3603,94 @@
 				}
 				staticVariance += delta * delta2;
 				
-				if(staticCount > 1) {
+				if(staticCount > 10) {
 					staticWeightSD = Math.sqrt(staticVariance / (staticCount - 1));
 				}
+			}
+			
+			function calculatePeaks(c) {
+				ok = false;
+				
+				let ref = staticWeight;
+				// ✅ Aggiorna estremi delle deviazioni per oscillazioni
+				if(force - ref > currentMax){
+					currentMax = force - ref;
+					maxValidated = false;
+				}
+				
+				if(force - ref < currentMin){
+					currentMin = force - ref;
+					minValidated = false;
+				}
+				
+				// Validazione MASSIMO: attraversamento media mobile scendendo
+				if (!maxValidated && c) {
+					maxValidated = true;
+					amplitude = Math.abs(currentMax - currentMin);
+					console.log('calculateMeans -> amplitude MASSIMO: '+amplitude+', currentMax: '+currentMax+', currentMin: '+currentMin+', ref: '+ref);
+					
+					// Reset per cercare prossimo minimo
+					currentMin = force - ref;
+					minValidated = false;
+					ok = true;
+				}
+				
+				// Validazione MINIMO: attraversamento media mobile salendo
+				if (!minValidated && c) {
+					minValidated = true;
+					amplitude = Math.abs(currentMax - currentMin);
+					console.log('calculateMeans -> amplitude MINIMO: '+amplitude+', currentMax: '+currentMax+', currentMin: '+currentMin+', ref: '+ref);
+					
+					// Reset per cercare prossimo massimo
+					currentMax = force - ref;
+					maxValidated = false;
+					ok = true;
+				}
+				return ok;
+			}
+			
+			function calculatePeaks1(ref) {
+				// ✅ Aggiorna estremi delle deviazioni per oscillazioni
+				if(force - ref > currentMax){
+					currentMax = force - ref;
+					maxValidated = false;
+				}
+				
+				if(force - ref < currentMin){
+					currentMin = force - ref;
+					minValidated = false;
+				}
+				
+				// Validazione MASSIMO: attraversamento media mobile scendendo
+				if (!maxValidated && currentMax > force - ref) {
+					if (force - ref <= 0) {
+						maxValidated = true;
+						amplitude = Math.abs(currentMax - currentMin);
+						console.log('calculateMeans -> amplitude MASSIMO: '+amplitude+', currentMax: '+currentMax+', currentMin: '+currentMin+', ref: '+ref);
+						
+						// Reset per cercare prossimo minimo
+						currentMin = force - ref;
+						minValidated = false;
+					}	
+				}
+				
+				// Validazione MINIMO: attraversamento media mobile salendo
+				if (!minValidated && currentMin < force - ref) {
+					if (force - ref >= 0) {
+						minValidated = true;
+						amplitude = Math.abs(currentMax - currentMin);
+						console.log('calculateMeans -> amplitude MINIMO: '+amplitude+', currentMax: '+currentMax+', currentMin: '+currentMin+', ref: '+ref);
+						
+						// Reset per cercare prossimo massimo
+						currentMax = force - ref;
+						maxValidated = false;
+					}
+				}
+			}
+			
+			function getPeakAmp() {
+				//console.log('getPeakAmp -> amplitude: '+amplitude);
+				return amplitude;
 			}
 			
 			function getMaxDelta() {
@@ -3600,6 +3702,7 @@
 			}
 			
 			function getSD() {
+				//console.log('getSD -> staticWeightSD: '+staticWeightSD);
 				return staticWeightSD;
 			}
 			
@@ -3620,7 +3723,7 @@
 			function calculateSDMean() {
 				sdCount++;
 				sdValue = sdValue + (staticWeightSD - sdValue) / sdCount; // calcolo media della varianza su più salti
-				console.log('calculateSDMean -> sdValue: '+sdValue);
+				//console.log('calculateSDMean -> sdValue: '+sdValue);
 				result.sd = sdValue;
 				return sdValue;
 			}
@@ -3628,12 +3731,29 @@
 			function initRunningMeans(force, deviation) {
 				staticWeight = force;
 				staticWeightSD = deviation;
-				sdValue = deviation;
+				//sdValue = deviation;
 				staticCount = 0;
 				console.log('initRunningMeans ->initForce: '+force+' initDev: '+deviation);
 				staticVariance = 0;  // Per Welford's algorithm
 				maxDiff = -Infinity;
 				minDiff = Infinity;
+			}
+			
+			function initSDMean(deviation) {
+				sdValue = deviation;
+			}
+			
+			function updateRollingWindow(derivative) {
+				derivativeWindow.push(Math.abs(derivative));
+				if(derivativeWindow.length > windowSize) {
+					derivativeWindow.shift(); // Rimuove il più vecchio
+				}
+			} 
+			
+			function getRollingPercentile(percentile) {
+				if(derivativeWindow.length < 20) return 1000; // Fallback iniziale
+				const sorted = derivativeWindow.slice().sort((a,b) => a-b);
+				return sorted[Math.floor(sorted.length * percentile / 100)];
 			}
 					
 			// ✅ LEGGI TUTTI I VALORI EMA DAI MENU (INCLUSA DERIVATA)
@@ -3677,31 +3797,26 @@
 			// ✅ EMA per la derivata (configurabile)
 			let derivativeEma = null;
 			let staticDerivativeEma = null;
-			
-			// Inizializza tutti gli EMA con il primo valore
-			const firstRawValue = calculateValue(recordBuffer[bIdx].v[vIdx]);
 			emaValues.t1 = firstRawValue;
 			emaValues.t2t3 = firstRawValue;
 			emaValues.t4 = firstRawValue;
 			emaValues.t5 = firstRawValue;
 			emaValues.current = firstRawValue;
-			emaValues.devRawEMA = firstRawValue;
-			emaValues.devRawRun = firstRawValue;
-			emaValues.devEmaRun = firstRawValue;
 			let staticWeight = firstRawValue;
 			let staticWeightSD = 0;
-			initRunningMeans(firstRawValue, sd);
+			initRunningMeans(firstRawValue, sd);// si parte da Fbody
+			initSDMean(sd);
 			
 			filterh.predict();
 			lastForce = filterh.update(emaValues.current);
 			batchLen = recordBuffer[0].v.length;			
 			// ANALISI PRINCIPALE CON EMA DINAMICO PER FASE
-			let lastDerivative = null;
 			let sampleIndex = 0;
 			staticDerivativeAlpha = 0.0001;
 			staticWeights.length = 0;
 			let esci = false;
 			let cont = 0;
+			let single = true;
 			for(let batchIdx = bIdx; batchIdx < recordBuffer.length && !esci; batchIdx++) {
 				const batch = recordBuffer[batchIdx];
 				currBatchTime = parseInt(recordBuffer[batchIdx].t, 16) / 1000000;// t in sec
@@ -3737,10 +3852,6 @@
 					//force = filterh.update(selectedEmaValue);
 					force = selectedEmaValue;
 					
-					emaValues.devRawEMA = betaRawEMA * Math.abs(rawValue - force) + (1 - betaRawEMA) * emaValues.devRawEMA;// deviazione standard raw da media EMA
-					emaValues.devRawRun = betaRawRun * Math.abs(rawValue - staticWeight) + (1 - betaRawRun) * emaValues.devRawRun;// deviazione standard raw da media running
-					emaValues.devEmaRun = betaEmaRun * Math.abs(force - staticWeight) + (1 - betaEmaRun) * emaValues.devEmaRun;// deviazione standard EMA da media running
-					
 					const currentTime = currBatchTime + (i * dt);
 					
 					// ✅ CALCOLA DERIVATA RAW
@@ -3773,33 +3884,49 @@
 					*/
 					
 					// ✅ USA DERIVATA SMOOTHED CONFIGURABILE NELLE SOGLIE
-					
 					//t1: start downward movement
 					if(result.t1 === null) {
+						//console.log(`time: ${1}`);
 						//if(smoothedDerivative < -200 && force < staticWeight && lastForce >= staticWeight) {
 						//if( Math.abs(force) < 0.95 * staticWeight && smoothedDerivative < 0) {
-						if( Math.abs(force) < 0.95 * staticWeight && Math.abs(force-getMean())>getSD()*5) {
+						//To identify the start of the countermovement after quiet standing, the first
+						//value that exceeded either the maximum + one SD or the
+						//minimum – one SD was identified.
+						if(currentTime - firstTime > 1.4 && getPeakAmp() < 2*getSD()){
+						//if( Math.abs(force) < 0.95 * staticWeight && Math.abs(force-getMean())>getSD()*5 ) {
 							result.sd = calculateSDMean();
-							result.t1 = {time:currentTime - 0.005*40, bidx: batchIdx - 40, vidx: 0, sd: getSDMean()}; //time backward							
+							console.log('calculateSDMean -> sdValue: '+result.sd);
+							console.log(`✅ getMeans=${staticWeight}, getMinDelta=${getMinDelta()},  getMaxDelta=${ getMaxDelta()}, getLocalSD()=${getLocalSD()}`);
+							result.t1 = {time:currentTime, bidx: batchIdx, vidx: i, sd: getSDMean()}; //time backward							
 							console.log(`✅ T1 trovato Force: ${force}, (EMA α=${emaAlphas.t1}, derivata α=${emaAlphas.derivative}): time=${currentTime.toFixed(3)}, force= derivata_raw=${rawDerivative.toFixed(0)}, derivata_smooth=${smoothedDerivative.toFixed(2)}`);					
-							result.sw1 = staticWeights[staticWeights.length - 41];// scarta fStatico degli ultimi 12 campioni
+							result.sw1 = staticWeights[staticWeights.length-1];// scarta fStatico degli ultimi 12 campioni
 							staticWeights.length = 0;
 							console.log(`📊 Peso statico 1 (EMA α=${emaAlphas.static}): ${staticWeight.toFixed(0)} da ${staticCount} campioni`);
+							
+							let sample = goForwardUntilOutNorm(result.t1.bidx, result.t1.vidx, 0.1*getMinDelta() - getLocalSD(), 0.1*getMaxDelta() + getLocalSD(), result.sw1, batchLen);
+							console.log(`✅ T1 forward prima time=${result.t1.time.toFixed(3)}, getLocalSD=${getLocalSD()}, bidx=${result.t1.bidx.toFixed(3)}, vidx=${result.t1.vidx.toFixed(3)}`);
+							console.log(`✅ T1 forward dopo time=${sample.time.toFixed(3)}, getLocalSD=${getLocalSD()}, bidx=${sample.bidx.toFixed(3)}, vidx=${sample.vidx.toFixed(3)}`);							
+							result.t1 = {time:sample.time, bidx: sample.bidx, vidx: sample.vidx};
 						}else{
 							calculateMeans();
-							//console.log(`force: ${force}, , mean: ${getMean()}, SD: ${getSDMean()}`);
+							calculatePeaks(Math.abs(smoothedDerivative) < 0.15);
+							//console.log(`time: ${currentTime}, force: ${force}, mean: ${getMean()}, SD: ${getSDMean()}, getMinDelta=${getMinDelta()}, getMaxDelta=${ getMaxDelta()}, getLocalSD()=${getLocalSD()}`);
 						}	
 					}						
 
 					//t2: max downward speed
 					//if(result.t2 == null && result.t1 !== null && smoothedDerivative > 0  && Math.abs(force-getMean())<getSDMean()) {
-					if(result.t2 == null && result.t1 !== null && smoothedDerivative > getRollingPercentile(95) && force > result.sw1-5*getSDMean() && lastForce <= result.sw1+5*getSDMean()) {
+					if(result.t2 == null && result.t1 !== null && Math.abs(force) < 0.95 * result.sw1 &&  smoothedDerivative > getRollingPercentile(95) ) {
+						console.log(`result.sw1: ${result.sw1}, force: ${force}`);
 						result.t2 = {time:currentTime, bidx: batchIdx, vidx: i};
 						console.log(`✅ T2 trovato Force: ${force}, (sdmean: ${getSDMean()}): time=${currentTime.toFixed(3)}, derivata_smooth=${smoothedDerivative.toFixed(2)}`);
+					}else{
+						//console.log(`result.sw1: ${result.sw1}, force: ${force}`);
 					}
 					
 					// t3: max upward speed
-					if(result.t3 == null && result.t2 !== null && smoothedDerivative < getRollingPercentile(20) && force < result.sw1+5*getSDMean() && lastForce >= result.sw1-5*getSDMean()) {
+					if(result.t3 == null && result.t2 !== null && smoothedDerivative < -getRollingPercentile(20) && force < result.sw1+5*getSDMean() && lastForce >= result.sw1-5*getSDMean()) {
+						console.log(`time: ${3}`);
 						result.t3 = {time:currentTime, bidx: batchIdx, vidx: i};
 						console.log(`✅ T3 trovato Force: ${force}, (derivata α=${emaAlphas.derivative}): time=${currentTime.toFixed(3)}, derivata_smooth=${smoothedDerivative.toFixed(2)}`);
 					}
@@ -3808,6 +3935,7 @@
 					//if(result.t4 == null && result.t3 !== null && force < 0.05 && smoothedDerivative < -100) {
 					//if(result.t4 == null && force < 0 && lastForce > 0) {
 					if(result.t4 == null && result.t3 !== null && force < 0.05) {
+						console.log(`time: ${4}`);
 						console.log(`Force: ${force}, lastForce: ${lastForce}`);
 						result.t4 = {time:currentTime, bidx: batchIdx, vidx: i};
 						console.log(`✅ T4 trovato Force: ${force}, derivata α=${emaAlphas.derivative}): time=${currentTime.toFixed(3)}, derivata_smooth=${smoothedDerivative.toFixed(2)}`);
@@ -3815,6 +3943,7 @@
 					
 					// t5: touch down
 					if(result.t5 == null && result.t4 !== null && force > result.sw1 *2/3) {
+						console.log(`time: ${5}`);
 						console.log(`avanti: ${currentTime}, Force: ${force}, result.sw1 *2/3: ${result.sw1 *2/3}, getSDMean() ${getSDMean()}, batchIdx: ${batchIdx}, vidx: ${i}`);
 						const sample = goBackUntilLower(batchIdx, i, 0.05, batchLen);
 						console.log(`indietro: ${sample.time}, SD: ${getSDMean()}, Force ${sample.value}, batchIdx: ${sample.bidx}, vidx: ${sample.vidx}`);
@@ -3825,30 +3954,43 @@
 					// t6: end landing
 					//if(result.t6 == null && result.t5 !== null && Math.abs(force) < 1.5 * result.sw1 && smoothedDerivative < 0.05 && smoothedDerivative > -0.05) {
 					// result.sw1 è misurato sul takeoff e non è uguale a quello sul landing per cui funziona meglio la derivata rispetto alla DS
-					if(result.t6 == null && result.t5 !== null && (force < 1.05 * result.sw1 && force > 0.95 * result.sw1  && smoothedDerivative < 0.05 && smoothedDerivative > -0.05)) {	
+					//if(result.t6 == null && result.t5 !== null && Math.abs(force - staticWeight) < getSDMean() ) {	
+					if(result.t6 == null && result.t5 !== null) {// quite standing start detection	
+					//console.log(`time: ${6}`);
 					//if(result.t6 == null && result.t5 !== null && Math.abs(force - result.sw1) < 20*getSDMean()  && Math.abs(force - result.sw1) > 0.01*getSDMean()) {	
-						result.t6 = {time:currentTime, bidx: batchIdx, vidx: i};
-						//staticWeight = 0;
-						console.log(`✅ T6 trovato Force: ${force}, (derivata α=${emaAlphas.derivative}): time=${currentTime.toFixed(3)}, derivata_smooth=${smoothedDerivative.toFixed(2)}`);
-						//initRunningMeans(force, getSDMean());
-						initRunningMeans(force, 0);
-						quietStandingExitCounter = 0;
+						console.log(`getPeakAmp() t7: ${getPeakAmp()}`);
+						if(getPeakAmp() < 0.4*getSDMean()) {// position condition	
+							result.t6 = {time:currentTime, bidx: batchIdx, vidx: i};
+							//staticWeight = 0;
+							console.log(`✅ T6 trovato Force: ${force}, (derivata α=${emaAlphas.derivative}): time=${currentTime.toFixed(3)}, derivata_smooth=${smoothedDerivative.toFixed(2)}`);
+							initRunningMeans(force, getSDMean());
+							quietStandingExitCounter = 0;
+						}else{
+							calculateMeans();
+							if(calculatePeaks(Math.abs(smoothedDerivative) < 0.15)){// velocity condition
+								initRunningMeans(force - staticWeight, getPeakAmp());// si parte da f - Fbody
+							}
+							//console.log(`getSD: ${getSD()}`);
+						}
 					}
 					
-					if(result.t7 == null && result.t6 !== null) {
-						if(force < 0.95 * result.sw1 || force > 1.05 * result.sw1 || 
-						   smoothedDerivative < -0.05 || smoothedDerivative > 0.05) {
+					if(result.t7 == null && result.t6 !== null) {// quite standing end detection
+						//console.log(` force - staticWeight t7: ${force - staticWeight}`);
+						//console.log(` getSD() t7: ${getSD()}`);
+						if(Math.abs(force - staticWeight) > 0.2*getSDMean() || smoothedDerivative > 0.05) {
+							//console.log(` getSD() t7: ${0.4*getSD()}`);
 							quietStandingExitCounter++;
 							
-							if(quietStandingExitCounter >= 15) { // 5 campioni consecutivi
+							if(quietStandingExitCounter >= 5) { // 5 campioni consecutivi
 								const quietDuration = currentTime - result.t6.time;
 								if(quietDuration >= 0.45) { // Almeno 500ms di quiet standing
 									//calculateSDMean();
 									result.t7 = {time:currentTime, bidx: batchIdx, vidx: i};
 									result.sw2 = staticWeights[staticWeights.length -1];
-									result.sd = getLocalSD();
 									//result.sd = calculateSDMean();
-									console.log(`✅ T7 trovato time=${result.t7.time.toFixed(3)}, getLocalSD=${getLocalSD()}, bidx=${result.t7.bidx.toFixed(3)}, vidx=${result.t7.vidx.toFixed(3)}`);
+									console.log('calculateSDMean -> sdValue: '+result.sd);
+									//result.sd = calculateSDMean();
+									console.log(`✅ T7 trovato time=${result.t7.time.toFixed(3)}, getLocalSD=${getLocalSD()}, bidx=${result.t7.bidx.toFixed(3)}, vidx=${result.t7.vidx.toFixed(3)}, derivata_smooth=${smoothedDerivative.toFixed(2)}`);
 								} else {
 									// Troppo breve, continua a cercare
 									//console.log(`⚠️ Quiet standing troppo breve (${quietDuration.toFixed(3)}s), continuo...`);
@@ -3865,12 +4007,12 @@
 					}
 					
 					if(result.t12 === null && result.t7 !== null) {
-						//if(Math.abs(force) < 0.90 * staticWeight || !(Math.abs(force) < 0.90 * staticWeight) && staticWeights.length > 700) {
-						if(Math.abs(force) < 0.90 * staticWeight || !(Math.abs(force) < 0.90 * staticWeight) && staticWeights.length > 700) {
-						//if( Math.abs(force) > staticWeight + 2*emaValues.devEmaRun) {
-							//console.log('devEmaRunstop: '+ (-Math.abs(force) + staticWeight + 4*emaValues.devEmaRun));
-							console.log('staticWeights.length: '+staticWeights.length);
-							if(Math.abs(force) < staticWeight - getLocalSD()){
+						//console.log(`time: ${12}`);
+						if(force < result.sw2*2/3 || (force >= result.sw2*2/3) && currentTime - result.t7.time > 0.7) {
+							//if( Math.abs(force) > staticWeight + 2*emaValues.devEmaRun) {
+							console.log('currentTime - result.t7.time: '+ (currentTime - result.t7.time));
+							console.log('force: '+force);console.log('result.sw2: '+result.sw2);console.log('is_a: '+(force < result.sw2*2/3));
+							if(force < result.sw2*2/3){
 								//result.sd = calculateSDMean();
 								//result.t12 = {time:currentTime - 0.005*40, bidx: batchIdx - 40, vidx: 0, sd: result.sd};
 								result.t12 = {time:currentTime, bidx: batchIdx, vidx: 0, sd: result.sd};								
@@ -3889,19 +4031,22 @@
 								result.t12 = {time:sample.time, bidx: sample.bidx, vidx: sample.vidx};
 								console.log(`✅ T12 dopo time=${result.t12.time.toFixed(3)}, getSDMean=${getSDMean()}, bidx=${result.t12.bidx.toFixed(3)}, vidx=${result.t12.vidx.toFixed(3)}`);
 								result.next = true;
+								console.log('result.next_a: '+result.next);
 							}else{
 								//result.sd = calculateSDMean();
 								//result.sd = getLocalSD();
-								result.t12 = {time:currentTime, bidx: batchIdx, vidx: i, sd: result.sd};								
+								result.t12 = {time:currentTime, bidx: batchIdx, vidx: i, sd: result.sd};		
+								console.log(`✅ T12 B Force: ${force}, (EMA α=${emaAlphas.t1}, derivata α=${emaAlphas.derivative}): time=${result.t12.time.toFixed(3)}, force= derivata_raw=${rawDerivative.toFixed(0)}, derivata_smooth=${smoothedDerivative.toFixed(2)}`);						
 								//result.sw2 = staticWeights[staticWeights.length-1];
 								console.log('fStatico2: '+result.sw2);
+								console.log('getLocalSD(): '+getLocalSD());
 								//staticWeight = force;
 								result.t12bidx = null;
 								result.t12vidx = null;
 								result.next = false;
+								console.log('result.next_b: '+result.next);
 							}
 							// inizio
-							// raffinamento t6 backward (Working backwards from the end of the trial, the first value that exceeded the maximum + one SD or the 
 							// minimum – one SD was obtained.)
 							console.log(`✅ getMinDelta=${getMinDelta()},  getMaxDelta=${ getMaxDelta()}, getLocalSD()=${getLocalSD()}`);
 							sample = goBackUntilOutNorm(result.t6.bidx, result.t6.vidx, getMinDelta() - getLocalSD(), getMaxDelta() + getLocalSD(), result.sw2, batchLen);
@@ -3926,17 +4071,16 @@
 							//console.log('devEmaRun: '+ (-Math.abs(force) + staticWeight + 4*emaValues.devEmaRun));
 							//calculateMeans();
 						}	
-					}		
+					}						
 					
 					lastForce = force;
-					lastDerivative = smoothedDerivative;
 					sampleIndex++;
 				}
 				precBatchTime = currBatchTime;
 				staticWeights.push(staticWeight);// salva fStatico ad ogni campione
 			}
 			
-			//console.log(`t1: ${(t12 != null)? t12.time: null} - t2: ${result.t2.time} - t3: ${result.t3.time} - t4: ${result.t4.time} - t5: ${result.t5.time} - t6: ${result.t6.time} - sw1: ${result.sw1} - sw2: ${result.sw2} - bidx: ${result.t12bidx} - vidx: ${result.t12vidx}`);
+			console.log(`next: ${result.next}`);
 			//console.log(`📊 Derivata finale smoothed (α=${emaAlphas.derivative}): ${derivativeEma?.toFixed(2)}`);
 			return result;
 		}	
@@ -3975,6 +4119,18 @@
 					break;
 				}
 				prec = sample.value;
+			}
+			return sample;
+		}
+			
+		function goForwardUntilOutNorm(bidx, vidx, lower, upper, offset = 0, len, nmax = 50000){
+			let sample = {bidx: bidx, vidx: vidx};
+			for(let k=0; k<nmax; k++){
+				sample = getNextValue(sample.bidx, sample.vidx, len);
+				//console.log(`sample.value - offset: ${sample.value - offset}, min: ${lower}, max: ${upper}`);
+				if(sample.value - offset < lower || sample.value - offset > upper){
+					break;
+				}
 			}
 			return sample;
 		}
@@ -4108,8 +4264,7 @@
 				}
 			}
 			return sample;
-		}
-		
+		}		
 
     </script>
 	<script>
@@ -4232,10 +4387,10 @@
 						document.getElementById(`cursorTime${panelNum}`).textContent = formatTime(data.time);
 						document.getElementById(`cursorBatch${panelNum}`).textContent = data.batchIndex.toString();
 						document.getElementById(`cursorSampleIndex${panelNum}`).textContent = data.sampleIndex.toString();
-						document.getElementById(`cursorValue${panelNum}`).textContent = data.value.toLocaleString();
+						document.getElementById(`cursorValue${panelNum}`).textContent = `${data.value.toFixed(3)} : ${(data.value - Fstatico1).toFixed(3)}`;
 						document.getElementById(`cursorPosition${panelNum}`).textContent = `${data.x.toFixed(1)}px`;
 						document.getElementById(`relativeForce${panelNum}`).textContent = `${data.rf.toFixed(1)}%`;
-						document.getElementById(`sdRatio${panelNum}`).textContent = `${data.sdRatio.toFixed(2)} sigma - ${data.sdRatio2.toFixed(2)} sigma`;
+						document.getElementById(`sdRatio${panelNum}`).textContent = `${data.sdRatio.toFixed(2)} sigma : ${data.sdRatio2.toFixed(2)} sigma`;
 					} else {
 						// Mostra valori vuoti se il cursore non è posizionato
 						document.getElementById(`cursorTime${panelNum}`).textContent = '-';
