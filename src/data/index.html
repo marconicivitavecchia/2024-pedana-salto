@@ -1704,7 +1704,7 @@
 			if(result.t1 != null && result.t4 != null && result.t5 != null && result.t6 != null){
 				r1 = relArea(result.t1.bidx, result.t1.vidx, result.t4.bidx, result.t4.vidx, result.sw1, result.sw2);	
 				r2 = relArea(result.t6.bidx, result.t6.vidx, result.t5.bidx, result.t5.vidx, result.sw1, result.sw2);
-				
+				//console.log('analyzeJump -> h_l: '+r1.hl);
 				return {
 					index,
 					flightTime,
@@ -3609,7 +3609,7 @@
 				if (!maxValidated && c) {
 					maxValidated = true;
 					amplitude = Math.abs(currentMax - currentMin);
-					console.log('calculateMeans -> amplitude MASSIMO: '+amplitude+', currentMax: '+currentMax+', currentMin: '+currentMin+', ref: '+ref);
+					//console.log('calculateMeans -> amplitude MASSIMO: '+amplitude+', currentMax: '+currentMax+', currentMin: '+currentMin+', ref: '+ref);
 					
 					// Reset per cercare prossimo minimo
 					currentMin = force - ref;
@@ -3621,7 +3621,7 @@
 				if (!minValidated && c) {
 					minValidated = true;
 					amplitude = Math.abs(currentMax - currentMin);
-					console.log('calculateMeans -> amplitude MINIMO: '+amplitude+', currentMax: '+currentMax+', currentMin: '+currentMin+', ref: '+ref);
+					//console.log('calculateMeans -> amplitude MINIMO: '+amplitude+', currentMax: '+currentMax+', currentMin: '+currentMin+', ref: '+ref);
 					
 					// Reset per cercare prossimo massimo
 					currentMax = force - ref;
@@ -4110,16 +4110,16 @@
 			return sample;
 		}
 		
-		function goForwardUntilOutNorm2(bidx, vidx, lower, upper, offset = 0, len, tmax = 1){
+		function goForwardUntilOutNorm2(bidx, vidx, lower, upper, offset = 0, len, tmax = 1, nmax = 50000){
 			const batch = recordBuffer[bidx];
 			const value = calculateValue(batch.v[vidx]);
 			const firstTime = (parseInt(batch.t, 16) + (vidx * 0.005/len*1000000))/1000000;
 			
 			let sample = {bidx: bidx, vidx: vidx, time: firstTime};
-			while(sample.time - firstTime <= tmax){
+			for(let k= 0; sample.time - firstTime <= tmax && k<nmax; k++){
 				sample = getNextValue(sample.bidx, sample.vidx, len);
 				//console.log(`sample.vsample.time - firstTimealue - offset: ${sample.value - offset}, min: ${lower}, max: ${upper}`);
-				console.log(`sample.time: ${sample.time}, firstTime: ${firstTime}, sample.time - firstTime: ${sample.time - firstTime}, tmax: ${tmax}`);
+				//console.log(`sample.time: ${sample.time}, firstTime: ${firstTime}, sample.time - firstTime: ${sample.time - firstTime}, tmax: ${tmax}`);
 				if(sample.value - offset < lower || sample.value - offset > upper){
 					break;
 				}
