@@ -3301,27 +3301,9 @@
 				<div style="margin: 10px 0; padding: 10px; background: #f0f8ff; border: 1px solid #0ea5e9; border-radius: 4px;">
 					<label><strong>EMA per Fasi del Salto:</strong></label>
 					
-					<div style="display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; margin: 5px 0;">
+					<div style="display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; margin: 5px 0;">						
 						<div style="text-align: center;">
-							<label style="font-size: 11px; color: #059669; font-weight: bold;">T1: Peso Statico</label>
-							<select id="emaAlphaStatic" style="width: 100%;">
-								<option value="0.0001">0.0001</option>
-								<option value="0.0005">0.0005</option>
-								<option value="0.001">0.001</option>
-								<option value="0.005">0.005</option>
-								<option value="0.01" selected>0.01</option>
-								<option value="0.02">0.02</option>
-								<option value="0.05">0.05</option>
-								<option value="0.1">0.10</option>
-								<option value="0.2">0.20</option>
-								<option value="0.3">0.30</option>
-								<option value="0.3">0.50</option>
-								<option value="1">1</option>
-							</select>
-						</div>
-						
-						<div style="text-align: center;">
-							<label style="font-size: 11px; color: #dc2626; font-weight: bold;">T1: Movimento</label>
+							<label style="font-size: 11px; color: #dc2626; font-weight: bold;">T1,T6</label>
 							<select id="emaAlphaT1" style="width: 100%;">
 								<option value="0.0001">0.0001</option>
 								<option value="0.0005">0.0005</option>
@@ -3436,7 +3418,7 @@
 		// 2. FUNZIONI PRESET EMA (come hai già)
 		// =====================================================
 		function resetEMAToFlat() {
-			document.getElementById('emaAlphaStatic').value = '1';
+			//document.getElementById('emaAlphaStatic').value = '1';
 			document.getElementById('emaAlphaT1').value = '1';
 			document.getElementById('emaAlphaT2T3').value = '1';
 			document.getElementById('emaAlphaT4').value = '1';
@@ -3445,7 +3427,7 @@
 		}
 		
 		function resetEMAToDefaults() {
-			document.getElementById('emaAlphaStatic').value = '0.05';
+			//document.getElementById('emaAlphaStatic').value = '0.05';
 			document.getElementById('emaAlphaT1').value = '0.1';
 			document.getElementById('emaAlphaT2T3').value = '0.2';
 			document.getElementById('emaAlphaT4').value = '0.3';
@@ -3455,7 +3437,7 @@
 		}
 
 		function setEMAForHighNoise() {
-			document.getElementById('emaAlphaStatic').value = '0.01';
+			//document.getElementById('emaAlphaStatic').value = '0.01';
 			document.getElementById('emaAlphaT1').value = '0.05';
 			document.getElementById('emaAlphaT2T3').value = '0.1';
 			document.getElementById('emaAlphaT4').value = '0.2';
@@ -3465,7 +3447,7 @@
 		}
 
 		function setEMAForFastJumps() {
-			document.getElementById('emaAlphaStatic').value = '0.05';
+			//document.getElementById('emaAlphaStatic').value = '0.05';
 			document.getElementById('emaAlphaT1').value = '0.2';
 			document.getElementById('emaAlphaT2T3').value = '0.3';
 			document.getElementById('emaAlphaT4').value = '0.5';
@@ -3773,7 +3755,7 @@
 					
 			// ✅ LEGGI TUTTI I VALORI EMA DAI MENU (INCLUSA DERIVATA)
 			const emaAlphas = {
-				static: parseFloat(document.getElementById('emaAlphaStatic')?.value || 0.05),
+				//static: parseFloat(document.getElementById('emaAlphaStatic')?.value || 0.05),
 				t1: parseFloat(document.getElementById('emaAlphaT1')?.value || 0.1),
 				t2t3: parseFloat(document.getElementById('emaAlphaT2T3')?.value || 0.2),
 				t4: parseFloat(document.getElementById('emaAlphaT4')?.value || 0.3),
@@ -3859,7 +3841,7 @@
 					} else if(result.t5 === null) {
 						selectedEmaValue = emaValues.t5;        // Fase T5: atterraggio
 					} else {
-						selectedEmaValue = emaValues.t2t3;      // Default: transizioni
+						selectedEmaValue = emaValues.t1;      // Default: transizioni
 						//selectedEmaValue = rawValue;  
 					}					
 					
@@ -3898,35 +3880,33 @@
 					t6: end landing
 					*/
 					
-					// ✅ USA DERIVATA SMOOTHED CONFIGURABILE NELLE SOGLIE
 					//t1: start downward movement
-					if(result.t1 === null) {
+					if(result.t1 === null) {// quite standing end detection
 						//console.log(`time: ${1}`);
-						//if(smoothedDerivative < -200 && force < staticWeight && lastForce >= staticWeight) {
-						//if( Math.abs(force) < 0.95 * staticWeight && smoothedDerivative < 0) {
-						//To identify the start of the countermovement after quiet standing, the first
-						//value that exceeded either the maximum + one SD or the
-						//minimum – one SD was identified.
-						if(isPeak() && currentTime - firstTime > 1.4 && getPeakAmp() < 2*getSD()){
-						//if( Math.abs(force) < 0.95 * staticWeight && Math.abs(force-getMean())>getSD()*5 ) {
+						if(currentTime - firstTime > 2.3){// QUITE STANDING END DETECTION
 							result.sd = calculateSDMean();
 							console.log('calculateSDMean -> sdValue: '+result.sd);
 							console.log(`✅ getMeans=${staticWeight}, getMinDelta=${getMinDelta()},  getMaxDelta=${ getMaxDelta()}, getLocalSD()=${getLocalSD()}`);
 							result.t1 = {time:currentTime, bidx: batchIdx, vidx: i, sd: getSDMean()}; //time backward							
 							console.log(`✅ T1 trovato Force: ${force}, (EMA α=${emaAlphas.t1}, derivata α=${emaAlphas.derivative}): time=${currentTime.toFixed(3)}, force= derivata_raw=${rawDerivative.toFixed(0)}, derivata_smooth=${smoothedDerivative.toFixed(2)}`);					
-							result.sw1 = staticWeights[staticWeights.length-1];// scarta fStatico degli ultimi 12 campioni
+							result.sw1 = staticWeight;
 							staticWeights.length = 0;
 							console.log(`📊 Peso statico 1 (EMA α=${emaAlphas.static}): ${staticWeight.toFixed(0)} da ${staticCount} campioni`);
-							
-							let sample = goForwardUntilOutNorm(result.t1.bidx, result.t1.vidx, 0.1*getMinDelta() - getLocalSD(), 0.1*getMaxDelta() + getLocalSD(), result.sw1, batchLen);
+							// CONUTERMOVEMENT START DETECTION
+							// To identify the start of the countermovement after quiet standing, the first
+							// value that exceeded either the maximum + one SD or the minimum – one SD was identified. 
+							let sample = goForwardUntilOutNorm(result.t1.bidx, result.t1.vidx, getMinDelta() - getLocalSD(), getMaxDelta() + getLocalSD(), result.sw1, batchLen);
 							console.log(`✅ T1 forward prima time=${result.t1.time.toFixed(3)}, getLocalSD=${getLocalSD()}, bidx=${result.t1.bidx.toFixed(3)}, vidx=${result.t1.vidx.toFixed(3)}`);
-							console.log(`✅ T1 forward dopo time=${sample.time.toFixed(3)}, getLocalSD=${getLocalSD()}, bidx=${sample.bidx.toFixed(3)}, vidx=${sample.vidx.toFixed(3)}`);							
+							console.log(`✅ T1 forward dopo time=${sample.time.toFixed(3)}, getLocalSD=${getLocalSD()}, bidx=${sample.bidx.toFixed(3)}, vidx=${sample.vidx.toFixed(3)}`);
+							// Working backwards, the first value that exceeded 0 N (either positive or negative) was
+							// identified as the start of the countermovement
+							sample = goBackUntilUpperNorm(sample.bidx, sample.vidx, 0, result.sw1, batchLen);
+							//sample = goBackUntilUpperNormUnsigned(sample.bidx, sample.vidx, 0, result.sw1, batchLen);
+							console.log(`✅ T1 backward dopo time=${sample.time.toFixed(3)}, getLocalSD=${getLocalSD()}, bidx=${sample.bidx.toFixed(3)}, vidx=${sample.vidx.toFixed(3)}`);
 							result.t1 = {time:sample.time, bidx: sample.bidx, vidx: sample.vidx};
 						}else{
 							calculateMeans();
-							calculatePeaks(Math.abs(smoothedDerivative) < 0.15);
-							//console.log(`time: ${currentTime}, force: ${force}, mean: ${getMean()}, SD: ${getSDMean()}, getMinDelta=${getMinDelta()}, getMaxDelta=${ getMaxDelta()}, getLocalSD()=${getLocalSD()}`);
-						}	
+						}
 					}						
 
 					//t2: max downward speed
@@ -4003,7 +3983,7 @@
 								if(quietDuration >= 0.45) { // Almeno 500ms di quiet standing
 									//calculateSDMean();
 									result.t7 = {time:currentTime, bidx: batchIdx, vidx: i};
-									result.sw2 = staticWeights[staticWeights.length -1];
+									result.sw2 = staticWeight;
 									//result.sd = calculateSDMean();
 									console.log('calculateSDMean -> sdValue: '+result.sd);
 									//result.sd = calculateSDMean();
@@ -4022,72 +4002,50 @@
 							calculateMeans();
 						}
 					}
+					    
 					
 					if(result.t12 === null && result.t7 !== null) {
-						//console.log(`time: ${12}`);
-						if(force < result.sw2*2/3 || (force >= result.sw2*2/3) && currentTime - result.t7.time > 0.7) {
-							//if( Math.abs(force) > staticWeight + 2*emaValues.devEmaRun) {
-							console.log('currentTime - result.t7.time: '+ (currentTime - result.t7.time));
-							console.log('force: '+force);console.log('result.sw2: '+result.sw2);console.log('is_a: '+(force < result.sw2*2/3));
-							if(force < result.sw2*2/3){
-								//result.sd = calculateSDMean();
-								//result.t12 = {time:currentTime - 0.005*40, bidx: batchIdx - 40, vidx: 0, sd: result.sd};
-								result.t12 = {time:currentTime, bidx: batchIdx, vidx: 0, sd: result.sd};								
-								console.log(`✅ T12 trovato Force: ${force}, (EMA α=${emaAlphas.t1}, derivata α=${emaAlphas.derivative}): time=${result.t12.time.toFixed(3)}, force= derivata_raw=${rawDerivative.toFixed(0)}, derivata_smooth=${smoothedDerivative.toFixed(2)}`);						
-								//result.sw2 = staticWeights[staticWeights.length -1];
-								console.log('fStatico2-12: '+result.sw2);
-								result.t12bidx = batchIdx;
-								result.t12vidx = 0;
-								// raffinamento t12 backward
-								console.log(`📊 Peso statico 2 (EMA α=${emaAlphas.static}): ${staticWeight.toFixed(0)} da ${staticCount} campioni`);
-								let sample = goBackUntilUpperNorm(result.t12.bidx, result.t12.vidx, 0, result.sw2, batchLen);
-								console.log(`✅ T12 prima time=${result.t12.time.toFixed(3)}, getSDMean=${getSDMean()}, bidx=${result.t12.bidx.toFixed(3)}, vidx=${result.t12.vidx.toFixed(3)}`);
-								console.log(`backstep: ${(result.t12bidx - sample.bidx) - 1}`);
-								//result.sw2 = staticWeights[staticWeights.length - (result.t12bidx - sample.bidx) - 1];
-								//console.log(`backstep sw2: ${result.sw2}`);
-								result.t12 = {time:sample.time, bidx: sample.bidx, vidx: sample.vidx};
-								console.log(`✅ T12 dopo time=${result.t12.time.toFixed(3)}, getSDMean=${getSDMean()}, bidx=${result.t12.bidx.toFixed(3)}, vidx=${result.t12.vidx.toFixed(3)}`);
-								result.next = true;
-								console.log('result.next_a: '+result.next);
-							}else{
-								//result.sd = calculateSDMean();
-								//result.sd = getLocalSD();
-								result.t12 = {time:currentTime, bidx: batchIdx, vidx: i, sd: result.sd};		
-								console.log(`✅ T12 B Force: ${force}, (EMA α=${emaAlphas.t1}, derivata α=${emaAlphas.derivative}): time=${result.t12.time.toFixed(3)}, force= derivata_raw=${rawDerivative.toFixed(0)}, derivata_smooth=${smoothedDerivative.toFixed(2)}`);						
-								//result.sw2 = staticWeights[staticWeights.length-1];
-								console.log('fStatico2: '+result.sw2);
-								console.log('getLocalSD(): '+getLocalSD());
-								//staticWeight = force;
-								result.t12bidx = null;
-								result.t12vidx = null;
-								result.next = false;
-								console.log('result.next_b: '+result.next);
-							}
-							// inizio
-							// minimum – one SD was obtained.)
-							/*console.log(`✅ getMinDelta=${getMinDelta()},  getMaxDelta=${ getMaxDelta()}, getLocalSD()=${getLocalSD()}`);
-							sample = goBackUntilOutNorm(result.t6.bidx, result.t6.vidx, getMinDelta() - getLocalSD(), getMaxDelta() + getLocalSD(), result.sw2, batchLen);
-							console.log(`✅ T6back prima time=${result.t6.time.toFixed(3)}, getLocalSD=${getLocalSD()}, bidx=${result.t6.bidx.toFixed(3)}, vidx=${result.t6.vidx.toFixed(3)}`);
-							console.log(`✅ T6back dopo time=${sample.time.toFixed(3)}, getLocalSD=${getLocalSD()}, bidx=${sample.bidx.toFixed(3)}, vidx=${sample.vidx.toFixed(3)}`);
-							// raffinamento t6 forward (Then, moving forward, the last point that exceeded 0 N (positive or negative) was identified as the end of the landing phase)
-							console.log(`✅ T6forward prima time=${sample.time.toFixed(3)}, getLocalSD=${getLocalSD()}, bidx=${sample.bidx.toFixed(3)}, vidx=${sample.vidx.toFixed(3)}`);
-							sample = goForwardUntilEqualNorm(sample.bidx, sample.vidx, 0, result.sw2, batchLen);
-							sample = getPrecValue(sample.bidx, sample.vidx, batchLen);
-							result.t6 = {time:sample.time, bidx: sample.bidx, vidx: sample.vidx};
-							console.log(`✅ T6forward dopo time=${result.t6.time.toFixed(3)}, getLocalSD=${getLocalSD()}, bidx=${result.t6.bidx.toFixed(3)}, vidx=${result.t6.vidx.toFixed(3)}`);
-							*/// fine
-							// metodo alternativo
-							/*const sample = goBackUntilUpperNorm(result.t6.bidx, result.t6.vidx, 0.5*result.sd, result.sw2, batchLen);
-							console.log(`✅ T6 prima time=${result.t6.time.toFixed(3)}, getSDMean=${getSDMean()}, bidx=${result.t6.bidx.toFixed(3)}, vidx=${result.t6.vidx.toFixed(3)}`);
-							result.t6 = {time:sample.time, bidx: sample.bidx, vidx: sample.vidx};
-							console.log(`✅ T6 prima time=${result.t6.time.toFixed(3)}, getSDMean=${getSDMean()}, bidx=${result.t6.bidx.toFixed(3)}, vidx=${result.t6.vidx.toFixed(3)}`);
-							*/// fine metodo alternativo
-							staticWeights.length = 0;
-							esci = true;
+						// LANDING END DETECTION
+						// Net GRF was calculated by subtracting the bodyweight from the zeroed
+						// GRF, and then net GRF maximum, minimum and SD values
+						// during quiet standing were identified. Working backwards
+						// from the end of the trial, the first value that exceeded the
+						// maximum + one SD or the minimum – one SD was obtained.
+						console.log(`✅ getMinDelta=${getMinDelta()},  getMaxDelta=${ getMaxDelta()}, getLocalSD()=${getLocalSD()}`);
+						let sample = goBackUntilOutNorm(result.t6.bidx, result.t6.vidx, getMinDelta() - getLocalSD(), getMaxDelta() + getLocalSD(), result.sw2, batchLen);
+						console.log(`✅ T6back prima time=${result.t6.time.toFixed(3)}, getLocalSD=${getLocalSD()}, bidx=${result.t6.bidx.toFixed(3)}, vidx=${result.t6.vidx.toFixed(3)}`);
+						console.log(`✅ T6back dopo time=${sample.time.toFixed(3)}, getLocalSD=${getLocalSD()}, bidx=${sample.bidx.toFixed(3)}, vidx=${sample.vidx.toFixed(3)}`);
+						// Then, moving forward, the last point that exceeded 0 N (positive or negative) was identified as the end of the landing phase
+						console.log(`✅ T6forward prima time=${sample.time.toFixed(3)}, getLocalSD=${getLocalSD()}, bidx=${sample.bidx.toFixed(3)}, vidx=${sample.vidx.toFixed(3)}`);
+						sample = goForwardUntilEqualNorm(sample.bidx, sample.vidx, 0, result.sw2, batchLen);
+						sample = getPrecValue(sample.bidx, sample.vidx, batchLen);
+						result.t6 = {time:sample.time, bidx: sample.bidx, vidx: sample.vidx};
+						console.log(`✅ T6forward dopo time=${result.t6.time.toFixed(3)}, getLocalSD=${getLocalSD()}, bidx=${result.t6.bidx.toFixed(3)}, vidx=${result.t6.vidx.toFixed(3)}`);
+						
+						// CONUTERMOVEMENT START DETECTION
+						// To identify the start of the countermovement after quiet standing, the first
+						// value that exceeded either the maximum + one SD or the minimum – one SD was identified. 
+						sample = goForwardUntilOutNorm2(result.t7.bidx, result.t7.vidx, getMinDelta() - getLocalSD(), getMaxDelta() + getLocalSD(), result.sw2, batchLen, 0.7);
+						if(sample.time - result.t7.time < 0.7){
+							console.log(`✅ T7 forward prima time=${result.t7.time.toFixed(3)}, getLocalSD=${getLocalSD()}, bidx=${result.t7.bidx.toFixed(3)}, vidx=${result.t7.vidx.toFixed(3)}`);
+							console.log(`✅ T12 forward dopo time=${sample.time.toFixed(3)}, getLocalSD=${getLocalSD()}, bidx=${sample.bidx.toFixed(3)}, vidx=${sample.vidx.toFixed(3)}`);
+							// Working backwards, the first value that exceeded 0 N (either positive or negative) was
+							// identified as the start of the countermovement
+							sample = goBackUntilUpperNorm(sample.bidx, sample.vidx, 0, result.sw2, batchLen);
+							//sample = goBackUntilUpperNormUnsigned(sample.bidx, sample.vidx, 0, result.sw1, batchLen);
+							console.log(`✅ T12 backward dopo time=${sample.time.toFixed(3)}, getLocalSD=${getLocalSD()}, bidx=${sample.bidx.toFixed(3)}, vidx=${sample.vidx.toFixed(3)}`);
+							result.t12 = {time:sample.time, bidx: sample.bidx, vidx: sample.vidx, sd: result.sd};
+							result.t12bidx = batchIdx;
+							result.t12vidx = 0;
+							result.next = true;
 						}else{
-							//console.log('devEmaRun: '+ (-Math.abs(force) + staticWeight + 4*emaValues.devEmaRun));
-							//calculateMeans();
-						}	
+							result.t12 = {time:sample.time, bidx: null, vidx: null, sd: result.sd};
+							result.t12bidx = null;
+							result.t12vidx = null;
+							result.next = false;
+						}
+						staticWeights.length = 0;
+						esci = true;
 					}						
 					
 					lastForce = force;
@@ -4145,6 +4103,23 @@
 			for(let k=0; k<nmax; k++){
 				sample = getNextValue(sample.bidx, sample.vidx, len);
 				//console.log(`sample.value - offset: ${sample.value - offset}, min: ${lower}, max: ${upper}`);
+				if(sample.value - offset < lower || sample.value - offset > upper){
+					break;
+				}
+			}
+			return sample;
+		}
+		
+		function goForwardUntilOutNorm2(bidx, vidx, lower, upper, offset = 0, len, tmax = 1){
+			const batch = recordBuffer[bidx];
+			const value = calculateValue(batch.v[vidx]);
+			const firstTime = (parseInt(batch.t, 16) + (vidx * 0.005/len*1000000))/1000000;
+			
+			let sample = {bidx: bidx, vidx: vidx, time: firstTime};
+			while(sample.time - firstTime <= tmax){
+				sample = getNextValue(sample.bidx, sample.vidx, len);
+				//console.log(`sample.vsample.time - firstTimealue - offset: ${sample.value - offset}, min: ${lower}, max: ${upper}`);
+				console.log(`sample.time: ${sample.time}, firstTime: ${firstTime}, sample.time - firstTime: ${sample.time - firstTime}, tmax: ${tmax}`);
 				if(sample.value - offset < lower || sample.value - offset > upper){
 					break;
 				}
